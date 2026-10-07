@@ -4,6 +4,7 @@ import { downloadBytes, downloadText } from '../../lib/download';
 import { requestSupportPrompt } from '../../lib/support';
 import MarkdownEditor from './MarkdownEditor';
 import MarkdownPreview from './MarkdownPreview';
+import { revealDisclosureTarget } from './disclosure-dom';
 import MarkdownSyntaxHelp from './MarkdownSyntaxHelp';
 import { parseMarkdownTree, parseMarkdown } from './parse-engine';
 import { collectMarkdownStyleSuggestions, MAX_STYLE_SUGGESTIONS } from './lint-engine';
@@ -135,6 +136,7 @@ export default function MarkdownWorkspace() {
 
   const [status, setStatus] = useState('Ready.');
   const [documentName, setDocumentName] = useState('');
+  const [previewDocumentKey, setPreviewDocumentKey] = useState(0);
   const documentNameRef = useRef(documentName);
   documentNameRef.current = documentName;
   const [lineWrapping, setLineWrapping] = useState(() => loadEditorPrefs().lineWrapping ?? true);
@@ -438,14 +440,16 @@ export default function MarkdownWorkspace() {
     return new Promise((resolve) => previewWaitersRef.current.push(resolve));
   }, []);
 
-  const scrollPreviewToLine = useCallback((line: number) => {
-    if (syncLockRef.current === 'preview') return;
+  const scrollPreviewToLine = useCallback((line: number, reveal = false) => {
+    if (!reveal && syncLockRef.current === 'preview') return;
     lastScrollSyncRef.current = { line, at: Date.now() };
     const anchors = editorViewScrollRef.current;
-    if (anchors.length === 0) return;
-    const targetOffset = computeScrollOffset(anchors, line);
     const scroller = previewHostRef.current?.querySelector<HTMLElement>('.markdown-workbench-preview');
     if (!scroller) return;
+    const target = reveal ? scroller.querySelector<HTMLElement>(`[data-source-line="${line}"]`) : null;
+    if (target) revealDisclosureTarget(target);
+    if (!target && anchors.length === 0) return;
+    const targetOffset = target ? target.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop : computeScrollOffset(anchors, line);
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     ignorePreviewUntilRef.current = Date.now() + (reducedMotion ? 180 : 700);
     programmaticPreviewTopRef.current = Math.max(0, Math.min(targetOffset, scroller.scrollHeight - scroller.clientHeight));
@@ -510,7 +514,7 @@ export default function MarkdownWorkspace() {
 
   const revealLine = useCallback((line: number) => {
     setRevealRequest({ line, nonce: Date.now() });
-    scrollPreviewToLine(line);
+    scrollPreviewToLine(line, true);
   }, [scrollPreviewToLine]);
 
   const loadMarkdownFile = useCallback(async (file: File) => {
@@ -555,6 +559,7 @@ export default function MarkdownWorkspace() {
       }
 
       const nextDocumentName = file.name.replace(DOCUMENT_FILE_EXTENSION, '');
+      setPreviewDocumentKey(key => key + 1);
       draftIdRef.current = null;
       persistedTextRef.current = text;
       persistedDocumentNameRef.current = nextDocumentName;
@@ -751,6 +756,7 @@ export default function MarkdownWorkspace() {
     }
     draftIdRef.current = null;
     persistedTextRef.current = DEFAULT_SOURCE;
+    setPreviewDocumentKey(key => key + 1);
     persistedDocumentNameRef.current = '';
     lastEditorChangeAtRef.current = 0;
     setHistory(createHistory(DEFAULT_SOURCE));
@@ -778,6 +784,7 @@ export default function MarkdownWorkspace() {
       return;
     }
     const restoredDocumentName = draft.name === 'Autosave' ? '' : draft.name;
+    setPreviewDocumentKey(key => key + 1);
     draftIdRef.current = draft.id;
     persistedTextRef.current = draft.text;
     persistedDocumentNameRef.current = restoredDocumentName;
@@ -906,6 +913,8 @@ export default function MarkdownWorkspace() {
           <div className="markdown-workbench-preview-pane" ref={previewHostRef}>
             <MarkdownPreview
               preparedSource={preparedSource}
+              documentKey={previewDocumentKey}
+              onNotice={setStatus}
               onAnchorsMeasured={handleAnchorsMeasured}
               onRenderStateChange={handlePreviewRenderStateChange}
               onPreviewScroll={handlePreviewScroll}

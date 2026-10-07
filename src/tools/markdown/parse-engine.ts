@@ -3,6 +3,7 @@ import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import remarkScripts from './script-plugin';
+import remarkDisclosures from './disclosure-plugin';
 import remarkAbbreviations from './abbreviation-plugin';
 import { remarkDefinitionList } from 'remark-definition-list';
 import type { Root, RootContent } from 'mdast';
@@ -16,7 +17,7 @@ import type { ParsedDocument, SourceLineNode } from './markdown-types';
 // headings, paragraphs, tables, and code/diagram/math blocks with the
 // preview, without the cost of tracking every inline node.
 
-export const createMarkdownParser = () => unified().use(remarkParse).use(remarkGfm, { singleTilde: false }).use(remarkMath).use(remarkScripts).use(remarkAbbreviations).use(remarkDefinitionList);
+export const createMarkdownParser = () => unified().use(remarkParse).use(remarkGfm, { singleTilde: false }).use(remarkMath).use(remarkScripts).use(remarkDisclosures).use(remarkAbbreviations).use(remarkDefinitionList);
 
 export const parseMarkdownTree = (source: string): Root => {
   const processor = createMarkdownParser();

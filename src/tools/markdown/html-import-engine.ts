@@ -12,6 +12,11 @@ export const htmlToMarkdownDocument = async (html: string): Promise<string> => {
   const parser = new DOMParser();
   const document = parser.parseFromString(html, 'text/html');
   document.querySelectorAll(BLOCKED_HTML).forEach((node) => node.remove());
+  for (const details of document.querySelectorAll('details')) {
+    let summary = details.querySelector(':scope > summary');
+    if (!summary) { summary = document.createElement('summary'); summary.textContent = 'Details'; }
+    details.prepend(summary);
+  }
 
   const { default: TurndownService } = await import('turndown');
   const service = new TurndownService({
@@ -20,6 +25,20 @@ export const htmlToMarkdownDocument = async (html: string): Promise<string> => {
     bulletListMarker: '-',
     emDelimiter: '*',
     strongDelimiter: '**',
+  });
+  const escapedAttribute = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  service.addRule('disclosureSummary', {
+    filter: 'summary',
+    replacement: (_content, node) => `<summary>${escapedAttribute(service.escape(node.textContent?.trim() || 'Details'))}</summary>\n\n`,
+  });
+  service.addRule('disclosure', {
+    filter: 'details',
+    replacement: (content, node) => {
+      const element = node as HTMLElement;
+      const name = element.getAttribute('name');
+      const attributes = `${element.hasAttribute('open') ? ' open' : ''}${name ? ` name="${escapedAttribute(name)}"` : ''}`;
+      return `\n\n<details${attributes}>\n${content.trim()}\n\n</details>\n\n`;
+    },
   });
   service.addRule('definitionList', {
     filter: 'dl',

@@ -9,6 +9,8 @@ import './code-highlight.css';
 import './alert-style.css';
 import './abbreviation-style.css';
 import './definition-list-style.css';
+import './disclosure-style.css';
+import { revealDisclosureTarget, uniqueDisclosureStates } from './disclosure-dom';
 
 export interface MarkdownPreviewProps {
   readonly preparedSource: string;
@@ -16,6 +18,8 @@ export interface MarkdownPreviewProps {
   readonly onRenderStateChange?: (pending: boolean) => void;
   readonly onPreviewScroll?: (offsetTop: number) => void;
   readonly onToggleTask?: (line: number) => void;
+  readonly documentKey?: number;
+  readonly onNotice?: (message: string) => void;
 }
 
 const DIAGRAM_DEBOUNCE_MS = 250;
@@ -30,15 +34,16 @@ const measureAnchors = (
   const hostTop = host.getBoundingClientRect().top;
   const offsets = anchors.flatMap((anchor) => {
     const element = host.querySelector<HTMLElement>(`[data-source-line="${anchor.sourceLine}"]`);
-    if (!element) return [];
+    if (!element || element.getClientRects().length === 0) return [];
     return [{ sourceLine: anchor.sourceLine, offsetTop: element.getBoundingClientRect().top - hostTop + host.scrollTop }];
   });
   onAnchorsMeasured(offsets);
 };
 
-export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onRenderStateChange, onPreviewScroll, onToggleTask }: MarkdownPreviewProps) {
+export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onRenderStateChange, onPreviewScroll, onToggleTask, documentKey = 0, onNotice }: MarkdownPreviewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const generationRef = useRef(0);
+  const previousDocumentKey = useRef(documentKey);
 
   const handlePreviewClick = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (
@@ -52,6 +57,7 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
 
     const origin = event.target;
     if (!(origin instanceof Element)) return;
+    if (origin.closest('summary')) return;
     const taskItem = origin.closest('li');
     if (taskItem?.querySelector('input[type="checkbox"]')) {
       const line = Number(taskItem.getAttribute('data-source-line'));
@@ -65,20 +71,32 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
     if (!anchor || !event.currentTarget.contains(anchor)) return;
 
     const href = anchor.getAttribute('href');
-    if (!href || href.length <= 1) return;
+    if (!href) return;
+    if (href === '#') {
+      event.preventDefault();
+      event.currentTarget.scrollTo({ top: 0 });
+      return;
+    }
+    if (href.startsWith('#/')) return;
+    event.preventDefault();
     let targetId = href.slice(1);
     try {
       targetId = decodeURIComponent(targetId);
     } catch {
+      onNotice?.('This section link has an invalid address.');
       return;
     }
 
     const destination = Array.from(
       event.currentTarget.querySelectorAll<HTMLElement>('[id]'),
     ).find((node) => node.id === targetId);
-    if (!destination) return;
+    if (!destination) {
+      onNotice?.('The section linked here was not found in this document.');
+      return;
+    }
 
     event.preventDefault();
+    revealDisclosureTarget(destination);
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     destination.scrollIntoView({
       block: 'start',
@@ -91,7 +109,18 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
     const host = hostRef.current;
     const cancels: (() => void)[] = [];
     if (host) {
+      const states = previousDocumentKey.current === documentKey ? uniqueDisclosureStates(host) : new Map();
+      previousDocumentKey.current = documentKey;
       host.innerHTML = html;
+      const fresh = uniqueDisclosureStates(host);
+      for (const node of host.querySelectorAll<HTMLDetailsElement>('details.markdown-disclosure')) {
+        const caption = node.querySelector(':scope > summary')?.textContent?.trim() ?? '';
+        const state = states.get(caption);
+        if (fresh.has(caption) && state && state.defaultOpen === node.dataset.disclosureDefaultOpen) node.open = state.open;
+      }
+      const onToggle = () => measureAnchors(host, anchors, onAnchorsMeasured);
+      host.addEventListener('toggle', onToggle, true);
+      cancels.push(() => host.removeEventListener('toggle', onToggle, true));
       cancels.push(addCodePreviewControls(host));
       measureAnchors(host, anchors, onAnchorsMeasured);
     }
@@ -138,7 +167,7 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
       // the current render. A replacement effect immediately marks itself pending.
       onRenderStateChange?.(false);
     };
-  }, [preparedSource, onAnchorsMeasured, onRenderStateChange]);
+  }, [preparedSource, onAnchorsMeasured, onRenderStateChange, documentKey]);
 
   useEffect(() => {
     const host = hostRef.current;

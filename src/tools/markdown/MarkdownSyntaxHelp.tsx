@@ -26,6 +26,10 @@ const SYNTAX_GROUPS = [
     examples: ['Term\n: Definition', 'Term\n: First definition\n: Second definition', 'Term\n\n:   First paragraph.\n\n    Continued paragraph.'],
   },
   {
+    title: 'Disclosure blocks',
+    examples: ['<details>\n<summary>More information</summary>\n\n**Markdown content**\n\n</details>', '<details open> starts expanded. Add name="group" to sibling blocks for an exclusive group.', 'Use only open/name attributes. Unclosed or unsupported wrappers stay readable as code.'],
+  },
+  {
     title: 'Abbreviations',
     examples: ['*[HTML]: HyperText Markup Language\n\nThe HTML document.', 'Open Abbreviations below the preview for expansions.'],
   },

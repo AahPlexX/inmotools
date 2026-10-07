@@ -32,6 +32,7 @@ const sanitizeSchema = {
     // accidentally stripped if tagging order ever changes.
     '*': [...(defaultSchema.attributes?.['*'] ?? []), 'className', 'style', 'dataSourceLine'],
     input: [...(defaultSchema.attributes?.input ?? []), 'type', 'disabled', 'checked'],
+    details: [...(defaultSchema.attributes?.details ?? []), 'dataDisclosureDefaultOpen'],
     annotation: ['encoding'],
   },
   tagNames: [
@@ -76,6 +77,25 @@ export const renderMarkdown = (source: string): RenderResult => {
     for (const child of node.children) collectAbbreviations(child);
   };
   tree.children.forEach(collectAbbreviations);
+  const ids = new Set<string>();
+  const collectIds = (node: HastRootContent): void => {
+    if (!isElement(node)) return;
+    if (typeof node.properties.id === 'string') ids.add(node.properties.id);
+    node.children.forEach(collectIds);
+  };
+  tree.children.forEach(collectIds);
+  const resolveFragments = (node: HastRootContent): void => {
+    if (!isElement(node)) return;
+    const href = node.properties.href;
+    if (node.tagName === 'a' && typeof href === 'string' && href.startsWith('#')) {
+      try {
+        const id = decodeURIComponent(href.slice(1));
+        if (!ids.has(id) && ids.has(`user-content-${id}`)) node.properties.href = `#${encodeURIComponent(`user-content-${id}`)}`;
+      } catch { /* Leave malformed authored fragments inert in the preview. */ }
+    }
+    node.children.forEach(resolveFragments);
+  };
+  tree.children.forEach(resolveFragments);
   if (abbreviations.size) {
     tree.children.push({ type: 'element', tagName: 'details', properties: { className: ['markdown-abbreviation-glossary'] }, children: [
       { type: 'element', tagName: 'summary', properties: {}, children: [{ type: 'text', value: `Abbreviations (${abbreviations.size})` }] },
