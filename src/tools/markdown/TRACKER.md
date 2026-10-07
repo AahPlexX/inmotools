@@ -13,7 +13,7 @@ updated: 2026-10-07
 
 ## Resume here
 
-2026-10-07 15:44:07 UTC: Metadata cycle/display repair is integrated and deployed at main d424ad345a1d8f15863a636accae66f70fbaafa0, tree-identical to tested checkpoint 6b1f5f1/runtime d1edf246. Integration 37643618750 passed 3908 units/14 skips and 246 owned browsers (7.3m), no browser retries/skips; Pages 37645772950 succeeded. Live deployed cycle/lifecycle/viewport acceptance passed 4/4 (29.3s). Local scope 403 units/38 production cases, TypeScript/build passed. Fresh full-site validation 37643618281 remains in progress on exact 6b1f5f1; unit/build steps passed and browsers are running. Do not cancel that full run. Task 42ab stays active until its required full receipt; no full-success claim for this repair yet. This record checkpoint changes documentation only; runtime/tests remain equal to 6b1f5f1. Verify the latest record integration on main, then inspect/record full 37643618281 before closing 42ab and implementing next frozen R55 (task 12d4, no implementation). References R51 scoped verified with full 37637141396 (3896 units/14 skips, 1711 browsers/171 skips, zero retries) and live exports/Pages. Duplicate R51 main full 37640254171 passed 1710 browsers plus one retried Crystal scalar-field case/171 skips (43.5m); unattributed concern is backlog c492, no source changes/repair claim for Crystal. R15 cause remains unresolved; citation annotation loss backlog d713. Tool/inventory incomplete.
+2026-10-07 16:10:49 UTC: References R51 and associated metadata cycle/display repair are scoped verified and deployed; task 42ab is done. Fresh full validation 37643618281 on exact checkpoint 6b1f5f1e2f3a78ac623115da73b890365828e1e4 succeeded: 3908 unit passes/14 skips and 1715 browser passes/171 skips (43.8m), zero browser retry markers/flaky summaries. Official browser summary completed 16:09:49 UTC. Runtime is d1edf246, integrated at main d424ad3 and retained unchanged in record-only main aba873bd2ea5f51f80e6b15734322dcd81de1a10; Pages 37645772950/37647083329 succeeded. Owned integration 37643618750 passed 246 browsers without retries/skips; live metadata/lifecycle/viewport acceptance 4/4 passed. Next frozen ID is MDW-R55, task T-markdown-readability-20261007-12d4 (next, no implementation). Start from current main; read its primary research and exact unchanged-engine/native-boundary/score fixtures, settle conservative English/undefined-state/native prose defaults in the spec before coding, and resolve the observed normalize-strings notice gap if adopting syllable 5.0.1. Isolated package/browser evaluation added no project dependency. Tool-check remains incomplete 79/92 (79 verified, 1 implemented, 2 partial, 10 missing). R15 cause remains unresolved despite fresh non-reproduction; compound citation annotation loss backlog d713; duplicate prior-source Crystal retry backlog c492, current full passed that test without retry and does not establish repair. This checkpoint contains documentation only; verify its latest main integration before continuing. No other tool advanced.
 
 ## Documents
 
@@ -70,7 +70,7 @@ updated: 2026-10-07
 | MDW-R36 | verified | tests/unit/markdown-disclosures.test.ts; tests/e2e/markdown-disclosures.spec.ts | Scoped 14 production cases and canonical 222 owned browsers passed; repair main 8cc619f/Pages passed. Later mixed-history repair passed at main 58be2be; full 37572856847 passed 1697 browsers/171 skips, no retries; associated task done. |
 | MDW-R37 | verified | e2e "live counts stay visible and a preview task click edits the source"; unit "checks an open task and unchecks a completed one" | |
 | MDW-R38 | verified | tests/unit/markdown-task-progress.test.ts; tests/e2e/markdown-task-progress.spec.ts | Local 343 units/20 combined production cases and canonical 228 owned browsers passed; main 58be2be/Pages passed. Full 37572856847 passed 1697 browsers/171 skips, no retries; associated tasks done. |
-| MDW-R39 | verified | tests/unit/markdown-frontmatter.test.ts; tests/unit/markdown-frontmatter-display.test.ts; tests/e2e/markdown-frontmatter-values.spec.ts; e2e "surfaces frontmatter and uses its title for exports" | Associated cycle/non-finite/wrapping/lifecycle repair main d424ad3; 3908 units/14 skips and 246 owned browsers pass, Pages/live 4 cases pass. Required fresh full 37643618281 pending; task 42ab active. |
+| MDW-R39 | verified | tests/unit/markdown-frontmatter.test.ts; tests/unit/markdown-frontmatter-display.test.ts; tests/e2e/markdown-frontmatter-values.spec.ts; e2e "surfaces frontmatter and uses its title for exports" | Associated cycle/non-finite/wrapping/lifecycle repair main d424ad3; full 37643618281 passed 3908 units/14 skips and 1715 browsers/171 skips (43.8m), zero retries; owned 246/Pages/live 4 cases pass. Task 42ab done. |
 | MDW-R40 | verified | unit "renders a valid inline expression to KaTeX markup", "renders a valid display-mode expression", "renders the mhchem \\ce{} chemistry notation", "renders the native CD commutative-diagram environment in display mode" | |
 | MDW-R41 | verified | e2e "reports malformed math without breaking the preview"; unit "reports a malformed expression with its line and an explanation" | |
 | MDW-R42 | verified | e2e "renders Mermaid in the real browser integration and preserves its source anchor", "shows Mermaid failures as visible accessible errors instead of title-only help", "turns the Mermaid 12 Gantt metadata crash into a line-specific authoring error", "rejects oversized Mermaid source before the library can substitute a different diagram" | |
@@ -85,7 +85,7 @@ updated: 2026-10-07
 | MDW-R51 | verified | tests/e2e/markdown-references.spec.ts; tests/unit/markdown-citation.test.ts; tests/unit/markdown-bibliography.test.ts | Main 230f637 is tree-identical; full 37637141396 passed 3896 units/14 skips and 1711 browsers/171 skips, zero retries. Pages deploy job 112857318705 succeeded; live actual exports 2/2 pass. Associated tasks 50cd/6e82/a67d/291b done; compound annotation limitation remains backlog d713. |
 | MDW-R52 | verified | e2e "builds a clickable outline from the document headings", "outline supports filtering and marks the current source section" | |
 | MDW-R53 | verified | e2e "live counts stay visible and a preview task click edits the source" | |
-| MDW-R54 | verified | e2e "document metrics show characters and lines alongside words and sentences"; unit "counts words and sentences in a simple two-sentence passage", "computes a Gunning Fog index from words, sentences, and complex words" | |
+| MDW-R54 | verified | e2e "document metrics show characters and lines alongside words and sentences"; unit "counts words and sentences in a simple two-sentence passage", "computes a Gunning Fog index from words, sentences, and complex words" | Associated native prose/character/syllable defects are confirmed in next R55 task 12d4; this row retains its existing scoped count cases, not universal count accuracy. |
 | MDW-R55 | missing | — | Gunning Fog exists |
 | MDW-R56 | missing | — | AST JSON export exists |
 | MDW-R57 | missing | — | |
@@ -127,24 +127,24 @@ updated: 2026-10-07
 
 ## Open work
 
-1. Tests for implemented rows: MDW-R68.
-2. Editing: listed editing requirements complete; retain regression coverage.
-3. Markdown syntax and rendering: MDW-R33, MDW-R34, MDW-R35, MDW-R36, MDW-R38.
-4. Citations: associated compound annotation loss in task d713, repair with MDW-R82.
-5. Navigation and metrics: MDW-R55, MDW-R56, MDW-R57.
-6. Files and storage: MDW-R69, MDW-R70, MDW-R71, MDW-R72.
-7. Export: MDW-R81, MDW-R82.
-8. Non-functional: MDW-R83, MDW-R85, MDW-R86.
+1. Tests for implemented row MDW-R68.
+2. Editing: unresolved typewriter centering concern in [task 17bf](../../../.tasks/items/T-markdown-typewriter-centering-20261007-17bf.md); retain its original diagnostic capture and expectation.
+3. Citations: compound annotation loss in [task d713](../../../.tasks/items/T-markdown-citation-locators-20261007-d713.md), repair with MDW-R82.
+4. Navigation and metrics: MDW-R55, MDW-R56, MDW-R57; confirmed associated count/syllable defects are in [next R55 task](../../../.tasks/items/T-markdown-readability-20261007-12d4.md).
+5. Files and storage: MDW-R69, MDW-R70, MDW-R71, MDW-R72.
+6. Export: MDW-R81, MDW-R82.
+7. Non-functional: MDW-R83, MDW-R85, MDW-R86.
 
 ## Known limitations
 
 - DOCX math is plain text; EPUB is not EPUBCheck-validated; PDF uses the browser print dialog.
 - Vancouver citation style is not offered (dependent CSL styles).
 - Compound citation prefixes, suffixes and locators are currently lost in rendered citations; original source survives. Confirmed unchanged/current behavior and required checks are in [task d713](../../../.tasks/items/T-markdown-citation-locators-20261007-d713.md); repair with R82 or the final associated-tool bug pass.
-- Metadata cycle-display crash is repaired at main d424ad3; required full verification remains pending in [task 42ab](../../../.tasks/items/T-markdown-metadata-display-20261007-42ab.md).
 - Images embedded by paste or drop are capped at 5 MB.
 
 ## Verification evidence
+
+These are dated historical snapshots. Current release receipts and the exact next action are in Resume here above. Earlier pending states are superseded by their later dated results.
 
 - 2026-10-06: MDW-R20 production acceptance passed 4/4 (54.2s), including saved-name reload/restoration/rename and storage-failure source preservation. TypeScript and build passed. Six earlier inventory items integrated as fc6a820f315bbc8abfed5e4e6094dbef3b8a799e; integration run37535034041 and Pages run37535764096 succeeded. Full regression remains pending.
 
