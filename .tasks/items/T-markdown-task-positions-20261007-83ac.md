@@ -17,7 +17,7 @@ Associated MDW-R36/37 interaction repair from the ordered audit: a task displaye
 
 ## Resume here
 
-Latest associated repair passed local scoped acceptance with R38 at 2026-10-07 04:43 UTC: all 343 Markdown units, TypeScript/build and 20 combined production desktop/touch cases, without retries/skips. The first R38 run confirmed the defect on unchanged deployed code; expanded real interaction acceptance now passes. Publish the current validated runtime, dispatch fresh full-site validation, inspect main/Pages/official receipts, then close this task. Existing full run 37571121544 covers the earlier runtime only and cannot validate this later change. Parent cursor R38; no latest release/full-pass claim.
+Latest associated repair is published in 7025c67d17b3bd1dadcd30191bc6bc76b2c68c1d, tree-equal to validated source (343 Markdown units, TypeScript/build, 20 combined desktop/touch production cases passed without retries/skips). At 2026-10-07 04:44 UTC, integration 37572819658 is running and fresh full-site validation 37572856847 is queued; record-only pushes may supersede integration. Inspect latest main/Pages/official full receipts before closing this task. Earlier full 37571121544 validates the older runtime only. Parent cursor R38; no latest release/full-pass claim.
 
 ## Log
 
