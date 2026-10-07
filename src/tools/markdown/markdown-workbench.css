@@ -351,6 +351,8 @@
 .markdown-workbench-view-split .markdown-workbench-preview { min-height: 0; }
 .markdown-workbench-view-split .markdown-workbench-editor .cm-editor { height: 100%; }
 .markdown-workbench-live-metrics { font-variant-numeric: tabular-nums; }
+.markdown-workbench-bibliography-output { min-width: 0; overflow-wrap: anywhere; }
+.markdown-workbench-bibliography-output .csl-entry + .csl-entry { margin-top: .5rem; }
 .markdown-workbench-status > span { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .markdown-workbench-status .markdown-workbench-autosave-status { white-space: normal; }
 .markdown-workbench-task-progress { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }

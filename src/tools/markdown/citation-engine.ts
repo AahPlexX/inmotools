@@ -1,5 +1,7 @@
 import { Engine } from 'citeproc';
-import type { CitationEntry, CitationLibrary, CitationResolution, CitationStyleId } from './markdown-types';
+import type { CitationEntry, CitationLibrary, CitationResolution, CitationStyleId, ParsedDocument } from './markdown-types';
+import { mapCitationProse, isEscaped } from './citation-source';
+import { prepareBibliography, plainCitationText } from './bibliography-engine';
 
 // Citation formatting via citeproc-js, driven by a defined set of bundled
 // CSL style and locale XML files shipped as local static assets - never
@@ -184,6 +186,7 @@ export const resolveCitekeys = (library: CitationLibrary, citekeys: string[]): C
 export interface FormattedCitations {
   readonly inText: Map<string, string>;
   readonly bibliographyHtml: string[];
+  readonly bibliographyMarkdown: string;
   readonly unresolved: string[];
 }
 
@@ -197,33 +200,21 @@ export interface FormattedCitations {
 const CITATION_MARKER = /\[[^\]]*@[\w:.#$%&\-+?<>~/]+[^\]]*\]/g;
 const CITEKEY_IN_MARKER = /@([\w:.#$%&\-+?<>~/]+)/g;
 
-// Applies `replace` only to the regions of a document that are outside
-// fenced code blocks and inline code spans. Without this, a document that
-// *documents* citation syntax (showing [@key] inside a code fence) would
-// have its own examples silently rewritten - the same class of corruption
-// that would affect any source-level substitution pass.
-export const mapOutsideCode = (source: string, replace: (segment: string) => string): string => {
-  const codeRegion = /(```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$)|`[^`\n]*`)/g;
-  let result = '';
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = codeRegion.exec(source))) {
-    result += replace(source.slice(lastIndex, match.index)) + match[0];
-    lastIndex = match.index + match[0].length;
-  }
-  return result + replace(source.slice(lastIndex));
-};
+export const mapOutsideCode = mapCitationProse;
 
 // Every distinct citekey referenced by the document, in first-appearance
 // order, ignoring markers inside code.
-export const extractCitekeys = (source: string): string[] => {
+export const extractCitekeys = (source: string, parsed?: ParsedDocument): string[] => {
   const keys = new Set<string>();
   mapOutsideCode(source, (segment) => {
     for (const marker of segment.matchAll(CITATION_MARKER)) {
-      for (const key of marker[0].matchAll(CITEKEY_IN_MARKER)) keys.add(key[1]);
+      if (isEscaped(segment, marker.index)) continue;
+      for (const key of marker[0].matchAll(CITEKEY_IN_MARKER)) {
+        if (!isEscaped(marker[0], key.index)) keys.add(key[1]);
+      }
     }
     return segment;
-  });
+  }, parsed);
   return [...keys];
 };
 
@@ -233,16 +224,6 @@ export const extractCitekeys = (source: string): string[] => {
 // to the reader. Reducing the fragment to its text content is therefore the
 // honest transformation: it keeps the citation correct and readable rather
 // than leaking visible markup into the document.
-const toPlainText = (html: string): string =>
-  html
-    .replace(/<[^>]*>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
-
 // Replaces each citation marker with its formatted in-text citation.
 // A marker whose key could not be resolved against the library is left
 // exactly as written, so an unresolved citation stays visible in the
@@ -252,13 +233,20 @@ export const substituteInTextCitations = (
   inText: ReadonlyMap<string, string>,
 ): string => {
   if (inText.size === 0) return source;
+  const renderedMarkers = new Map<string, string>();
   return mapOutsideCode(source, (segment) =>
-    segment.replace(CITATION_MARKER, (marker) => {
-      const keys = [...marker.matchAll(CITEKEY_IN_MARKER)].map((match) => match[1]);
+    segment.replace(CITATION_MARKER, (marker: string, offset: number) => {
+      if (isEscaped(segment, offset)) return marker;
+      const keys = [...marker.matchAll(CITEKEY_IN_MARKER)].filter(match => !isEscaped(marker, match.index)).map((match) => match[1]);
       if (keys.length === 0) return marker;
       const rendered = keys.map((key) => inText.get(key));
       if (rendered.some((value) => value === undefined)) return marker;
-      return toPlainText(rendered.join('; '));
+      const fragment = rendered.join('; ');
+      const cached = renderedMarkers.get(fragment);
+      if (cached !== undefined) return cached;
+      const text = plainCitationText(fragment);
+      renderedMarkers.set(fragment, text);
+      return text;
     }),
   );
 };
@@ -269,11 +257,11 @@ export const formatCitations = async (
   style: CitationStyleId,
 ): Promise<FormattedCitations> => {
   const resolutions = resolveCitekeys(library, citekeys);
-  const resolvedKeys = resolutions.filter((r) => r.resolved).map((r) => r.citekey);
+  const resolvedKeys = [...new Set(resolutions.filter((r) => r.resolved).map((r) => r.citekey))];
   const unresolved = resolutions.filter((r) => !r.resolved).map((r) => r.citekey);
 
   if (resolvedKeys.length === 0) {
-    return { inText: new Map(), bibliographyHtml: [], unresolved };
+    return { inText: new Map(), bibliographyHtml: [], bibliographyMarkdown: '', unresolved };
   }
 
   const styleXml = await loadCitationStyle(style);
@@ -288,18 +276,26 @@ export const formatCitations = async (
   engine.updateItems(resolvedKeys);
 
   const inText = new Map<string, string>();
+  const preceding: [string, number][] = [];
+  const keyByCitationId = new Map<string, string>();
   resolvedKeys.forEach((citekey, index) => {
+    const citationID = `workbench-${index}`;
     const citation = {
+      citationID,
       citationItems: [{ id: citekey }],
       properties: { noteIndex: index },
     };
-    const [, clusters] = engine.processCitationCluster(citation, [], []);
-    const rendered = clusters.find(([, , id]) => id !== undefined)?.[1] ?? clusters[0]?.[1] ?? '';
-    inText.set(citekey, rendered);
+    keyByCitationId.set(citationID, citekey);
+    const [, clusters] = engine.processCitationCluster(citation, preceding, []);
+    for (const [clusterIndex, rendered, id] of clusters) {
+      const key = keyByCitationId.get(id) ?? resolvedKeys[clusterIndex];
+      if (key !== undefined) inText.set(key, rendered);
+    }
+    preceding.push([citationID, index]);
   });
 
   const bibliography = engine.makeBibliography();
-  const bibliographyHtml = bibliography ? bibliography[1] : [];
+  const prepared = prepareBibliography(bibliography ? bibliography[1] : []);
 
-  return { inText, bibliographyHtml, unresolved };
+  return { inText, bibliographyHtml: prepared.html, bibliographyMarkdown: prepared.markdown, unresolved };
 };

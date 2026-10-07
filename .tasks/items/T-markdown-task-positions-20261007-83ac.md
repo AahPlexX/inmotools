@@ -3,7 +3,7 @@ task: T-markdown-task-positions-20261007-83ac
 tool: markdown-workbench
 doc: task
 kind: fix
-state: active
+state: done
 branch: fix/markdown-workbench
 created: 2026-10-07
 updated: 2026-10-07
@@ -17,7 +17,7 @@ Associated MDW-R36/37 interaction repair from the ordered audit: a task displaye
 
 ## Resume here
 
-Latest runtime is scoped-verified and deployed at main 58be2be9e46203b87e416699e1a7e038c9dbc7fd, equal to published runtime/tests 7025c67d. Integration 37572936067 and Pages 37573618697 succeeded; official receipt: 3852 unit passes/14 skips, 228 owned browser passes (6.5m), no browser retries/skips. Local 343 units, TypeScript/build and 20 combined production cases passed. At 2026-10-07 04:57 UTC, fresh full-site validation 37572856847 on 7025c67d remains in progress; earlier 37571121544 succeeded on older runtime with 1689 passes/2 flaky/171 skips (37.3m). Its R15 mobile case repeated the same 2571.9765625px failure, then passed retry. Inspect latest full receipt and any owned failures, then close this task with its exact source/main receipts and computed tool-check result. Parent ordered cursor is R51. Task remains active until full-site evidence; no full-pass claim.
+At 2026-10-07 05:37 UTC, official full 37572856847 completed successfully on runtime/tests 7025c67d: 3852 unit passes/14 skips; all 1697 executed browser cases passed, 171 skipped (50.3m), zero retries/flaky cases. R38/history/HTML task repairs are deployed at main 58be2be via integration 37572936067 and Pages 37573618697; scoped 228 owned browsers also passed without retries. Reproduce with pinned pnpm install --frozen-lockfile, pnpm build, pnpm test:unit and pnpm test:e2e; scoped tests/e2e/markdown-task-progress.spec.ts plus markdown-disclosures.spec.ts. Task done for this verified scope; parent cursor R51 remains active. The older R15 retry concern remains independently active and is not claimed repaired.
 
 ## Log
 
@@ -40,3 +40,5 @@ Latest runtime is scoped-verified and deployed at main 58be2be9e46203b87e416699e
 - 2026-10-07 04:43 UTC: Associated repair passes expanded actual-cycle acceptance: all 20 R36+R38 production cases (1.2m), 343 Markdown units (9.64s), TypeScript and clean build (13.66s). No retries/skips. Latest runtime publication/full-site/main/Pages pending; task remains active.
 
 - 2026-10-07 04:57 UTC: Latest repair integrated/deployed at main 58be2be: integration 37572936067 and Pages 37573618697 success. Official logs: 3852 unit passes/14 skips, 228 owned browsers passed (6.5m), no browser retries/skips. Fresh full 37572856847 still running; leave task active. Scoped R38 verified and cursor R51; tool incomplete.
+
+- 2026-10-07 05:37 UTC: Downloaded official runtime full receipt 37572856847 confirms 3852 unit passes/14 skips and 1697 browser passes/171 skips (50.3m), zero retries/flakies. Latest associated repairs already integrated/deployed; scope complete. No claim to repair the older intermittent R15 failure.

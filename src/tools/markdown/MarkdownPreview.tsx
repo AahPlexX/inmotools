@@ -14,6 +14,7 @@ import { revealDisclosureTarget, uniqueDisclosureStates } from './disclosure-dom
 
 export interface MarkdownPreviewProps {
   readonly preparedSource: string;
+  readonly generatedReferences?: string;
   readonly onAnchorsMeasured: (anchors: { sourceLine: number; offsetTop: number }[]) => void;
   readonly onRenderStateChange?: (pending: boolean) => void;
   readonly onPreviewScroll?: (offsetTop: number) => void;
@@ -40,7 +41,7 @@ const measureAnchors = (
   onAnchorsMeasured(offsets);
 };
 
-export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onRenderStateChange, onPreviewScroll, onToggleTask, documentKey = 0, onNotice }: MarkdownPreviewProps) {
+export default function MarkdownPreview({ preparedSource, generatedReferences = '', onAnchorsMeasured, onRenderStateChange, onPreviewScroll, onToggleTask, documentKey = 0, onNotice }: MarkdownPreviewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const generationRef = useRef(0);
   const previousDocumentKey = useRef(documentKey);
@@ -105,7 +106,7 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
   };
 
   useEffect(() => {
-    const { html, anchors } = renderMarkdown(preparedSource);
+    const { html, anchors } = renderMarkdown(preparedSource, generatedReferences);
     const host = hostRef.current;
     const cancels: (() => void)[] = [];
     if (host) {
@@ -167,7 +168,7 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
       // the current render. A replacement effect immediately marks itself pending.
       onRenderStateChange?.(false);
     };
-  }, [preparedSource, onAnchorsMeasured, onRenderStateChange, documentKey]);
+  }, [preparedSource, generatedReferences, onAnchorsMeasured, onRenderStateChange, documentKey]);
 
   useEffect(() => {
     const host = hostRef.current;

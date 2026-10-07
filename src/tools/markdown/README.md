@@ -8,6 +8,7 @@ Local editor for writing, previewing, and exporting Markdown. Documents, drafts,
 - Formatting toolbar, cancellable local auto-format, syntax suggestions, find and replace, Vim keys, spellcheck, optional typewriter scrolling, and a syntax guide.
 - Tables with local formulas and a dimension picker, math, Mermaid and Graphviz diagrams, GitHub alerts, subscripts/superscripts, abbreviation definitions with a glossary, definition lists, native disclosure sections, emoji shortcodes, and citations (APA, IEEE, Chicago, MLA).
 - Click a task checkbox in the preview to toggle that line; document task progress shows completed/total and includes nested tasks.
+- Resolved prose citations generate References in preview and rendered exports; code/metadata literals and uncited library entries are excluded. Original Markdown remains unchanged.
 - Open `.md`, `.markdown`, `.txt`, or local HTML. Paste or drop an image to embed it as a data URI (5 MB cap).
 - Export Markdown, rendered Markdown, standalone HTML, print/PDF, DOCX, structural EPUB, or a syntax-tree JSON file.
 - Drafts live in IndexedDB. Editor settings live in `localStorage` under `inmotools.markdown-workbench.prefs`.
@@ -16,7 +17,7 @@ Local editor for writing, previewing, and exporting Markdown. Documents, drafts,
 
 Read [TRACKER.md](TRACKER.md) **Resume here** first, then the [current spec](../../../docs/superpowers/specs/2026-10-05-markdown-workbench-design.md), [active tool task](../../../.tasks/items/T-markdown-workbench-20261006-ea9f.md), and [verification evidence](VERIFICATION.md). The [ordered inventory](../../../.tasks/items/T-ordered-requirement-inventory-20261006-9cf1.md) preserves the original cross-tool sequence. Update the tracker, current task, inventory cursor and evidence together when behavior or check status changes.
 
-As of 2026-10-07, the current ordered item is MDW-R51; MDW-R55 follows it. Disclosures, task progress and associated HTML-task/history fixes pass scoped acceptance and are deployed at main 58be2be. Fresh full-site validation remains running, so associated tasks stay active. The tracker records exact revisions, receipts, citation-boundary baseline and the open typewriter investigation. Refresh those records and GitHub results before continuing. Older audits and the dated fixes below are historical evidence.
+As of 2026-10-07, current item MDW-R51 is implemented with 370 unit passes and final 28/28 production acceptance; publication/full integration/main/Pages receipts are pending. MDW-R55 follows it. Disclosures, task progress and associated HTML-task/history fixes are deployed at main 58be2be and their full run 37572856847 passed without retries; associated tasks are done. The tracker records exact revisions, receipts and the open typewriter investigation. Refresh those records and GitHub results before continuing. Older audits and the dated fixes below are historical evidence.
 
 ## Historical fixes
 

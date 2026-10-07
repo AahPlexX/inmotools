@@ -111,7 +111,7 @@ Out of scope: real-time collaboration, cloud sync and comment threads (need a se
 | MDW-R48 | Unresolved keys are listed and left as written; markers in code are never rewritten | [@missing] stays visible and is reported |
 | MDW-R49 | Changing the style never shows the previous style's output while the new one loads | Switch APA to IEEE; no APA text remains |
 | MDW-R50 | An invalid bibliography explains the parse problem | Pasting broken BibTeX shows an explanation |
-| MDW-R51 | A bibliography section listing every cited entry is appended | A cited key appears in a generated References list |
+| MDW-R51 | A generated References section lists resolved document citations once in the bundled CSL style order, without editing original source | Preview, rendered Markdown, HTML, DOCX, EPUB and AST include cited entries; code/metadata/literal markers and uncited library entries are excluded; style/library/document resets remove stale entries; long references wrap on phone portrait/landscape and tablet |
 
 ### Navigation and metrics
 
@@ -180,6 +180,10 @@ The tool is complete when every requirement is `verified` or `prohibited`, and t
 
 ## Technique decisions
 
+- 2026-10-07: An optional component import failure within the loaded/current Markdown workspace reports through its local catch without automatic shell reload, preserving open text. Initial tool loading and navigation outside the workspace retain shell recovery. Citation pending/failure states block rendered exports and leave original Markdown available; another valid style/library input can recover.
+
+- 2026-10-07: R51 generates a separate native document section from sanitized CSL fragments. Generated nodes have no authored source positions; original Markdown export/drafts remain unchanged. Rendered Markdown export may serialize its final literal block with complete delimiters or omit a final inert raw HTML block so References cannot become part of that block. Existing authored References headings remain; the generated list is separate. Preserve text, emphasis and safe links across export formats; recognized emoji shortcodes in reference metadata are inline literals. CSL small-cap/font/hanging-indent typography is not a claim of exact publication layout. Rendered exports wait for current citation formatting, with a visible status; original Markdown stays available. Owner may override these conservative presentation defaults.
+
 - 2026-10-06: Typewriter mode is an independent editor option, default off, remembered locally. It centers the caret inside the source editor while typing, with padding for first/last lines and resizing; it does not alter document text or require Focus writing. Owner may override.
 
 ## Intent not recorded
@@ -221,3 +225,7 @@ Count native mdast list items with boolean checked values across the already par
 HTML task import retains the checked state of a leading checkbox input directly in a list item or its leading paragraph as a Markdown task marker. Nested items remain independent. Non-leading and standalone form controls are not inferred as document tasks. Labels remain escaped by the existing converter and executable content stays removed. R38 actual import/export acceptance covers this associated repair.
 
 - 2026-10-07 04:57 UTC: R38 scoped acceptance/main/Pages verified at main 58be2be; native counter, leading HTML task import, mixed keyboard/document history and narrow/oriented status layout pass. Official integration: 3852 unit passes/14 skips, 228 owned browsers passed. Latest full-site 37572856847 remains pending; associated tasks stay active. Cursor advances to R51; its native-code boundary failures are recorded before implementation.
+
+- 2026-10-07 13:54:07 UTC: R51 shared recovery opt-in guard is necessary because the earlier shell listener reloads before a later workspace capture listener can preserve source. Current-route mounted workspace guard unregisters on cleanup; absent/false/throwing guards retain ordinary recovery. 370 units, TypeScript/build and two actual asset-failure/recovery browser cases passed. Final 28-case production acceptance and fresh full/main/Pages receipts remain pending.
+
+- 2026-10-07 13:56 UTC: R51 final runtime passed all 28 R36/R38/R51 production cases (3.7m), 370 units, TypeScript/build. R51 implemented; cursor stays R51 until exact full integration/main/Pages receipts, then R55. Shared recovery guard requires full browsers; no duplicate dispatch is needed when integration selects the full suite.
