@@ -12,6 +12,8 @@ import { markdownSyntaxCompletions } from './markdown-completions';
 import { buildOutline } from './outline-engine';
 import { HEADING_ID_PREFIX } from './heading-slug';
 import MarkdownTableBuilder from './MarkdownTableBuilder';
+import { astHighlightField, astHighlightTheme, selectAstRange, setAstHighlight } from './ast-highlight';
+import type { AstRange } from './ast-inspector-engine';
 
 const formattingChange = Annotation.define<boolean>();
 const normalizedSource = (source: string) => source.replace(/\r\n?|\n/g, '\n');
@@ -193,6 +195,9 @@ export interface MarkdownEditorProps {
   // bare line number so selecting the same heading twice still re-reveals it.
   readonly revealRequest?: { readonly line: number; readonly nonce: number; readonly focus?: boolean };
   readonly taskEditRequest?: { readonly before: string; readonly after: string };
+  // Syntax-tree inspector: the chosen node's range is highlighted, and a request also selects and scrolls to it.
+  readonly astHighlight?: AstRange | null;
+  readonly astRangeRequest?: { readonly range: AstRange; readonly nonce: number };
 }
 
 export default function MarkdownEditor({
@@ -212,6 +217,8 @@ export default function MarkdownEditor({
   typewriterMode = false,
   revealRequest,
   taskEditRequest,
+  astHighlight = null,
+  astRangeRequest,
 }: MarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -333,6 +340,8 @@ export default function MarkdownEditor({
         // keymap when the compartment is reconfigured.
         vimCompartment.of(vimModeRef.current ? vim() : []),
         lineNumbers(),
+        astHighlightField,
+        astHighlightTheme,
         history(),
         sourceState.init(() => ({ source: valueRef.current, canonical: normalizedSource(valueRef.current) })),
         invertedEffects.of(transaction => {
@@ -573,6 +582,16 @@ export default function MarkdownEditor({
       : { effects: EditorView.scrollIntoView(info.from, { y: 'start' }) });
     if (focus) view.focus();
   }, [revealRequest]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view) setAstHighlight(view, astHighlight);
+  }, [astHighlight, value]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view && astRangeRequest) selectAstRange(view, astRangeRequest.range);
+  }, [astRangeRequest]);
 
   const insertPattern = (before: string, after: string, fallback: string, useSelection = true) => {
     const view = viewRef.current;

@@ -479,3 +479,14 @@
   .markdown-code-body { display: block; max-height: none; overflow: visible; }
   .markdown-code-body pre code { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 }
+
+.markdown-workbench-ast { display: grid; gap: 6px; margin-top: 10px; min-width: 0; }
+.markdown-workbench-ast-tree { position: relative; overflow-x: hidden; overflow-y: auto; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); max-width: 100%; }
+.markdown-workbench-ast-tree:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
+.markdown-workbench-ast-spacer { position: relative; width: 100%; }
+.markdown-workbench-ast-row { position: absolute; left: 0; right: 0; display: flex; align-items: center; gap: 6px; box-sizing: border-box; padding-right: 8px; overflow: hidden; white-space: nowrap; font-size: 12px; cursor: pointer; color: var(--ink); }
+.markdown-workbench-ast-row[aria-selected="true"] { background: var(--signal-soft); box-shadow: inset 3px 0 0 var(--signal); }
+.markdown-workbench-ast-toggle { flex: 0 0 14px; text-align: center; color: var(--muted); }
+.markdown-workbench-ast-type { flex: 0 0 auto; font-weight: 700; }
+.markdown-workbench-ast-detail { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.markdown-workbench-ast-range { flex: 0 0 auto; margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }

@@ -13,7 +13,7 @@ updated: 2026-10-07
 
 ## Resume here
 
-2026-10-07 17:02:50 UTC: Final R55 runtime/test checkpoint 64e17739586fac7c92a38ea94ef436fc11312d2b is published through GitHub MCP and fetched tree equals locally validated 406af5f. It includes both grades, native boundary/count/syllable fixes, exact legacy R54 assertions, Unicode hyphen equivalence and actual generated-caption decisions. Local 443 units (15.49s), TypeScript/clean production build and 12/12 combined browsers (59.8s), zero retries/skips, passed. Fresh full integration 37655869959 is pending on exact source. This immediate documentation-only checkpoint supersedes that initial request; obtain the latest integration head/official full receipt without further record-only pushes. Runtime/tests must remain identical to 64e1773. Earlier R55 full requests apply to older source and cannot establish final repair acceptance. Main still 2410e7a; no final R55 main/Pages/full-success claim. After full success compare main tree, verify Pages and live cases, then finish R55/advance R56. Frozen cursor R55; tool incomplete 79/92. R15/citation/Crystal concerns remain open.
+Cursor: MDW-R56 done (syntax-tree inspector panel); next MDW-R57 (diff view). Base commit 7e32dd82. R56 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet.
 
 ## Documents
 
@@ -87,7 +87,7 @@ updated: 2026-10-07
 | MDW-R53 | verified | e2e "live counts stay visible and a preview task click edits the source" | |
 | MDW-R54 | verified | e2e "document metrics show characters and lines alongside words and sentences"; unit "counts words and sentences in a simple two-sentence passage", "computes a Gunning Fog index from words, sentences, and complex words" | Associated native prose/character/syllable defects are repaired in active R55 candidate 12d4, with local native-boundary/CMU/reference acceptance; fresh full release is pending. Counts and sentence/syllable boundaries remain heuristic. |
 | MDW-R55 | verified | unit "matches official CS50 2026 published rounded Coleman grades using letters alone", "matches the independently counted monosyllabic Flesch formula without clamping"; e2e "MDW-R55 reference grades update through editing Undo reset draft restore and exact source export", "MDW-R55 long metric labels and values fit phone orientations tablet and desktop without overlap" | English heuristic scope; unsupported input is reported unavailable. Verified on main 0ddb7cff: 8/8 e2e (desktop+mobile), CS50 reference unit. |
-| MDW-R56 | missing | — | AST JSON export exists |
+| MDW-R56 | verified | e2e "MDW-R56 keyboard tree selection highlights the node source range and follows edits", "MDW-R56 large documents render a bounded window of tree rows"; unit "expands level by level with levels, positions and source ranges", "caps the row count for very large documents and reports truncation" | Syntax tree panel (tree role, arrow/Home/End/Enter keys); only expanded branches and a 28px row window are rendered, 20000-row cap. Highlight is a CodeMirror decoration that follows edits. |
 | MDW-R57 | missing | — | |
 | MDW-R58 | verified | e2e "opens a local Markdown file without uploading it", "file selection validates Markdown or plain text instead of trusting accept alone", "dropping a .md file over the editor still opens it as a whole new document" | |
 | MDW-R59 | verified | e2e "local HTML files import as Markdown without upload" | |

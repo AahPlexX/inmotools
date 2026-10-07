@@ -21,6 +21,8 @@ import { computeProseMetrics } from './prose-metrics-engine';
 import { formatFrontmatterValue } from './frontmatter-display';
 import { splitIntoSlides } from './slide-engine';
 import { buildOutline } from './outline-engine';
+import type { AstRange } from './ast-inspector-engine';
+import AstInspector from './AstInspector';
 import { collectMathDiagnostics } from './math-engine';
 import { applyPreparedCitations, prepareDocument, toFilenameStem } from './document-pipeline';
 import { appendReferencesMarkdown } from './bibliography-engine';
@@ -173,6 +175,9 @@ export default function MarkdownWorkspace() {
   }, [view, lineWrapping, fontSize, vimMode, spellcheck, syntaxSuggestions, darkMode, typewriterMode]);
 
   const [outlineFilter, setOutlineFilter] = useState('');
+  const [astOpen, setAstOpen] = useState(false);
+  const [astHighlight, setAstHighlight] = useState<AstRange | null>(null);
+  const [astRangeRequest, setAstRangeRequest] = useState<{ range: AstRange; nonce: number }>();
   const [activeSourceLine, setActiveSourceLine] = useState(1);
   const [revealRequest, setRevealRequest] = useState<{ line: number; nonce: number; focus?: boolean }>();
 
@@ -529,6 +534,14 @@ export default function MarkdownWorkspace() {
     lastCursorLineRef.current = line;
     handleSourceLineChange(line);
   }, [handleSourceLineChange]);
+
+  const handleAstSelect = useCallback((range: AstRange | null, reveal: boolean) => {
+    setAstHighlight(range);
+    if (reveal && range) {
+      setView((current) => current === 'preview' ? 'split' : current);
+      setAstRangeRequest({ range, nonce: Date.now() });
+    }
+  }, []);
 
   const revealLine = useCallback((line: number) => {
     setRevealRequest({ line, nonce: Date.now() });
@@ -926,6 +939,8 @@ export default function MarkdownWorkspace() {
             typewriterMode={typewriterMode}
             revealRequest={revealRequest}
             taskEditRequest={taskEditRequest}
+            astHighlight={astHighlight}
+            astRangeRequest={astRangeRequest}
           />
         </div>
         {view !== 'source' ? (
@@ -989,6 +1004,12 @@ export default function MarkdownWorkspace() {
             ) : <p className="markdown-workbench-hint">No headings match that filter.</p>}
           </>
         ) : <p className="markdown-workbench-hint">No headings yet. Add a line starting with # to build an outline.</p>}
+      </details>
+
+      <details className="markdown-workbench-panel" onToggle={(event) => setAstOpen(event.currentTarget.open)}>
+        <summary>Syntax tree</summary>
+        <p className="markdown-workbench-hint">The parsed Markdown tree for this document. Choose a node to highlight its source range in the editor.</p>
+        {astOpen ? <AstInspector tree={parsed.tree} lineOffset={parsed.frontmatter.format === null ? 0 : parsed.frontmatter.bodyStartLine - 1} onSelect={handleAstSelect} /> : null}
       </details>
 
       <details className="markdown-workbench-panel">

@@ -125,6 +125,8 @@ Out of scope: real-time collaboration, cloud sync and comment threads (need a se
 | MDW-R56 | Syntax-tree (AST) inspector panel showing the parsed tree next to the source | Selecting a node highlights its source range |
 | MDW-R57 | Diff view between the current text and a saved draft or the opened file | Edit a line; the diff shows it as changed |
 
+MDW-R56 detail: the Syntax tree panel (collapsed by default) shows the document's mdast tree below the toolbar as an ARIA tree. Arrow Up/Down move and select, Right/Left expand, collapse or move to the parent, Home/End jump, Enter/Space select. Selecting a node highlights its source range in the editor (front matter lines are accounted for) without moving focus. Only expanded branches are built and rows are windowed; at most 20000 rows are listed. The highlight and selection follow edits by node path and clear when the path no longer exists.
+
 ### Files and storage
 
 | ID | Requirement | Acceptance test |
