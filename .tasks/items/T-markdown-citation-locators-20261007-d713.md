@@ -32,3 +32,4 @@ Current substituteInTextCitations extracts only keys, joins their independently 
 ## Log
 
 - 2026-10-07 14:38:21 UTC: Actual current and unchanged R38 browser baselines both show annotation loss. Finding recorded for the ordered Pandoc/associated tool repair; no runtime change and no fixed claim.
+- 2026-10-07: claimed `fix/markdown-workbench`.

@@ -11,6 +11,8 @@ Local editor for writing, previewing, and exporting Markdown. Documents, drafts,
 - Resolved prose citations generate References in preview and rendered exports; code/metadata literals and uncited library entries are excluded. Original Markdown remains unchanged.
 - Prose counts, reading/speaking estimates, Gunning Fog and English Flesch–Kincaid/Coleman–Liau grade estimates; code, math and metadata are excluded.
 - Open `.md`, `.markdown`, `.txt`, or local HTML. Paste or drop an image to embed it as a data URI (5 MB cap).
+- Syntax tree panel: browse the parsed tree with the keyboard; choosing a node highlights its source range.
+- Compare changes panel: diff the current text against the opened file or a saved draft.
 - Export Markdown, rendered Markdown, standalone HTML, print/PDF, DOCX, structural EPUB, or a syntax-tree JSON file.
 - Drafts live in IndexedDB. Editor settings live in `localStorage` under `inmotools.markdown-workbench.prefs`.
 
