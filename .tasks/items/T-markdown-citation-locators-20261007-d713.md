@@ -3,7 +3,7 @@ task: T-markdown-citation-locators-20261007-d713
 tool: markdown-workbench
 doc: task
 kind: fix
-state: backlog
+state: active
 branch: fix/markdown-workbench
 created: 2026-10-07
 updated: 2026-10-07
@@ -32,3 +32,4 @@ Current substituteInTextCitations extracts only keys, joins their independently 
 ## Log
 
 - 2026-10-07 14:38:21 UTC: Actual current and unchanged R38 browser baselines both show annotation loss. Finding recorded for the ordered Pandoc/associated tool repair; no runtime change and no fixed claim.
+- 2026-10-07: claimed `fix/markdown-workbench`.
