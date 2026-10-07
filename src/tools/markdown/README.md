@@ -6,7 +6,7 @@ Local editor for writing, previewing, and exporting Markdown. Documents, drafts,
 
 - Source, split, and preview. In split view, scrolling either side moves the other.
 - Formatting toolbar, cancellable local auto-format, syntax suggestions, find and replace, Vim keys, spellcheck, optional typewriter scrolling, and a syntax guide.
-- Tables with local formulas and a dimension picker, math, Mermaid and Graphviz diagrams, GitHub alerts, subscripts/superscripts, abbreviation definitions with a glossary, definition lists, emoji shortcodes, and citations (APA, IEEE, Chicago, MLA).
+- Tables with local formulas and a dimension picker, math, Mermaid and Graphviz diagrams, GitHub alerts, subscripts/superscripts, abbreviation definitions with a glossary, definition lists, native disclosure sections, emoji shortcodes, and citations (APA, IEEE, Chicago, MLA).
 - Click a task checkbox in the preview to toggle that line.
 - Open `.md`, `.markdown`, `.txt`, or local HTML. Paste or drop an image to embed it as a data URI (5 MB cap).
 - Export Markdown, rendered Markdown, standalone HTML, print/PDF, DOCX, structural EPUB, or a syntax-tree JSON file.
@@ -16,7 +16,7 @@ Local editor for writing, previewing, and exporting Markdown. Documents, drafts,
 
 Read [TRACKER.md](TRACKER.md) **Resume here** first, then the [current spec](../../../docs/superpowers/specs/2026-10-05-markdown-workbench-design.md), [active tool task](../../../.tasks/items/T-markdown-workbench-20261006-ea9f.md), and [verification evidence](VERIFICATION.md). The [ordered inventory](../../../.tasks/items/T-ordered-requirement-inventory-20261006-9cf1.md) preserves the original cross-tool sequence. Update the tracker, current task, inventory cursor and evidence together when behavior or check status changes.
 
-As of 2026-10-07, the next ordered item is MDW-R36. Definition-list acceptance and canonical full integration passed; main f644133 was deployed successfully. Refresh the tracker for subsequent work. Refresh the tracker and GitHub run results before continuing. Older audits and the dated fixes below are historical evidence, not the current continuation cursor.
+As of 2026-10-07, the current ordered item is MDW-R36; MDW-R38 follows it. The core disclosure release is deployed, and the associated quoted-task/source-history repair is integrated/deployed with canonical owned browser acceptance passed; fresh full browser validation is running. The tracker records exact revisions, receipts and the associated typewriter investigation. Refresh those records and GitHub results before continuing. Older audits and the dated fixes below are historical evidence.
 
 ## Historical fixes
 
