@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { autocompletion, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
-import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, isolateHistory, invertedEffects } from '@codemirror/commands';
 import { markdown, markdownKeymap } from '@codemirror/lang-markdown';
 import { defaultHighlightStyle, HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { openSearchPanel, searchKeymap } from '@codemirror/search';
-import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state';
+import { Annotation, Compartment, EditorState, StateEffect, StateField, Transaction } from '@codemirror/state';
 import { drawSelection, EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import { getCM, vim } from '@replit/codemirror-vim';
@@ -14,6 +14,22 @@ import { HEADING_ID_PREFIX } from './heading-slug';
 import MarkdownTableBuilder from './MarkdownTableBuilder';
 
 const formattingChange = Annotation.define<boolean>();
+const normalizedSource = (source: string) => source.replace(/\r\n?|\n/g, '\n');
+const restoreSource = StateEffect.define<string>();
+const sourceState = StateField.define<{ source: string; canonical: string }>({
+  create: state => {
+    const source = state.doc.toString();
+    return { source, canonical: source };
+  },
+  update: (previous, transaction) => {
+    for (const effect of transaction.effects) if (effect.is(restoreSource)) {
+      return { source: effect.value, canonical: normalizedSource(effect.value) };
+    }
+    if (!transaction.docChanged) return previous;
+    const source = transaction.newDoc.toString();
+    return { source, canonical: source };
+  },
+});
 
 // CodeMirror 6 markdown source editor, mirroring the wiring pattern already
 // used by this catalog's other CodeMirror-based tools (see LatticeEditor.tsx,
@@ -176,6 +192,7 @@ export interface MarkdownEditorProps {
   // view and focused (used by the document outline). A counter rather than a
   // bare line number so selecting the same heading twice still re-reveals it.
   readonly revealRequest?: { readonly line: number; readonly nonce: number; readonly focus?: boolean };
+  readonly taskEditRequest?: { readonly before: string; readonly after: string };
 }
 
 export default function MarkdownEditor({
@@ -194,6 +211,7 @@ export default function MarkdownEditor({
   darkMode,
   typewriterMode = false,
   revealRequest,
+  taskEditRequest,
 }: MarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -316,6 +334,12 @@ export default function MarkdownEditor({
         vimCompartment.of(vimModeRef.current ? vim() : []),
         lineNumbers(),
         history(),
+        sourceState.init(() => ({ source: valueRef.current, canonical: normalizedSource(valueRef.current) })),
+        invertedEffects.of(transaction => {
+          const before = transaction.startState.field(sourceState);
+          return transaction.docChanged && (before.source !== before.canonical || transaction.effects.some(effect => effect.is(restoreSource)))
+            ? [restoreSource.of(before.source)] : [];
+        }),
         drawSelection(),
         highlightActiveLine(),
         closeBrackets(),
@@ -383,7 +407,7 @@ export default function MarkdownEditor({
           if (update.docChanged && !isExternalSyncRef.current) {
             const report = update.transactions.some((transaction) => transaction.annotation(formattingChange))
               ? onFormatChangeRef.current ?? onChangeRef.current : onChangeRef.current;
-            report(update.state.doc.toString());
+            report(update.state.field(sourceState).source);
           }
           if (update.viewportChanged) {
             const viewportPosition = update.view.visibleRanges[0]?.from ?? update.view.viewport.from;
@@ -491,10 +515,14 @@ export default function MarkdownEditor({
     const view = viewRef.current;
     if (!view) return;
     const current = view.state.doc.toString();
-    if (current === value) return;
+    if (current === normalizedSource(value)) {
+      if (view.state.field(sourceState).source !== value) view.dispatch({ effects: restoreSource.of(value), annotations: Transaction.addToHistory.of(false) });
+      return;
+    }
     isExternalSyncRef.current = true;
     view.dispatch({
       changes: { from: 0, to: current.length, insert: value },
+      effects: restoreSource.of(value),
       // This tool keeps two deliberately separate levels of history:
       // CodeMirror's own fine-grained text history (Ctrl+Z inside the editor,
       // which preserves the caret) and the workspace's document-level
@@ -506,6 +534,31 @@ export default function MarkdownEditor({
     });
     isExternalSyncRef.current = false;
   }, [value]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !taskEditRequest) return;
+    const { before: originalBefore, after: originalAfter } = taskEditRequest;
+    const before = normalizedSource(originalBefore); const after = normalizedSource(originalAfter);
+    if (view.state.field(sourceState).source !== originalBefore || view.state.doc.toString() !== before) {
+      onStatusRef.current?.('Task toggle cancelled because the source changed. Try this checkbox again.');
+      return;
+    }
+    let from = 0;
+    while (from < before.length && from < after.length && before[from] === after[from]) from++;
+    let to = before.length; let end = after.length;
+    while (to > from && end > from && before[to - 1] === after[end - 1]) { to--; end--; }
+    if (from === to && from === end) return;
+    // Keep task edits in both editor history and the workspace's isolated
+    // document-change callback, as formatting edits already are.
+    view.dispatch({
+      changes: { from, to, insert: after.slice(from, end) },
+      effects: restoreSource.of(originalAfter),
+      annotations: [isolateHistory.of('full'), formattingChange.of(true)],
+      userEvent: 'input.task',
+    });
+    onStatusRef.current?.('Toggled the task on that line. The change stays in this document.');
+  }, [taskEditRequest]);
 
   useEffect(() => {
     const view = viewRef.current;
