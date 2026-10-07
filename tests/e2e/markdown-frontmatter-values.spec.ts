@@ -1,0 +1,87 @@
+import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+
+test('MDW-R39 circular YAML metadata remains visible and editable without losing original source', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('./#/tools/markdown-workbench');
+  const source = '---\r\nmeta: &loop\r\n  self: *loop\r\nshared: &value {name: readable}\r\nlist: [*value, *value]\r\nnumber: .inf\r\n---\r\n\r\nVisible prose.\r\n';
+  await page.setInputFiles('input[type="file"][accept*=".html"]', { name: 'circular-metadata.md', mimeType: 'text/markdown', buffer: Buffer.from(source) });
+  const metadata = page.getByTestId('markdown-frontmatter');
+  const panel = page.locator('details').filter({ has: metadata });
+  await panel.locator('summary').click();
+  await expect(metadata).toContainText('[Circular reference]');
+  await expect(metadata).toContainText('[{"name":"readable"},{"name":"readable"}]');
+  await expect(metadata).toContainText('Infinity');
+  await expect(page.locator('.markdown-workbench-preview')).toContainText('Visible prose.');
+  const pending = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Markdown', exact: true }).click();
+  expect((await readFile((await (await pending).path())!)).equals(Buffer.from(source))).toBe(true);
+  const editor = page.getByRole('textbox', { name: 'Markdown source' });
+  await editor.click();
+  await editor.press('ControlOrMeta+End');
+  await page.keyboard.insertText('Still editable.');
+  await expect(page.locator('.markdown-workbench-preview')).toContainText('Still editable.');
+  await page.getByRole('button', { name: 'Undo document step', exact: true }).click();
+  await expect(page.locator('.markdown-workbench-preview')).not.toContainText('Still editable.');
+  await expect(metadata).toContainText('[Circular reference]');
+  const restored = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Markdown', exact: true }).click();
+  expect((await readFile((await (await restored).path())!)).equals(Buffer.from(source))).toBe(true);
+  const astDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'AST JSON', exact: true }).click();
+  const ast = JSON.parse(await readFile((await (await astDownload).path())!, 'utf8')) as { type: string; children: unknown[] };
+  expect(ast.type).toBe('root');
+  expect(JSON.stringify(ast.children)).toContain('Visible prose.');
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByTestId('markdown-save-state')).toContainText(/Saved/, { timeout: 15_000 });
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await expect(metadata).toHaveCount(0);
+  await expect(page.locator('.markdown-workbench-preview h1')).toContainText('Untitled document');
+  const drafts = page.getByTestId('markdown-draft-list');
+  await page.locator('details').filter({ has: drafts }).locator('summary').click();
+  await expect(drafts.locator('li')).toHaveCount(1);
+  await drafts.locator('li > button').first().click();
+  await expect(metadata).toContainText('[Circular reference]');
+  await expect(page.locator('.markdown-workbench-preview')).toContainText('Visible prose.');
+  const recovered = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Markdown', exact: true }).click();
+  expect((await readFile((await (await recovered).path())!)).equals(Buffer.from(source))).toBe(true);
+  await page.setInputFiles('input[type="file"][accept*=".html"]', { name: 'ordinary-metadata.md', mimeType: 'text/markdown', buffer: Buffer.from('---\nname: Ordinary\n---\n\nReplacement prose.') });
+  await expect(metadata).toContainText('Ordinary');
+  await expect(metadata).not.toContainText('[Circular reference]');
+  await expect(page.locator('.markdown-workbench-preview')).toContainText('Replacement prose.');
+  await expect(page.getByTestId('markdown-workbench')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
+test('MDW-R39 long metadata keys and values wrap across phone orientations and tablet size', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  const key = 'metadataKey'.repeat(32);
+  const value = '<script>literal</script>'.repeat(32);
+  const source = '---\n' + JSON.stringify(key) + ': ' + JSON.stringify(value) + '\n---\n\nBody.';
+  await page.setInputFiles('input[type="file"][accept*=".html"]', { name: 'metadata-wrap.md', mimeType: 'text/markdown', buffer: Buffer.from(source) });
+  const metadata = page.getByTestId('markdown-frontmatter');
+  const panel = page.locator('details').filter({ has: metadata });
+  await panel.locator('summary').click();
+  await expect(metadata.locator('dt')).toHaveText(key);
+  await expect(metadata.locator('dd')).toHaveText(value);
+  await expect(metadata.locator('script')).toHaveCount(0);
+  for (const size of [{ width: 320, height: 568 }, { width: 844, height: 390 }, { width: 768, height: 1024 }]) {
+    await page.setViewportSize(size);
+    const bounds = await metadata.evaluate(node => {
+      const container = node.getBoundingClientRect();
+      const label = node.querySelector('dt')!.getBoundingClientRect();
+      const value = node.querySelector('dd')!.getBoundingClientRect();
+      return { left: container.left, right: container.right, labelLeft: label.left, labelRight: label.right, labelBottom: label.bottom, valueLeft: value.left, valueRight: value.right, valueTop: value.top, overflow: node.scrollWidth > node.clientWidth + 1 };
+    });
+    expect(bounds.left).toBeGreaterThanOrEqual(0);
+    expect(bounds.right).toBeLessThanOrEqual(size.width);
+    expect(bounds.labelLeft).toBeGreaterThanOrEqual(bounds.left);
+    expect(bounds.labelRight).toBeLessThanOrEqual(bounds.right + 1);
+    expect(bounds.valueLeft).toBeGreaterThanOrEqual(bounds.left);
+    expect(bounds.valueRight).toBeLessThanOrEqual(bounds.right + 1);
+    expect(bounds.valueTop).toBeGreaterThanOrEqual(bounds.labelBottom);
+    expect(bounds.overflow).toBe(false);
+  }
+});

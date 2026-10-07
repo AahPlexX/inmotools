@@ -13,7 +13,7 @@ updated: 2026-10-07
 
 ## Resume here
 
-2026-10-07 14:28:54 UTC: Metadata-repaired runtime/test checkpoint a924c377059efc0c879af613f2cf98652e8ffb41 published through GitHub MCP; fetched tree equals locally validated eb72999. Fresh full integration 37636989225 is pending on that exact source and supersedes older runtime run 37632859293. This immediate record-only checkpoint will supersede the initial fresh request before lengthy validation; inspect the latest integration run/head for final full results. Main remains 500adae; no repair main/Pages/full-success claim. Final local scope 391 units/34 production cases (4.2m), TypeScript/build passes, no retries/skips. Next: let fresh required full integration finish without further record-only pushes, retrieve exact official receipt, verify main tree/Pages/no PRs, then close R51 associated tasks/advance R55. R15 cause remains unresolved; task 12d4 supplies next-item official research/baselines.
+2026-10-07 15:23:20 UTC: Metadata-display source/tests published through GitHub MCP as d1edf2463dc82a49a32177457062f9a037936553; fetched tree equals locally validated source. Integration 37643416284 is running. This immediate record-only checkpoint supersedes the initial integration before lengthy owned checks; inspect the latest integration head/run for its exact receipt. Dispatch fresh full validation on this checkpoint, then do not interrupt required runs with further record-only pushes. Scope: 403 units, TypeScript/build and expanded 38/38 production cases (3.5m), no retries/skips. No cycle-repair main/Pages/full-success claim yet. References scoped verified at main 230f637: full 37637141396 passed 3896 units/14 skips and 1711 browsers/171 skips (46.5m), zero retries; Pages deploy job success and live actual exports 2/2. Independent cycle-display task 42ab remains active until fresh required full/main/Pages receipts. Frozen cursor R55, preparatory task 12d4; R15 cause unresolved, annotation loss backlog d713, tool/inventory incomplete. Next: verify latest owned integration/main/Pages, inspect fresh full logs, record exact receipts, then continue R55.
 
 ## Documents
 
@@ -82,7 +82,7 @@ updated: 2026-10-07
 | MDW-R48 | verified | e2e "an unresolved citekey is reported and left verbatim in the document", "a citation marker inside a code fence is never rewritten" | |
 | MDW-R49 | verified | e2e "changing citation style never shows a stale previous style while the new style loads" | |
 | MDW-R50 | verified | e2e "invalid bibliography input explains the parse problem instead of failing silently" | |
-| MDW-R51 | implemented | tests/e2e/markdown-references.spec.ts; tests/unit/markdown-citation.test.ts; tests/unit/markdown-bibliography.test.ts | Final metadata-repaired scope: 34 production passes and 391 Markdown/recovery unit passes; exact full/main/Pages receipts pending. Tasks 50cd/6e82/a67d/291b. |
+| MDW-R51 | verified | tests/e2e/markdown-references.spec.ts; tests/unit/markdown-citation.test.ts; tests/unit/markdown-bibliography.test.ts | Main 230f637 is tree-identical; full 37637141396 passed 3896 units/14 skips and 1711 browsers/171 skips, zero retries. Pages deploy job 112857318705 succeeded; live actual exports 2/2 pass. Associated tasks 50cd/6e82/a67d/291b done; compound annotation limitation remains backlog d713. |
 | MDW-R52 | verified | e2e "builds a clickable outline from the document headings", "outline supports filtering and marks the current source section" | |
 | MDW-R53 | verified | e2e "live counts stay visible and a preview task click edits the source" | |
 | MDW-R54 | verified | e2e "document metrics show characters and lines alongside words and sentences"; unit "counts words and sentences in a simple two-sentence passage", "computes a Gunning Fog index from words, sentences, and complex words" | |
@@ -130,7 +130,7 @@ updated: 2026-10-07
 1. Tests for implemented rows: MDW-R68.
 2. Editing: listed editing requirements complete; retain regression coverage.
 3. Markdown syntax and rendering: MDW-R33, MDW-R34, MDW-R35, MDW-R36, MDW-R38.
-4. Citations: MDW-R51.
+4. Citations: associated compound annotation loss in task d713, repair with MDW-R82.
 5. Navigation and metrics: MDW-R55, MDW-R56, MDW-R57.
 6. Files and storage: MDW-R69, MDW-R70, MDW-R71, MDW-R72.
 7. Export: MDW-R81, MDW-R82.
@@ -140,6 +140,8 @@ updated: 2026-10-07
 
 - DOCX math is plain text; EPUB is not EPUBCheck-validated; PDF uses the browser print dialog.
 - Vancouver citation style is not offered (dependent CSL styles).
+- Compound citation prefixes, suffixes and locators are currently lost in rendered citations; original source survives. Confirmed unchanged/current behavior and required checks are in [task d713](../../../.tasks/items/T-markdown-citation-locators-20261007-d713.md); repair with R82 or the final associated-tool bug pass.
+- Circular YAML metadata blanks the published workspace. Local display repair and exact reproduction/check status are in [task 42ab](../../../.tasks/items/T-markdown-metadata-display-20261007-42ab.md); release pending.
 - Images embedded by paste or drop are capped at 5 MB.
 
 ## Verification evidence

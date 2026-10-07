@@ -3,7 +3,7 @@ task: T-markdown-citation-clusters-20261007-6e82
 tool: markdown-workbench
 doc: task
 kind: fix
-state: active
+state: done
 branch: fix/markdown-workbench
 created: 2026-10-07
 updated: 2026-10-07
@@ -17,7 +17,7 @@ Associated R51 bug: retain every resolved document citation in citeproc's regist
 
 ## Resume here
 
-2026-10-07 14:28:54 UTC: Metadata-repaired runtime/test checkpoint a924c377059efc0c879af613f2cf98652e8ffb41 published through GitHub MCP; fetched tree equals locally validated eb72999. Fresh full integration 37636989225 is pending on that exact source and supersedes older runtime run 37632859293. This immediate record-only checkpoint will supersede the initial fresh request before lengthy validation; inspect the latest integration run/head for final full results. Main remains 500adae; no repair main/Pages/full-success claim. Final local scope 391 units/34 production cases (4.2m), TypeScript/build passes, no retries/skips. Next: let fresh required full integration finish without further record-only pushes, retrieve exact official receipt, verify main tree/Pages/no PRs, then close R51 associated tasks/advance R55. R15 cause remains unresolved; task 12d4 supplies next-item official research/baselines.
+Done at 2026-10-07 15:20:46 UTC. References runtime a924c377/checkpoint a3885a9 is integrated at main 230f637d3c60a31a45559aaa05bc41c1c05de582 (exact tree equality). Full integration 37637141396 succeeded at 15:19:16 UTC: 3896 unit passes/14 skips and 1711 browser passes/171 skips (46.5m), zero browser retries/flaky cases. Pages build/deploy jobs 112856996133/112857318705 succeeded in run 37640254171; deploy completed 14:52:34 UTC. Live deployed actual References export acceptance passed 2/2 desktop/touch (27.7s). Separate duplicate main/PR validate jobs may still be running; they are not needed to invent or replace this exact full receipt. tool:check markdown-workbench reports incomplete 79/92 verified; this scoped task is done, not the tool. Continue current tracker/parent task; cycle-display repair 42ab requires its own release, then R55.
 
 ## Log
 
@@ -34,3 +34,5 @@ Associated R51 bug: retain every resolved document citation in citeproc's regist
 - 2026-10-07 14:25:51 UTC: Final metadata-repaired R51 source passes 34/34 owned R36/R38/R51 production cases (4.2m), no retries/skips, and 391 units (23.29s), TypeScript/build. Real repair publication/fresh full/main/Pages pending.
 
 - 2026-10-07 14:28:54 UTC: Metadata-repaired runtime/test checkpoint a924c377059efc0c879af613f2cf98652e8ffb41 published through GitHub MCP; fetched tree equals locally validated eb72999. Fresh full integration 37636989225 is pending on that exact source and supersedes older runtime run 37632859293. This immediate record-only checkpoint will supersede the initial fresh request before lengthy validation; inspect the latest integration run/head for final full results. Main remains 500adae; no repair main/Pages/full-success claim. Final local scope 391 units/34 production cases (4.2m), TypeScript/build passes, no retries/skips. Next: let fresh required full integration finish without further record-only pushes, retrieve exact official receipt, verify main tree/Pages/no PRs, then close R51 associated tasks/advance R55. R15 cause remains unresolved; task 12d4 supplies next-item official research/baselines.
+
+- 2026-10-07 15:20:46 UTC: References runtime a924c377/checkpoint a3885a9 is integrated at main 230f637d3c60a31a45559aaa05bc41c1c05de582 (exact tree equality). Full integration 37637141396 succeeded at 15:19:16 UTC: 3896 unit passes/14 skips and 1711 browser passes/171 skips (46.5m), zero browser retries/flaky cases. Pages build/deploy jobs 112856996133/112857318705 succeeded in run 37640254171; deploy completed 14:52:34 UTC. Live deployed actual References export acceptance passed 2/2 desktop/touch (27.7s). Separate duplicate main/PR validate jobs may still be running; they are not needed to invent or replace this exact full receipt. Scoped task done; computed tool completion 79/92, still incomplete.
