@@ -132,3 +132,25 @@ test('MDW-R36 local HTML import retains literal captions, nested bodies and empt
   await expect(preview.locator('details').first()).toHaveAttribute('name', 'user-content-a&b');
   await expect(preview.locator('[onclick], img, script')).toHaveCount(0);
 });
+
+test('MDW-R36 changed defaults and duplicate captions cannot reuse another disclosure state', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  const source = '<details><summary>Unique</summary>\n\nBody\n\n</details>';
+  await setSource(page, source);
+  const preview = page.locator('.markdown-workbench-preview');
+  const details = preview.locator('details.markdown-disclosure');
+  await expect(details).not.toHaveAttribute('open');
+  await setSource(page, source.replace('<details>', '<details open>'));
+  await expect(details).toHaveAttribute('open', '');
+  await details.locator('summary').click();
+  await expect(details).not.toHaveAttribute('open');
+  await setSource(page, source.replace('<details>', '<details open>').replace('Body', 'Edited body'));
+  await expect(details).not.toHaveAttribute('open');
+  await setSource(page, source + '\n\n' + source);
+  await expect(details).toHaveCount(2);
+  await details.first().locator('summary').click();
+  await expect(details.first()).toHaveAttribute('open', '');
+  await setSource(page, (source + '\n\n' + source).replaceAll('Body', 'Other body'));
+  await expect(details.first()).not.toHaveAttribute('open');
+  await expect(details.nth(1)).not.toHaveAttribute('open');
+});

@@ -216,7 +216,7 @@ Next-item references (retrieved HTTP 200 at 2026-10-07 01:58:07 UTC): [GitHub co
 
 Authoritative references refreshed on 2026-10-07: [GitHub collapsed sections](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/organizing-information-with-collapsed-sections), [MDN details](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/details), [MDN summary](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/summary), [remark-rehype](https://github.com/remarkjs/remark-rehype) and [mdast-util-to-hast](https://github.com/syntax-tree/mdast-util-to-hast) returned HTTP 200 at 03:13:38–41 UTC. [W3C EPUB 3.3 XHTML requirements](https://www.w3.org/TR/epub-33/#sec-xhtml) returned HTTP 200 at 03:29:58 UTC. [WHATWG details element](https://html.spec.whatwg.org/multipage/interactive-elements.html#the-details-element) returned HTTP 200 at 03:32:04 UTC; named groups forbid nested members and multiple initially open members. The spec records content-preserving normalization and export/import defaults.
 
-Baseline: 11 failed/2 passed unit cases against unchanged main f644133; reachable production baseline failed for the absent native element. Exclude the earlier connection-refused browser attempt. Final acceptance is not yet complete. Reproduce without session IDs or optional local artifacts:
+Baseline: 11 failed/2 passed unit cases against unchanged main f644133; reachable production baseline failed for the absent native element. Exclude the earlier connection-refused browser attempt. Scoped acceptance passed 8 production cases plus 2 state guards on desktop/touch; full validation and main release are pending. Reproduce without session IDs or optional local artifacts:
 
 ```sh
 pnpm exec tsc --noEmit -p tsconfig.app.json
@@ -228,4 +228,6 @@ pnpm docs:check
 pnpm tool:check markdown-workbench --base origin/main
 ```
 
-The R36 source/tests are an in-progress checkpoint. Full-suite, integration and deployment receipts for this change must be obtained from GitHub; the successful f644133 receipts validate earlier work only.
+The R36 source/tests are implemented with scoped acceptance. Full-suite, integration and deployment receipts for this change must be obtained from GitHub; the successful f644133 receipts validate earlier work only.
+
+- 2026-10-07 03:48 UTC: R36 published source/test checkpoint b7dff7c0f19c3b0cb0c8e7b217e44a2bbf565664 fetched and tree-compared equal to local source. Final production acceptance passed 8/8 on desktop/touch in 39.2s. Additional changed-default/duplicate-caption guard acceptance passed 2/2 in 9.1s on the same unchanged runtime; its added test is in this checkpoint. All 331 Markdown units passed with two workers (11.29s); fresh TypeScript and final build passed. R36 is implemented with scoped acceptance; verification still requires full browsers/main release. GitHub MCP observed integration 37568185577 and explicitly dispatched full validation 37568220227 in progress on b7dff7c at 03:46–48 UTC. Zero open PRs at 03:44 UTC. A record/test-only push can supersede the integration run; always inspect latest branch run. Full validation on b7dff7c still covers the identical runtime, while the two extra state guards have their own fresh acceptance. No R36 integration/deployment/full-pass claim yet.
