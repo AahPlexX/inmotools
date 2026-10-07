@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-markdown-workbench-design.md
 tracker: src/tools/markdown/TRACKER.md
-updated: 2026-10-06
+updated: 2026-10-07
 ---
 
 # Markdown Workbench — spec
@@ -86,7 +86,7 @@ Out of scope: real-time collaboration, cloud sync and comment threads (need a se
 | MDW-R28 | Fences over 20,000 characters are shown plain without highlighting (formerly F09) | A 26,000-character fence renders with no token spans |
 | MDW-R29 | Live-preview code blocks show bounded line numbers and a Copy button; controls remain usable in narrow/oriented views and absent from exports/print | Copy preserves every literal line and terminal newline; blocked clipboard access offers selectable code; nested task controls preserve source; long blocks keep only visible line numbers in the DOM |
 | MDW-R30 | GitHub alert callouts: NOTE, TIP, IMPORTANT, WARNING and CAUTION | > [!TIP] renders a styled tip callout |
-| MDW-R31 | A DANGER callout kind | > [!DANGER] renders a danger callout |
+| MDW-R31 | A DANGER callout kind, documented as a Workbench extension; alert styling persists in standalone HTML and EPUB | > [!DANGER] renders a titled danger callout with formatting; escaped markers stay literal; portrait/landscape and dark themes stay readable; detached HTML/EPUB include self-contained alert styling |
 | MDW-R32 | Emoji shortcodes (about 150) render as emoji outside code; unknown codes stay as written | :tada: renders 🎉; `:tada:` in code stays text |
 | MDW-R33 | Subscript and superscript (H~2~O, x^2^) | H~2~O renders H<sub>2</sub>O |
 | MDW-R34 | Abbreviations (`*[HTML]: HyperText Markup Language`) | HTML renders as <abbr> with the title |

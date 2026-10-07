@@ -6,14 +6,14 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-markdown-workbench-design.md
 tracker: src/tools/markdown/TRACKER.md
-updated: 2026-10-06
+updated: 2026-10-07
 ---
 
 # Markdown Workbench — tracker
 
 ## Resume here
 
-Current ordered item: MDW-R31 DANGER callout, then MDW-R33 subscript/superscript. MDW-R09/12/15/17/18/19/20 are integrated and deployed as bcdd08ea. MDW-R29 production acceptance passed 12/12, including the nested task-click fix, exact clipboard fallback, orientation, keyboard focus and print. Broader pre-guard Markdown regression passed 58/58; the separate 12/12 production run verifies the guard. Canonical full validation run 37538813696 remains in progress. R29 publication/release evidence is pending. Tool remains incomplete; compute counts with pnpm tool:check markdown-workbench.
+Current ordered item: MDW-R31 DANGER callout and associated literal/export fixes, partially implemented. TypeScript, clean build and 54 alert/render/export unit checks passed. Next: production browser acceptance (portrait/landscape, light/dark, standalone HTML and EPUB), then Markdown regression; advance to MDW-R33 only after scoped checks pass. MDW-R09/12/15/17/18/19/20 passed full validation run 37538813696 and are integrated/deployed. R29 integrated/deployed as f0ae6602; its full validation run 37551755268 is in progress. Tool remains incomplete; compute counts with pnpm tool:check markdown-workbench.
 
 ## Documents
 
@@ -62,7 +62,7 @@ Current ordered item: MDW-R31 DANGER callout, then MDW-R33 subscript/superscript
 | MDW-R28 | verified | e2e "an oversized recognized fence remains readable without running cosmetic syntax highlighting"; unit "leaves an oversized recognized fence plain instead of parsing it for cosmetic highlighting" | |
 | MDW-R29 | verified | e2e "MDW-R29 numbered code copies every literal line and keeps preview controls out of HTML exports", "MDW-R29 denied clipboard access offers selection of code without line numbers", "MDW-R29 long code keeps the numbered gutter bounded while showing the last lines", "MDW-R29 selecting code inside a task preserves its checkbox while ordinary task clicks still work", "MDW-R29 code controls wrap through orientation changes and print without clipping or copy controls" | Production desktop/touch checks 12/12 including ordinary task toggling; TypeScript and clean build passed. Full regression/release pending |
 | MDW-R30 | verified | e2e "GitHub-style alert blockquotes render as styled callouts instead of plain quotes"; unit "leaves an ordinary blockquote without a marker untouched" | |
-| MDW-R31 | missing | — | Five GitHub kinds exist |
+| MDW-R31 | partial | `github-alerts-plugin.ts`, `alert-style.css`, detached exporter styling; new alert tests | DANGER/source-aware literal matching and shared preview/export styles implemented. TypeScript, clean build and 54 unit checks passed; production acceptance pending. Baseline 10 unit failures/2 passes and 4 browser failures |
 | MDW-R32 | verified | e2e "a recognized emoji shortcode renders as its emoji in the live preview"; unit "converts a recognized emoji shortcode and leaves an unrecognized one exactly as written", "does not convert emoji-shaped text inside inline code or a fenced code block" | |
 | MDW-R33 | missing | — | |
 | MDW-R34 | missing | — | |
@@ -167,3 +167,9 @@ Current ordered item: MDW-R31 DANGER callout, then MDW-R33 subscript/superscript
 - **2026-10-05:** Created with the spec; 92 requirements.
 
 - 2026-10-06 22:25 UTC: MDW-R29 production acceptance passed 12/12 (1.5m) on the guard build. Clipboard and manual fallback preserve terminal newline, 2000-line gutter DOM stays bounded, 320px/landscape controls remain reachable, print removes controls and clipping, and code interaction preserves nested task state. TypeScript/build passed. Cursor MDW-R31; broader regression and publication remain pending.
+
+- 2026-10-07 00:23 UTC: GitHub confirmed R29 source 22f886e35490e2dd5f6257827a33c1757c8f91cb integrated as f0ae66023ecdc754f5681b39b5502c3d59ca5c0e. Integration run 37540554800 and Pages run 37541230836 succeeded. Canonical full validation run 37538813696 passed on preceding seven-item revision bcdd08ea. Requested full validation on current R29 main; its result is not yet available. Cursor MDW-R31.
+
+- 2026-10-07 00:27 UTC: R31 implementation adds DANGER, source-aware literal markers and shared alert CSS in preview/HTML/EPUB. TypeScript passed. Unit checks: 52 passed, 2 failed; failures are unresolved. Browser baseline on unchanged R29 production failed 4/4. Current R31 is partial; production acceptance/release pending.
+
+- 2026-10-07 00:29 UTC: both remaining unit failures came from the default unit runner replacing CSS imports with empty strings, confirmed in official Vitest CSS documentation. The owned test now supplies the tracked stylesheet to verify export logic; production browser checks will verify actual Vite inline CSS. Corrected unit rerun is pending. Clean R31 production build is running.

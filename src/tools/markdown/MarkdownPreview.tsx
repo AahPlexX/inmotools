@@ -6,6 +6,7 @@ import { highlightCodeBlocks } from './code-highlight-engine';
 import { addCodePreviewControls } from './code-preview-controls';
 import type { ScrollAnchor } from './markdown-types';
 import './code-highlight.css';
+import './alert-style.css';
 
 export interface MarkdownPreviewProps {
   readonly preparedSource: string;

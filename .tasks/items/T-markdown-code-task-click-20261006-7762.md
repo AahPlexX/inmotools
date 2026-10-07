@@ -6,7 +6,7 @@ kind: fix
 state: active
 branch: fix/markdown-workbench
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-07
 ---
 
 # Preserve task state when interacting with nested code controls
@@ -15,7 +15,7 @@ updated: 2026-10-06
 Associated MDW-R29 defect: selecting the clipboard fallback in a task-list code block toggled the task and removed the fallback during preview rerender.
 
 ## Resume here
-Live-preview code frames stop click propagation to the task-item click handler. Baseline failed on desktop/touch; production acceptance passed on both, including ordinary task toggling, in the 12/12 guarded R29 checks (1.5m). TypeScript and clean build passed. Full regression and integration/deployment remain pending; the owning ordered task holds the cursor.
+Live-preview code frames stop click propagation to the task-item click handler. Baseline failed on desktop/touch; production acceptance passed on both, including ordinary task toggling, in the 12/12 guarded R29 checks (1.5m). TypeScript and clean build passed. Integrated/deployed as f0ae66023ecdc754f5681b39b5502c3d59ca5c0e: integration run 37540554800 and Pages run 37541230836 succeeded. Full cross-tool validation of that newer revision has been requested and remains pending; the owning ordered task holds the cursor.
 
 ## Log
 - 2026-10-06 22:20 UTC: with clipboard access rejected, clicking the readonly fallback changed `- [ ] Task` to `- [x] Task` and removed the fallback. The owning code frame now isolates its clicks; ordinary task toggling remains in the preview handler.

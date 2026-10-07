@@ -6,7 +6,7 @@ kind: fix
 state: active
 branch: fix/markdown-workbench
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-07
 ---
 
 # Complete ordered Markdown requirement inventory with current verification and resumable records
@@ -15,7 +15,7 @@ updated: 2026-10-06
 Work through the reviewed requirement inventory in its recorded order, implement missing behavior and fix associated bugs. Keep each tool's spec, tracker, evidence and exact next action current in every checkpoint. Record source revisions, reproducible checks, known limitations and the next action at every checkpoint. Preserve browser-only operation, no authentication, no backend/server database.
 
 ## Resume here
-Current item: MDW-R31 DANGER callout, then MDW-R33 subscript/superscript. MDW-R29 production acceptance passed 12/12 (1.5m), including the nested task-click fix, exact clipboard fallback, orientation, keyboard focus and print; TypeScript and clean build passed. The broader Markdown run passed 58/58 (6.2m) on the pre-guard artifact; the separate 12/12 run verifies the guard on its newer artifact. Publish R29 after records checks, then confirm integration/deployment and continue R31. First seven items are integrated/deployed as bcdd08ea4f42067c50f2c54870cf69d13a9902ef, from e8af2c308a5fa0be683ad0e063e661784f8685b8. Canonical full validation run 37538813696 on that seven-item main revision is still in progress; records, unit tests and build passed. Reconcile current upstream before publishing. Worktree: ../inmotools-markdown-workbench, fix/markdown-workbench. In a new environment, resume from current main and committed requirements/tests; local artifacts are optional. Tool remains incomplete.
+Current item: MDW-R31 DANGER callout and associated literal/export fixes, partially implemented. TypeScript, clean production build and 54 alert/render/export unit checks passed. Next: start the built artifact (`markdown-r31-dist`) preview, run tests/e2e/markdown-alerts.spec.ts plus existing Markdown alert/guide regression, then remaining Markdown regression. Tests cover portrait/landscape, light/dark title contrast and self-contained HTML/EPUB styling. The default unit runner empties CSS imports; owned packaging tests supply the tracked CSS and production tests check actual bundled CSS. Advance to MDW-R33 only after scoped verification. First eight items are integrated/deployed as f0ae66023ecdc754f5681b39b5502c3d59ca5c0e; integration run 37540554800 and Pages run 37541230836 succeeded. Full canonical run 37538813696 passed on the preceding seven-item revision bcdd08ea. R29 full validation is run 37551755268, in progress. Reconcile current upstream before publishing. Worktree: ../inmotools-markdown-workbench, fix/markdown-workbench. In a new environment, resume from committed source/tests and these records; local artifacts are optional. Tool remains incomplete.
 
 ## Log
 - 2026-10-06: scope outside the tool folder is limited to owned Markdown unit/browser acceptance tests and generated documentation indexes. New tests are necessary to verify the existing and added requirements; full browser checks are running against the built `770d69e` checkpoint. Combined acceptance passed 10/10 (32.1s), build passed; release/regression pending. Dated sources and portable commands are in `src/tools/markdown/VERIFICATION.md`.
@@ -45,3 +45,13 @@ Current item: MDW-R31 DANGER callout, then MDW-R33 subscript/superscript. MDW-R2
 - 2026-10-06 22:25 UTC: guarded R29 clean build, TypeScript and production acceptance passed 12/12 (1.5m). Initial nested task regression failed on both projects; corrected runtime passed on both, including normal task toggling. An initial new-test attempt incorrectly clicked a disabled preview checkbox; it was stopped and corrected to click its task text, matching the existing preview interaction. Broader Markdown run remains in progress on the pre-guard artifact. Cursor MDW-R31.
 
 - 2026-10-06 22:26 UTC: broader pre-guard production Markdown regression passed 58/58 (6.2m): all eight inventory items, preview/source scrolling, highlighting, oversized fences, Mermaid/Graphviz and HTML/EPUB diagram/code exports. Guard production acceptance separately passed 12/12. Canonical cross-tool full regression remains pending.
+
+- 2026-10-07 00:23 UTC: GitHub confirmed R29 source 22f886e35490e2dd5f6257827a33c1757c8f91cb integrated as f0ae66023ecdc754f5681b39b5502c3d59ca5c0e. Integration run 37540554800 and Pages run 37541230836 succeeded. Canonical full validation run 37538813696 passed on preceding seven-item revision bcdd08ea. Requested full validation on current R29 main; its result is not yet available. Cursor MDW-R31.
+
+- 2026-10-07 00:24 UTC: R31 baseline unit checks 8 failed, 2 passed; DANGER absent and five escaped standard alert markers incorrectly transformed. Added associated task T-markdown-alert-literals-20261007-d920. Source-aware marker matching and detached alert styling are specified before implementation. Browser baseline uses the unchanged R29 guard artifact, restarted after the paused environment stopped the preview process; connection-refused attempts are not product evidence.
+
+- 2026-10-07 00:27 UTC: DANGER, source-aware escaped-marker matching and shared preview/HTML/EPUB alert styling implemented. TypeScript passed; unit run 52 passed/2 failed, unresolved. Browser baseline failed 4/4 on the restarted unchanged R29 production artifact. Current source changes are uncommitted and R31 remains partial. Next: inspect unit failures, correct them, rebuild and run production acceptance.
+
+- 2026-10-07 00:29 UTC: both remaining unit failures came from the default unit runner replacing CSS imports with empty strings, confirmed in official Vitest CSS documentation. The owned test now supplies the tracked stylesheet to verify export logic; production browser checks will verify actual Vite inline CSS. Corrected unit rerun is pending. Clean R31 production build is running.
+
+- 2026-10-07 00:30 UTC: corrected unit harness passed 54/54 (1.78s); TypeScript and clean production build passed. R31 remains partial pending production browsers/regression. Current source and next action are checkpointed before starting those checks.

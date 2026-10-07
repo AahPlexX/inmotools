@@ -1,7 +1,7 @@
 ---
 tool: markdown-workbench
 doc: research
-updated: 2026-10-06
+updated: 2026-10-07
 ---
 
 # Ordered Markdown implementation evidence
@@ -68,9 +68,9 @@ Baseline4/4 failed; initial editor checks passed4/4 (1.6m), including a named dr
 
 ## Current release and MDW-R29 checkpoint
 
-Seven inventory items were published as `e8af2c308a5fa0be683ad0e063e661784f8685b8`, integrated as `bcdd08ea4f42067c50f2c54870cf69d13a9902ef`, and deployed successfully in [Pages run 37537306543](https://github.com/AahPlexX/inmotools/actions/runs/37537306543). Canonical full validation [run 37538813696](https://github.com/AahPlexX/inmotools/actions/runs/37538813696) uses that main revision and the committed configuration. As of 2026-10-06 22:18 UTC, records, unit tests and build passed; browser tests remain in progress. Deployment and validation are separate jobs; deployment success does not certify browser validation.
+Seven inventory items were published as `e8af2c308a5fa0be683ad0e063e661784f8685b8`, integrated as `bcdd08ea4f42067c50f2c54870cf69d13a9902ef`, and deployed successfully in [Pages run 37537306543](https://github.com/AahPlexX/inmotools/actions/runs/37537306543). Canonical full validation [run 37538813696](https://github.com/AahPlexX/inmotools/actions/runs/37538813696) uses that main revision and the committed configuration. Verified on 2026-10-07 00:23 UTC: that run succeeded, including records, unit tests, build and the full browser suite. Deployment and validation are separate jobs; deployment success does not certify browser validation.
 
-MDW-R29 live-preview code controls and the nested task-click guard passed production acceptance 12/12 (1.5m), TypeScript and a clean build. Publication/full regression remain pending. Six focused desktop/touch checks passed (48.7s), plus TypeScript. Clipboard content includes every literal line and terminal newline; blocked clipboard access exposes a readonly, fully selectable fallback. Line-number DOM is bounded to visible lines. Detached exports do not run the preview enhancer. Initial tests exposed a selection fallback dropping a final newline; native textarea selection corrected it.
+MDW-R29 live-preview code controls and the nested task-click guard passed production acceptance 12/12 (1.5m), TypeScript and a clean build. R29 is integrated/deployed as f0ae6602; its full validation run 37551755268 remains in progress. Six focused desktop/touch checks passed (48.7s), plus TypeScript. Clipboard content includes every literal line and terminal newline; blocked clipboard access exposes a readonly, fully selectable fallback. Line-number DOM is bounded to visible lines. Detached exports do not run the preview enhancer. Initial tests exposed a selection fallback dropping a final newline; native textarea selection corrected it.
 
 The unchanged R20 production baseline processed the 2000-line fixture via native paste in 431ms and file import in 1510ms, while direct Playwright `keyboard.insertText` took 60,889ms. These local probes distinguish input paths; they do not establish a universal performance bound or root cause. The committed long-code acceptance uses native clipboard paste. Preserve this observation for MDW-R85 input/performance review. Artifacts: `mdw-r29-fixed-paste.json/log`, `typecheck-r29-fallback.log` and `build-r29.log` in the optional local evidence directory.
 
@@ -79,3 +79,20 @@ Official [MDN Clipboard.writeText](https://developer.mozilla.org/en-US/docs/Web/
 Associated R29 task-click defect: clicking the readonly clipboard fallback inside a task-list item toggled its task and removed the fallback on the initial production artifact. Code frames now stop click propagation to the task handler. Committed regression checks cover source preservation plus ordinary task toggling, horizontal code scrolling at 320×568 and 844×390, keyboard focus and print overflow. The nested-task baseline failed on both projects; guarded production acceptance passed 12/12 (1.5m), including those checks and ordinary task toggling. Artifact: `mdw-r29-guard-production-fixed-test.json/log`, `build-r29-guard.log`, `typecheck-r29-guard.log`. The broader run passed 58/58 (6.2m) on the pre-guard immutable artifact, covering eight inventory items, scroll synchronization, highlighting, oversized fences, task toggling and diagram/code exports. The newer guard artifact separately passed 12/12. Artifact: `mdw-r29-production.json/log`.
 
 For MDW-R31, the official [GitHub alert syntax](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts) returned HTTP 200 at 2026-10-06 22:24:21 UTC. It lists NOTE, TIP, IMPORTANT, WARNING and CAUTION. DANGER is a Workbench extension, not one of those five GitHub kinds. Implementation has not started in this checkpoint.
+
+- 2026-10-07 00:23 UTC: GitHub confirmed R29 source 22f886e35490e2dd5f6257827a33c1757c8f91cb integrated as f0ae66023ecdc754f5681b39b5502c3d59ca5c0e. Integration run 37540554800 and Pages run 37541230836 succeeded. Canonical full validation run 37538813696 passed on preceding seven-item revision bcdd08ea. Requested full validation on current R29 main; its result is not yet available. Cursor MDW-R31.
+
+
+## MDW-R31 current checkpoint
+
+As of 2026-10-07 00:30 UTC, DANGER, source-aware escaped-marker preservation and shared alert styling are implemented locally. TypeScript, a clean production build and corrected alert/render/export unit checks passed 54/54 (1.78s). Production acceptance remains pending. Twelve-case baseline units had 10 failures and 2 passes; detached warning styles were absent. Four browser baseline checks failed on the unchanged R29 guard production artifact. Stopped-server connection-refused attempts are environment failures, not product evidence.
+
+Next: serve the clean production artifact and run `pnpm test:e2e tests/e2e/markdown-alerts.spec.ts --workers=1`, then Markdown regression. Artifacts: `mdw-r31-unit-export-baseline.log`, `mdw-r31-units.log`, `mdw-r31-browser-baseline-active.json/log`, `typecheck-r31.log`.
+
+Official [GitHub syntax](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts), [unified API](https://github.com/unifiedjs/unified#processorrunsynctree-file) and [CommonMark 0.31.2](https://spec.commonmark.org/0.31.2/) were refreshed HTTP 200 on 2026-10-07 00:24:28–29 UTC. GitHub lists five standard kinds; DANGER is documented as a Workbench extension. The unified runSync API accepts the source file alongside the parsed tree, allowing original marker bytes to be checked before transforming unescaped text.
+
+Full validation of integrated/deployed R29 main f0ae6602 is [run 37551755268](https://github.com/AahPlexX/inmotools/actions/runs/37551755268), in progress. It does not cover newer R31 changes.
+
+At 2026-10-07 00:29 UTC the two remaining unit failures were identified as the default unit runner replacing CSS imports with empty strings. Official [Vitest CSS configuration](https://vitest.dev/config/css) returned HTTP 200 at 00:29:07 UTC and documents this behavior. The owned export test supplies the tracked CSS file to verify packaging logic; production acceptance checks actual Vite inline CSS separately. Corrected rerun/build remain pending.
+
+Corrected unit harness passed 54/54 (1.78s); TypeScript and clean build passed at the R31 implementation checkpoint. Artifacts: `mdw-r31-units-corrected-harness.log`, `typecheck-r31.log`, `build-r31.log`. Production cases measure callout bounds at 320×568 and 844×390, title contrast in light/dark workspaces, and downloaded HTML rendering plus EPUB stylesheet packaging. Official [WCAG 2.2 Contrast Minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html) returned HTTP 200 at 2026-10-07 00:30:28 UTC; normal text requires 4.5:1. No production-browser result is claimed yet.

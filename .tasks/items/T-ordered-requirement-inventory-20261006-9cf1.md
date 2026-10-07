@@ -5,7 +5,7 @@ kind: fix
 state: active
 branch: fix/markdown-workbench
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-07
 ---
 
 # Ordered requirement implementation
@@ -80,3 +80,9 @@ Baseline: `3d64fdeff005555388cb2f593ed5c15bfa3b7756`. Existing acceptance defini
 - 2026-10-06 22:18 UTC: first seven inventory items integrated as bcdd08ea4f42067c50f2c54870cf69d13a9902ef; Pages run 37537306543 succeeded. Current item MDW-R29 passed six focused checks and TypeScript, with production acceptance pending. Canonical full validation run 37538813696 on the seven-item main revision has passed records, units and build; browser checks remain in progress.
 
 - 2026-10-06 22:25 UTC: MDW-R29 production acceptance passed 12/12 with associated task-click fix; TypeScript/build passed. Cursor MDW-R31. Broader pre-guard Markdown regression passed 58/58; the guard separately passed 12/12. Canonical cross-tool validation and the next checkpoint's integration/deployment remain pending.
+
+- 2026-10-07 00:23 UTC: GitHub confirmed R29 source 22f886e35490e2dd5f6257827a33c1757c8f91cb integrated as f0ae66023ecdc754f5681b39b5502c3d59ca5c0e. Integration run 37540554800 and Pages run 37541230836 succeeded. Canonical full validation run 37538813696 passed on preceding seven-item revision bcdd08ea. Requested full validation on current R29 main; its result is not yet available. Cursor MDW-R31.
+
+- 2026-10-07 00:27 UTC: cursor remains MDW-R31. Implementation is partial; TypeScript passed, current units 52 passed/2 failed. R29 full validation is run 37551755268, in progress. Next: resolve R31 unit failures, then production acceptance.
+
+- 2026-10-07 00:30 UTC: MDW-R31 remains partial; 54 unit checks, TypeScript and clean build passed. Next: production acceptance and Markdown regression. Current source/records are checkpointed before those checks.
