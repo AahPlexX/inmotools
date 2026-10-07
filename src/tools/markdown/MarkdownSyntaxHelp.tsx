@@ -29,6 +29,7 @@ const SYNTAX_GROUPS = [
     title: 'Alerts, footnotes & emoji',
     examples: [
       '> [!NOTE]\n> One of NOTE, TIP, IMPORTANT,\n> WARNING, or CAUTION',
+      '> [!DANGER]\n> Workbench extension for critical warnings',
       'A claim needing a source.[^1]\n\n[^1]: The source.',
       ':tada: :rocket: :bulb:',
     ],

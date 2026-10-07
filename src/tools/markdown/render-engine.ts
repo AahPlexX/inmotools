@@ -66,7 +66,7 @@ const isElement = (node: HastRootContent): node is Element => node.type === 'ele
 
 export const renderMarkdown = (source: string): RenderResult => {
   const processor = createProcessor();
-  const tree = processor.runSync(processor.parse(source)) as HastRoot;
+  const tree = processor.runSync(processor.parse(source), source) as HastRoot;
 
   const anchors: ScrollAnchor[] = [];
   const seenLines = new Set<number>();

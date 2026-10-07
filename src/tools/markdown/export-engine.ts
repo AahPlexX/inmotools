@@ -18,6 +18,7 @@ import JSZip from 'jszip';
 import type { Root as MdastRoot, RootContent as MdastRootContent, PhrasingContent, Nodes, Definition } from 'mdast';
 import katexExportCss from 'katex/dist/katex.css?inline';
 import codeHighlightCss from './code-highlight.css?inline';
+import alertStyleCss from './alert-style.css?inline';
 import { bundleStylesheetAssetsForEpub, type ExportAsset } from './export-assets';
 
 const escapeHtml = (value: string): string =>
@@ -29,6 +30,9 @@ export interface StandaloneHtmlOptions {
 
 const hasHighlightedCode = (bodyHtml: string): boolean =>
   /class=(['"])[^'"]*\btok-[A-Za-z][^'"]*\1/.test(bodyHtml);
+
+const hasAlerts = (bodyHtml: string): boolean =>
+  /class=(['"])[^'"]*\bmarkdown-alert\b[^'"]*\1/.test(bodyHtml);
 
 export const buildStandaloneMarkdownHtml = (
   title: string,
@@ -51,6 +55,7 @@ export const buildStandaloneMarkdownHtml = (
   .katex-display { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
   .katex-error { color: #b3261e; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 ${hasHighlightedCode(bodyHtml) ? codeHighlightCss : ''}
+${hasAlerts(bodyHtml) ? alertStyleCss : ''}
 ${options.additionalCss ?? ''}
 </style>
 </head>
@@ -428,6 +433,10 @@ export const buildEpubArchive = async (
   }
   if (hasHighlightedCode(bodyHtml)) {
     stylesheetCss = [stylesheetCss, codeHighlightCss].filter(Boolean).join('\n');
+  }
+
+  if (hasAlerts(bodyHtml)) {
+    stylesheetCss = [stylesheetCss, alertStyleCss].filter(Boolean).join('\n');
   }
 
   const stylesheetPath = stylesheetCss ? 'styles/markdown.css' : undefined;
