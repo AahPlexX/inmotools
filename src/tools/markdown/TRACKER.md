@@ -13,7 +13,7 @@ updated: 2026-10-07
 
 ## Resume here
 
-Current ordered item: MDW-R31 DANGER callout and associated literal/export fixes, partially implemented. TypeScript, clean build and 54 alert/render/export unit checks passed. Next: production browser acceptance (portrait/landscape, light/dark, standalone HTML and EPUB), then Markdown regression; advance to MDW-R33 only after scoped checks pass. MDW-R09/12/15/17/18/19/20 passed full validation run 37538813696 and are integrated/deployed. R29 integrated/deployed as f0ae6602; its full validation run 37551755268 is in progress. Tool remains incomplete; compute counts with pnpm tool:check markdown-workbench.
+Current ordered item: MDW-R33 subscript/superscript, then MDW-R34 abbreviations. MDW-R31 production acceptance passed 10/10, including literal escapes, formatting, portrait/landscape bounds, light/dark title contrast, guide usability and self-contained HTML/EPUB styles; TypeScript, clean build and 54 units passed. Source 8787c115 is published; integration run 37552440278 is in progress. Frozen all-Markdown regression on that source is running; do not rebuild its artifact. R29 full validation run 37551755268 is in progress; preceding seven-item full run 37538813696 passed. Tool remains incomplete; compute counts with pnpm tool:check markdown-workbench.
 
 ## Documents
 
@@ -62,7 +62,7 @@ Current ordered item: MDW-R31 DANGER callout and associated literal/export fixes
 | MDW-R28 | verified | e2e "an oversized recognized fence remains readable without running cosmetic syntax highlighting"; unit "leaves an oversized recognized fence plain instead of parsing it for cosmetic highlighting" | |
 | MDW-R29 | verified | e2e "MDW-R29 numbered code copies every literal line and keeps preview controls out of HTML exports", "MDW-R29 denied clipboard access offers selection of code without line numbers", "MDW-R29 long code keeps the numbered gutter bounded while showing the last lines", "MDW-R29 selecting code inside a task preserves its checkbox while ordinary task clicks still work", "MDW-R29 code controls wrap through orientation changes and print without clipping or copy controls" | Production desktop/touch checks 12/12 including ordinary task toggling; TypeScript and clean build passed. Full regression/release pending |
 | MDW-R30 | verified | e2e "GitHub-style alert blockquotes render as styled callouts instead of plain quotes"; unit "leaves an ordinary blockquote without a marker untouched" | |
-| MDW-R31 | partial | `github-alerts-plugin.ts`, `alert-style.css`, detached exporter styling; new alert tests | DANGER/source-aware literal matching and shared preview/export styles implemented. TypeScript, clean build and 54 unit checks passed; production acceptance pending. Baseline 10 unit failures/2 passes and 4 browser failures |
+| MDW-R31 | verified | e2e "MDW-R31 DANGER previews preserve formatting and literal escapes through orientation changes", "MDW-R31 standalone HTML and EPUB retain the callout title, body and self-contained styling"; unit "renders %s with a title, body formatting and source anchor", "keeps an escaped %s marker literal", "retains existing alert styling in standalone HTML", "packages existing alert styling in EPUB" | Production acceptance plus alert/guide regression 10/10; light/dark contrast, 320px/landscape, source escapes and detached exports passed. Unit checks 54/54, TypeScript/build passed; full regression/release pending |
 | MDW-R32 | verified | e2e "a recognized emoji shortcode renders as its emoji in the live preview"; unit "converts a recognized emoji shortcode and leaves an unrecognized one exactly as written", "does not convert emoji-shaped text inside inline code or a fenced code block" | |
 | MDW-R33 | missing | — | |
 | MDW-R34 | missing | — | |
@@ -129,7 +129,7 @@ Current ordered item: MDW-R31 DANGER callout and associated literal/export fixes
 
 1. Tests for implemented rows: MDW-R68.
 2. Editing: listed editing requirements complete; retain regression coverage.
-3. Markdown syntax and rendering: MDW-R31, MDW-R33, MDW-R34, MDW-R35, MDW-R36, MDW-R38.
+3. Markdown syntax and rendering: MDW-R33, MDW-R34, MDW-R35, MDW-R36, MDW-R38.
 4. Citations: MDW-R51.
 5. Navigation and metrics: MDW-R55, MDW-R56, MDW-R57.
 6. Files and storage: MDW-R69, MDW-R70, MDW-R71, MDW-R72.
@@ -173,3 +173,5 @@ Current ordered item: MDW-R31 DANGER callout and associated literal/export fixes
 - 2026-10-07 00:27 UTC: R31 implementation adds DANGER, source-aware literal markers and shared alert CSS in preview/HTML/EPUB. TypeScript passed. Unit checks: 52 passed, 2 failed; failures are unresolved. Browser baseline on unchanged R29 production failed 4/4. Current R31 is partial; production acceptance/release pending.
 
 - 2026-10-07 00:29 UTC: both remaining unit failures came from the default unit runner replacing CSS imports with empty strings, confirmed in official Vitest CSS documentation. The owned test now supplies the tracked stylesheet to verify export logic; production browser checks will verify actual Vite inline CSS. Corrected unit rerun is pending. Clean R31 production build is running.
+
+- 2026-10-07 00:32 UTC: MDW-R31 production acceptance/alert and guide regression passed 10/10 (30.8s). Source 8787c115 published and local/remote trees equal. Cursor MDW-R33. Integration run 37552440278 and frozen full Markdown regression are in progress.

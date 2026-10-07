@@ -14,7 +14,7 @@ updated: 2026-10-07
 Complete the reviewed inventory in the frozen order below, including associated bugs. Maintain current per-tool requirements, verification evidence and resumable progress. Preserve existing verified behavior and the static browser-only architecture. Record exact source revisions, reproducible checks, known limitations and the next action at every checkpoint.
 
 ## Resume here
-Current tool: 1, Markdown Workbench. Current requirement: MDW-R31. Read its current tracker/spec and active tool task first. Work each frozen ID sequentially; an item already complete still needs current acceptance evidence. On finishing the listed items, resolve that tool's associated confirmed audit bugs and run its completion checks before advancing. All tool tasks stay active until integration/deployment evidence exists; incomplete work is never labeled done.
+Current tool: 1, Markdown Workbench. Current requirement: MDW-R33. Read its current tracker/spec and active tool task first. Work each frozen ID sequentially; an item already complete still needs current acceptance evidence. On finishing the listed items, resolve that tool's associated confirmed audit bugs and run its completion checks before advancing. All tool tasks stay active until integration/deployment evidence exists; incomplete work is never labeled done.
 
 Before each checkpoint: update the tool tracker requirement row, its Resume here, active tool task and this cursor in the same commit. Record exact commands/outcomes, source/check commit, limitations and next item. Verify changes on the pushed/integrated revision. Reconcile current upstream changes instead of applying the audit snapshot blindly. If a physical check is required, preserve its explicit awaiting-human flag and do not invent verification.
 
@@ -86,3 +86,5 @@ Baseline: `3d64fdeff005555388cb2f593ed5c15bfa3b7756`. Existing acceptance defini
 - 2026-10-07 00:27 UTC: cursor remains MDW-R31. Implementation is partial; TypeScript passed, current units 52 passed/2 failed. R29 full validation is run 37551755268, in progress. Next: resolve R31 unit failures, then production acceptance.
 
 - 2026-10-07 00:30 UTC: MDW-R31 remains partial; 54 unit checks, TypeScript and clean build passed. Next: production acceptance and Markdown regression. Current source/records are checkpointed before those checks.
+
+- 2026-10-07 00:32 UTC: MDW-R31 verified for scoped production acceptance (10/10), 54 units, TypeScript/build. Source 8787c115 is published; integration and frozen all-Markdown regression are running. Cursor MDW-R33.
