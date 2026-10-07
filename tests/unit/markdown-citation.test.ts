@@ -127,6 +127,7 @@ describe('citation formatting against the bundled CSL styles', () => {
     await expect(formatCitations(library, ['invalidkey'], 'apa')).resolves.toEqual({
       inText: new Map(),
       bibliographyHtml: [],
+      bibliographyMarkdown: '',
       unresolved: ['invalidkey'],
     });
   });
@@ -139,6 +140,15 @@ describe('citation formatting against the bundled CSL styles', () => {
 
 
 describe('citekey extraction', () => {
+  it('ignores native variable fences, multiline spans, indented code and escaped markers', () => {
+    const source = 'See [@real].\n\n    [@indented]\n\n``[@span] ` inner``\n\n````md\n```\n[@fence]\n````\n\n\\[@escaped]\n\n$[@math]$';
+    expect(extractCitekeys(source)).toEqual(['real']);
+  });
+
+  it('uses authored prose positions in metadata, quoted disclosures and link boundaries', () => {
+    const source = '---\ntitle: "[@metadata]"\n---\n\n> <details>\n> <summary>See [@caption] and ``[@literal] ` inner``</summary>\n>\n> Real [@body].\n>\n> </details>\n\n[Link](https://example.invalid/[@url])\n\n[@reference]: https://example.invalid';
+    expect(extractCitekeys(source)).toEqual(['caption', 'body']);
+  });
   it('finds a single citekey', () => {
     expect(extractCitekeys('See [@smith2024] for details.')).toEqual(['smith2024']);
   });
@@ -173,6 +183,11 @@ describe('in-text citation substitution', () => {
     ['smith2024', '(Smith, 2024)'],
     ['doe2023', '(Doe, 2023)'],
   ]);
+
+  it('preserves all native code marker bytes while resolving real prose', () => {
+    const literal = '    [@smith2024]\n\n``[@smith2024] ` inner``\n\n````md\n```\n[@smith2024]\n````';
+    expect(substituteInTextCitations('See [@smith2024].\n\n' + literal, inText)).toBe('See (Smith, 2024).\n\n' + literal);
+  });
 
   it('replaces a resolved marker with its formatted citation', () => {
     expect(substituteInTextCitations('See [@smith2024].', inText)).toBe('See (Smith, 2024).');
@@ -213,4 +228,22 @@ describe('in-text citation substitution', () => {
   it('is a no-op when no citations were formatted', () => {
     expect(substituteInTextCitations('See [@smith2024].', new Map())).toBe('See [@smith2024].');
   });
+});
+
+
+describe('citation positions after native metadata', () => {
+  const headers = [
+    ['yaml', '---\ntitle: "[@metadata]"\n---'],
+    ['toml', '+++\ntitle = "[@metadata]"\n+++'],
+    ['json', '{\n"title": "brace } and [@metadata]"\n}'],
+  ] as const;
+  for (const [format, header] of headers) {
+    for (const newline of ['\n', '\r\n', '\r']) {
+      it(`uses original ${format} body offsets with ${JSON.stringify(newline)} line endings`, () => {
+        const source = header.replace(/\n/g, newline) + newline + ['', '[@alpha].', '', '    [@literal]', '', 'End.', ''].join(newline);
+        expect(extractCitekeys(source)).toEqual(['alpha']);
+        expect(substituteInTextCitations(source, new Map([['alpha', '(Alpha, 2026)']]))).toBe(source.replace('[@alpha]', '(Alpha, 2026)'));
+      });
+    }
+  }
 });

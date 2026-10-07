@@ -1,9 +1,35 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createPreloadErrorRecoveryHandler, recoverLatestDeployment } from '../../src/lib/deployment-recovery';
+import { createPreloadErrorRecoveryHandler, recoverLatestDeployment, registerPreloadRecoveryGuard } from '../../src/lib/deployment-recovery';
 
 const fakeEvent = () => ({ preventDefault: vi.fn() }) as unknown as Event;
 
 describe('deployment recovery', () => {
+  it('leaves a guarded importer failure observable and restores ordinary recovery after cleanup', () => {
+    const recover = vi.fn();
+    const event = fakeEvent();
+    const remove = registerPreloadRecoveryGuard(() => true);
+    const handler = createPreloadErrorRecoveryHandler({ recover, readMarker: () => null, writeMarker: vi.fn() });
+    try {
+      handler(event);
+      expect(event.preventDefault).not.toHaveBeenCalled();
+      expect(recover).not.toHaveBeenCalled();
+    } finally { remove(); }
+    handler(event);
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(recover).toHaveBeenCalledOnce();
+  });
+
+  it('keeps recovery enabled when an optional guard does not match or throws', () => {
+    const recover = vi.fn();
+    const event = fakeEvent();
+    const removeFalse = registerPreloadRecoveryGuard(() => false);
+    const removeBroken = registerPreloadRecoveryGuard(() => { throw new Error('Synthetic guard fault'); });
+    try {
+      createPreloadErrorRecoveryHandler({ recover, readMarker: () => null, writeMarker: vi.fn() })(event);
+      expect(event.preventDefault).toHaveBeenCalledOnce();
+      expect(recover).toHaveBeenCalledOnce();
+    } finally { removeFalse(); removeBroken(); }
+  });
   it('suppresses the preload error and starts one recovery attempt', async () => {
     const recover = vi.fn(() => Promise.resolve());
     const writeMarker = vi.fn();

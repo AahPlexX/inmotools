@@ -44,8 +44,8 @@ const sanitizeSchema = {
   ],
 };
 
-const createProcessor = () =>
-  createMarkdownParser()
+const createProcessor = (generatedSection: string) =>
+  createMarkdownParser(generatedSection)
     .use(remarkGithubAlerts)
     .use(remarkHeadingIds)
     .use(remarkEmoji)
@@ -60,8 +60,8 @@ const createProcessor = () =>
 
 const isElement = (node: HastRootContent): node is Element => node.type === 'element';
 
-export const renderMarkdown = (source: string): RenderResult => {
-  const processor = createProcessor();
+export const renderMarkdown = (source: string, generatedSection = ''): RenderResult => {
+  const processor = createProcessor(generatedSection);
   const tree = processor.runSync(processor.parse(source), source) as HastRoot;
 
   const anchors: ScrollAnchor[] = [];

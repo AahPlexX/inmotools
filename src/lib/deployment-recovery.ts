@@ -4,6 +4,12 @@ const RECOVERY_RESET_MS = 60_000;
 const WORKER_STATE_TIMEOUT_MS = 4_000;
 
 type RecoveryAction = () => void | Promise<void>;
+const preloadRecoveryGuards = new Set<() => boolean>();
+
+export const registerPreloadRecoveryGuard = (preserveOpenWork: () => boolean) => {
+  preloadRecoveryGuards.add(preserveOpenWork);
+  return () => { preloadRecoveryGuards.delete(preserveOpenWork); };
+};
 
 interface PreloadRecoveryOptions {
   readonly now?: () => number;
@@ -75,6 +81,11 @@ export const createPreloadErrorRecoveryHandler = ({
   readMarker = () => window.sessionStorage.getItem(PRELOAD_RECOVERY_KEY),
   writeMarker = (value) => window.sessionStorage.setItem(PRELOAD_RECOVERY_KEY, value),
 }: PreloadRecoveryOptions = {}) => (event: Event) => {
+  for (const preserveOpenWork of preloadRecoveryGuards) {
+    try {
+      if (preserveOpenWork()) return;
+    } catch { /* A broken optional guard must not disable ordinary recovery. */ }
+  }
   event.preventDefault();
 
   const timestamp = now();

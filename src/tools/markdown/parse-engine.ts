@@ -6,7 +6,7 @@ import remarkScripts from './script-plugin';
 import remarkDisclosures from './disclosure-plugin';
 import remarkAbbreviations from './abbreviation-plugin';
 import { remarkDefinitionList } from 'remark-definition-list';
-import type { Root, RootContent } from 'mdast';
+import type { Root, RootContent, Nodes } from 'mdast';
 import { parseFrontmatter, stripFrontmatter } from './frontmatter-engine';
 import type { ParsedDocument, SourceLineNode } from './markdown-types';
 
@@ -17,10 +17,23 @@ import type { ParsedDocument, SourceLineNode } from './markdown-types';
 // headings, paragraphs, tables, and code/diagram/math blocks with the
 // preview, without the cost of tracking every inline node.
 
-export const createMarkdownParser = () => unified().use(remarkParse).use(remarkGfm, { singleTilde: false }).use(remarkMath).use(remarkScripts).use(remarkDisclosures).use(remarkAbbreviations).use(remarkDefinitionList);
+export const createMarkdownParser = (generatedSection = '') => {
+  const processor = unified().use(remarkParse).use(remarkGfm, { singleTilde: false }).use(remarkMath).use(remarkScripts).use(remarkDisclosures).use(remarkAbbreviations).use(remarkDefinitionList);
+  if (generatedSection) processor.use(() => (tree: Root) => {
+    const section = parseMarkdownTree(generatedSection);
+    const stack: Nodes[] = [section];
+    while (stack.length) {
+      const node = stack.pop()!;
+      delete node.position;
+      if ('children' in node) stack.push(...node.children as Nodes[]);
+    }
+    tree.children.push(...section.children);
+  });
+  return processor;
+};
 
-export const parseMarkdownTree = (source: string): Root => {
-  const processor = createMarkdownParser();
+export const parseMarkdownTree = (source: string, generatedSection = ''): Root => {
+  const processor = createMarkdownParser(generatedSection);
   return processor.runSync(processor.parse(source), source) as Root;
 };
 

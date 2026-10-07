@@ -4,6 +4,7 @@ import { downloadBytes, downloadText } from '../../lib/download';
 import { requestSupportPrompt } from '../../lib/support';
 import MarkdownEditor from './MarkdownEditor';
 import MarkdownPreview from './MarkdownPreview';
+import { registerPreloadRecoveryGuard } from '../../lib/deployment-recovery';
 import { revealDisclosureTarget } from './disclosure-dom';
 import MarkdownSyntaxHelp from './MarkdownSyntaxHelp';
 import { parseMarkdownTree, parseMarkdown } from './parse-engine';
@@ -21,6 +22,7 @@ import { splitIntoSlides } from './slide-engine';
 import { buildOutline } from './outline-engine';
 import { collectMathDiagnostics } from './math-engine';
 import { applyPreparedCitations, prepareDocument, toFilenameStem } from './document-pipeline';
+import { appendReferencesMarkdown } from './bibliography-engine';
 import { commitHistory, createHistory, redoHistory, replaceHistoryPresent, undoHistory } from './state-engine';
 import {
   createDraftRecord,
@@ -119,13 +121,17 @@ Start writing here. Add **bold text**, tables, math like $E = mc^2$, diagrams, a
 | Widgets | 4 | 2.5 | =B2*C2 |
 `;
 
-const parseToMdast = (source: string): MdastRoot =>
-  parseMarkdownTree(source);
+const parseToMdast = (source: string, references = ''): MdastRoot =>
+  parseMarkdownTree(source, references);
 
 const formatBytes = (bytes: number): string =>
   bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 export default function MarkdownWorkspace() {
+  useEffect(() => {
+    const workspaceRoute = window.location.hash;
+    return registerPreloadRecoveryGuard(() => window.location.hash === workspaceRoute);
+  }, []);
   const [view, setView] = useState<ViewMode>(() => loadEditorPrefs().view ?? 'split');
   const [history, setHistory] = useState<ProjectHistory<string>>(() => createHistory(DEFAULT_SOURCE));
   const source = history.present;
@@ -172,6 +178,7 @@ export default function MarkdownWorkspace() {
   const [bibliographyText, setBibliographyText] = useState('');
   const [bibliographyFormat, setBibliographyFormat] = useState<'bib' | 'json'>('bib');
   const [citationStyle, setCitationStyle] = useState<CitationStyleId>('apa');
+  const [citationFailureKey, setCitationFailureKey] = useState<string | null>(null);
   const [citationSnapshot, setCitationSnapshot] = useState<{
     readonly key: string;
     readonly result: FormattedCitations;
@@ -363,7 +370,7 @@ export default function MarkdownWorkspace() {
   const citationLibrary = citationParse.library;
   const citationProblem = citationParse.problem;
 
-  const citekeys = useMemo(() => extractCitekeys(source), [source]);
+  const citekeys = useMemo(() => extractCitekeys(source, parsed), [source, parsed]);
   const citekeySignature = citekeys.join('\u0000');
   const citationRequestKey = useMemo(
     () => JSON.stringify([bibliographyFormat, bibliographyText, citationStyle, citekeySignature]),
@@ -377,12 +384,17 @@ export default function MarkdownWorkspace() {
     citationLibrary && citationSnapshot?.key === citationRequestKey
       ? citationSnapshot.result
       : null;
+  const citationFormatFailed = Boolean(citationLibrary && citationFailureKey === citationRequestKey);
+  const citationsPending = Boolean(citationLibrary && citekeys.length > 0 && !citationResult && !citationFormatFailed);
+  const citationExportBlocked = citationsPending || citationFormatFailed;
 
   useEffect(() => {
     if (!citationLibrary || citekeys.length === 0) {
       setCitationSnapshot(null);
+      setCitationFailureKey(null);
       return;
     }
+    setCitationFailureKey(null);
     let cancelled = false;
     const requestKey = citationRequestKey;
     formatCitations(citationLibrary, citekeys, citationStyle)
@@ -392,6 +404,7 @@ export default function MarkdownWorkspace() {
       .catch(() => {
         if (!cancelled) {
           setCitationSnapshot(null);
+          setCitationFailureKey(requestKey);
           setStatus('Citation formatting failed for the selected style.');
         }
       });
@@ -430,6 +443,7 @@ export default function MarkdownWorkspace() {
     () => applyPreparedCitations(formulaPreparedSource, citationResult?.inText),
     [formulaPreparedSource, citationResult],
   );
+  const generatedReferences = citationResult?.bibliographyMarkdown ?? '';
 
   const handlePreviewRenderStateChange = useCallback((pending: boolean) => {
     previewPendingRef.current = pending;
@@ -620,11 +634,11 @@ export default function MarkdownWorkspace() {
     // jank. Rendering into a detached host also guarantees Source view and a
     // still-settling live preview export the same current document.
     const scratch = document.createElement('div');
-    scratch.innerHTML = renderMarkdown(prepareExportSource()).html;
+    scratch.innerHTML = renderMarkdown(prepareExportSource(), generatedReferences).html;
     await highlightCodeBlocks(scratch);
     await renderDiagramBlocks(scratch);
     return scratch.innerHTML;
-  }, [prepareExportSource]);
+  }, [prepareExportSource, generatedReferences]);
 
   const noteExport = (message: string) => {
     requestSupportPrompt({ key: 'markdown-workbench-export', message });
@@ -637,7 +651,7 @@ export default function MarkdownWorkspace() {
   };
 
   const exportRenderedMarkdown = () => {
-    downloadText(prepareExportSource(), `${filenameStem}.rendered.md`);
+    downloadText(appendReferencesMarkdown(prepareExportSource(), generatedReferences), `${filenameStem}.rendered.md`);
     setStatus(`Exported ${filenameStem}.rendered.md with table formulas evaluated and citations formatted.`);
     noteExport('Exported your document locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
   };
@@ -662,14 +676,14 @@ export default function MarkdownWorkspace() {
   };
 
   const exportAstJson = () => {
-    downloadText(buildAstJson(parseToMdast(prepareExportSource())), `${filenameStem}.ast.json`, 'application/json;charset=utf-8');
+    downloadText(buildAstJson(parseToMdast(prepareExportSource(), generatedReferences)), `${filenameStem}.ast.json`, 'application/json;charset=utf-8');
     setStatus(`Exported ${filenameStem}.ast.json for the prepared document (formulas evaluated, citations formatted).`);
   };
 
   const exportDocx = async () => {
     setStatus('Generating DOCX…');
     try {
-      const bytes = await renderDocxToBytes(parseToMdast(prepareExportSource()));
+      const bytes = await renderDocxToBytes(parseToMdast(prepareExportSource(), generatedReferences));
       downloadBytes(bytes, `${filenameStem}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       setStatus(`Exported ${filenameStem}.docx. Code blocks, blockquotes, ordered lists, links, and image references are preserved; math remains non-editable plain text unless rasterized.`);
       noteExport('Exported your document locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
@@ -870,12 +884,12 @@ export default function MarkdownWorkspace() {
           <span className="markdown-workbench-toolbar-label">Export as</span>
           <div className="markdown-workbench-toolbar-group markdown-workbench-export-group">
             <button type="button" onClick={exportMarkdown} title="Download the source you typed, with formulas and citation markers left as written.">Markdown</button>
-            <button type="button" onClick={exportRenderedMarkdown} title="Download Markdown after table formulas and citations are filled in.">Rendered Markdown</button>
-            <button type="button" onClick={() => void exportHtml()} title="Download one HTML file with the rendered document, diagrams, and images bundled in.">Standalone HTML</button>
-            <button type="button" onClick={printDocument} title="Print the rendered preview, or save it as PDF from the print dialog. Switch out of Source view first.">Print / PDF</button>
-            <button type="button" onClick={() => void exportDocx()} title="Download a Word file. Math stays as plain text.">DOCX</button>
-            <button type="button" onClick={() => void exportEpub()} title="Package a structural EPUB on this device. It is not EPUBCheck-validated.">EPUB (structural)</button>
-            <button type="button" onClick={exportAstJson} title="Download the prepared document as a syntax tree, for inspection rather than reading.">AST JSON</button>
+            <button type="button" disabled={citationExportBlocked} onClick={exportRenderedMarkdown} title="Download Markdown with formulas evaluated, citations formatted and References included. Available when citation formatting finishes.">Rendered Markdown</button>
+            <button type="button" disabled={citationExportBlocked} onClick={() => void exportHtml()} title="Download one HTML file with the rendered document, diagrams, and images bundled in. Available when citation formatting finishes.">Standalone HTML</button>
+            <button type="button" disabled={citationExportBlocked} onClick={printDocument} title="Print the rendered preview, or save it as PDF from the print dialog. Switch out of Source view first. Available when citation formatting finishes.">Print / PDF</button>
+            <button type="button" disabled={citationExportBlocked} onClick={() => void exportDocx()} title="Download a Word file. Math stays as plain text. Available when citation formatting finishes.">DOCX</button>
+            <button type="button" disabled={citationExportBlocked} onClick={() => void exportEpub()} title="Package a structural EPUB on this device. It is not EPUBCheck-validated. Available when citation formatting finishes.">EPUB (structural)</button>
+            <button type="button" disabled={citationExportBlocked} onClick={exportAstJson} title="Download the prepared document as a syntax tree, for inspection rather than reading. Available when citation formatting finishes.">AST JSON</button>
           </div>
         </div>
       </div>
@@ -917,6 +931,7 @@ export default function MarkdownWorkspace() {
           <div className="markdown-workbench-preview-pane" ref={previewHostRef}>
             <MarkdownPreview
               preparedSource={preparedSource}
+              generatedReferences={generatedReferences}
               documentKey={previewDocumentKey}
               onNotice={setStatus}
               onAnchorsMeasured={handleAnchorsMeasured}
@@ -1020,6 +1035,9 @@ export default function MarkdownWorkspace() {
 
       <details className="markdown-workbench-panel">
         <summary>Citations ({citekeys.length} referenced)</summary>
+        <p className="markdown-workbench-hint">Resolved document citations add a References section to preview and rendered exports. Original Markdown keeps your citation markers. Code examples, metadata and uncited library entries are excluded.</p>
+        {citationsPending ? <p className="markdown-workbench-hint" role="status">Formatting citations… Rendered exports will be available when this finishes.</p> : null}
+        {citationFormatFailed ? <p className="markdown-workbench-citation-warning" role="alert">Couldn’t format these citations. Check the bibliography or choose another style. Original Markdown is available.</p> : null}
         <div className="markdown-workbench-citation-controls">
           <label>
             Bibliography format
@@ -1043,7 +1061,7 @@ export default function MarkdownWorkspace() {
           value={bibliographyText}
           onChange={(event) => setBibliographyText(event.target.value)}
         />
-        <p className="markdown-workbench-hint">Reference a source with <code>[@citekey]</code>. Resolved markers are replaced with formatted citations in the preview and in every export; an unresolved marker is left exactly as written so it stays visible.</p>
+        <p className="markdown-workbench-hint">Reference a source with <code>[@citekey]</code>. Resolved markers are formatted in preview and rendered exports; unresolved markers remain visible. Original Markdown keeps the markers.</p>
         {citationProblem ? <p className="markdown-workbench-citation-warning" role="alert">{citationProblem}</p> : null}
         {citationResult ? (
           <div className="markdown-workbench-citation-preview">

@@ -13,9 +13,9 @@ declare module 'citeproc' {
     constructor(sys: CiteprocSys, style: string, lang?: string, forceLang?: boolean);
     updateItems(idList: string[]): void;
     processCitationCluster(
-      citation: { citationItems: { id: string; locator?: string; label?: string }[]; properties: { noteIndex: number } },
-      citationsPre: unknown[],
-      citationsPost: unknown[],
+      citation: { citationID?: string; citationItems: { id: string; locator?: string; label?: string }[]; properties: { noteIndex: number } },
+      citationsPre: [string, number][],
+      citationsPost: [string, number][],
     ): [unknown, [number, string, string][]];
     makeBibliography(): [unknown, string[]] | false;
   }
