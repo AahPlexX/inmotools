@@ -66,6 +66,9 @@ test('MDW-R34 actual exports preserve semantic abbreviations, accessible expansi
   await exported.getByText('Abbreviations (1)', { exact: true }).click();
   await expect(exported.locator('dd')).toHaveText('HyperText Markup Language');
   expect(await exported.locator('summary').evaluate((node) => node.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+  await exported.locator('summary').click();
+  await exported.emulateMedia({ media: 'print' });
+  await expect(exported.locator('dd')).toBeVisible();
   await exported.close();
   const epub = await JSZip.loadAsync(await download('EPUB (structural)'));
   expect(await epub.file('OEBPS/chapter1.xhtml')!.async('string')).toContain('<abbr title="HyperText Markup Language">HTML</abbr>');

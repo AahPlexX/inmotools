@@ -14,7 +14,7 @@ updated: 2026-10-07
 Complete the reviewed inventory in the frozen order below, including associated bugs. Maintain current per-tool requirements, verification evidence and resumable progress. Preserve existing verified behavior and the static browser-only architecture. Record exact source revisions, reproducible checks, known limitations and the next action at every checkpoint.
 
 ## Resume here
-Current tool: 1, Markdown Workbench. Current requirement: MDW-R34. Read its current tracker/spec and active tool task first. Work each frozen ID sequentially; an item already complete still needs current acceptance evidence. On finishing the listed items, resolve that tool's associated confirmed audit bugs and run its completion checks before advancing. All tool tasks stay active until integration/deployment evidence exists; incomplete work is never labeled done.
+Current tool: 1, Markdown Workbench. Current requirement: MDW-R35. Read its current tracker/spec and active tool task first. Work each frozen ID sequentially; an item already complete still needs current acceptance evidence. On finishing the listed items, resolve that tool's associated confirmed audit bugs and run its completion checks before advancing. All tool tasks stay active until integration/deployment evidence exists; incomplete work is never labeled done.
 
 Before each checkpoint: update the tool tracker requirement row, its Resume here, active tool task and this cursor in the same commit. Record exact commands/outcomes, source/check commit, limitations and next item. Verify changes on the pushed/integrated revision. Reconcile current upstream changes instead of applying the audit snapshot blindly. If a physical check is required, preserve its explicit awaiting-human flag and do not invent verification.
 
@@ -114,3 +114,9 @@ Baseline: `3d64fdeff005555388cb2f593ed5c15bfa3b7756`. Existing acceptance defini
 - 2026-10-07 01:13 UTC: canonical full R29 validation 37551755268 succeeded on integrated/deployed f0ae6602. Associated task-click task is done. Current R34 unit DOM assertion required a browser API absent from the Node unit runner; unit now verifies escaped text serialization, while the committed production case verifies actual DOM has no image and preserves the literal title. Corrected unit rerun pending.
 
 - 2026-10-07 01:14 UTC: R34 corrected harness passed all 95 focused units (16.87s); TypeScript and clean production build passed. R34 remains partial; production browsers are running on the immutable built implementation. No formatter change was needed for the tested abbreviation boundaries.
+
+- 2026-10-07 01:15 UTC: R34 source/tests/partial evidence published as 16fbefedea8846a7d52c34d160dbbd3e2d0bbb2c and tree-equal. Browser baseline on unchanged R33 failed 6/6. Initial R34 production exposed closed glossary print visibility; corrected native content-visibility print rule and added actual HTML print coverage. Rebuild/rerun pending.
+
+- 2026-10-07 01:16 UTC: initial R34 production finished 4 passed/2 failed (1.2m), both failures were print visibility of a closed glossary. Corrected clean production build passed; corrected acceptance will use immutable markdown-r34-print-dist (port 4194). Two further owned unit checks cover indented/raw-HTML definitions and Unicode/link/image boundaries; their result is pending.
+
+- 2026-10-07 01:17 UTC: R34 print-corrected production acceptance passed 6/6 (1.0m); TypeScript, 95 focused units, 17 expanded abbreviation cases and clean build passed. Cursor R35. Source/tests/current evidence are checkpointed together; broader regression and canonical integration/full browsers remain pending.

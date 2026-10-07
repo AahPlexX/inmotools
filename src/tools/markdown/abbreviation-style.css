@@ -17,5 +17,6 @@
 .markdown-abbreviation-glossary dt { font-weight: bold; }
 .markdown-abbreviation-glossary dd { margin: 0.25rem 0 0.75rem; }
 @media print {
+  .markdown-abbreviation-glossary::details-content { content-visibility: visible !important; }
   .markdown-abbreviation-glossary > dl { display: block !important; }
 }

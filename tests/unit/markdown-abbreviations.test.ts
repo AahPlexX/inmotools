@@ -39,6 +39,18 @@ describe('Markdown abbreviations', () => {
     const html = renderMarkdown('Prose *[HTML]: Expansion\n\nHTML').html;
     expect(html).not.toContain('<abbr');
   });
+  it('keeps indented definitions and raw HTML block contents outside abbreviation parsing', () => {
+    const html = renderMarkdown('    *[HTML]: Indented\n\n<div>\n*[HTML]: Raw\n</div>\n\nHTML').html;
+    expect(html).not.toContain('<abbr');
+  });
+  it('matches Unicode labels and link text without changing link destinations or image alt text', () => {
+    const html = renderMarkdown('*[東京]: City\n*[HTML]: Expansion\n\n東京 東京駅 [HTML](https://example.com/HTML) ![HTML](image.png)').html;
+    expect(html).toContain('<abbr title="City">東京</abbr>');
+    expect(html).toContain('東京駅');
+    expect(html).toContain('href="https://example.com/HTML"');
+    expect(html).toContain('<abbr title="Expansion">HTML</abbr>');
+    expect(html).toContain('alt="HTML"');
+  });
   it('exposes used expansions in a collapsible glossary without enabling raw HTML', () => {
     const html = renderMarkdown('*[HTML]: <img src=x> & "quoted"\n\nHTML HTML').html;
     expect(html).toContain('<details');
