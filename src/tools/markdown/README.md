@@ -5,8 +5,8 @@ Local editor for writing, previewing, and exporting Markdown. Documents, drafts,
 ## What it does
 
 - Source, split, and preview. In split view, scrolling either side moves the other.
-- Formatting toolbar, syntax suggestions, find and replace, Vim keys, spellcheck, and a syntax guide.
-- Tables with local formulas, math, Mermaid and Graphviz diagrams, GitHub alerts, emoji shortcodes, and citations (APA, IEEE, Chicago, MLA).
+- Formatting toolbar, cancellable local auto-format, syntax suggestions, find and replace, Vim keys, spellcheck, optional typewriter scrolling, and a syntax guide.
+- Tables with local formulas and a dimension picker, math, Mermaid and Graphviz diagrams, GitHub alerts, subscripts/superscripts, abbreviation definitions with a glossary, definition lists, emoji shortcodes, and citations (APA, IEEE, Chicago, MLA).
 - Click a task checkbox in the preview to toggle that line.
 - Open `.md`, `.markdown`, `.txt`, or local HTML. Paste or drop an image to embed it as a data URI (5 MB cap).
 - Export Markdown, rendered Markdown, standalone HTML, print/PDF, DOCX, structural EPUB, or a syntax-tree JSON file.
@@ -14,8 +14,10 @@ Local editor for writing, previewing, and exporting Markdown. Documents, drafts,
 
 ## Handoff
 
-Behavior changes and verification notes are appended in `docs/markdown-audit-2026-09-16.md`. Do not delete earlier sections of that file when recording a new pass.
+Read [TRACKER.md](TRACKER.md) **Resume here** first, then the [current spec](../../../docs/superpowers/specs/2026-10-05-markdown-workbench-design.md), [active tool task](../../../.tasks/items/T-markdown-workbench-20261006-ea9f.md), and [verification evidence](VERIFICATION.md). The [ordered inventory](../../../.tasks/items/T-ordered-requirement-inventory-20261006-9cf1.md) preserves the original cross-tool sequence. Update the tracker, current task, inventory cursor and evidence together when behavior or check status changes.
 
-## Fixes
+As of 2026-10-07, the next ordered item is MDW-R36. Definition-list scoped acceptance passed; full regression/integration remains pending. Refresh the tracker and GitHub run results before continuing. Older audits and the dated fixes below are historical evidence, not the current continuation cursor.
+
+## Historical fixes
 
 - 2026-10-01 — Preview-to-source scroll (F11) lost the person's scroll when it came within 0.7 s of a caret move: the tool's own catch-up scroll and repeated caret reports pulled both panes back to the caret line. Now a preview scroll away from the tool's target takes over at once, a re-measure does not undo it, repeated caret reports for the same line no longer re-scroll the preview, and a reveal without focus no longer re-sends the selection. Browser tests "scrolling the preview moves the source…" and "outline supports filtering…" pass 60/60 repeated; all Markdown browser specs pass.
