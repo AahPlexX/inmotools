@@ -254,7 +254,7 @@ test('MDW-R12 invalid stored preference values fall back to usable editor settin
   await expect(page.getByTestId('markdown-font-size-value')).toHaveText('13 px');
 });
 
-test('MDW-R15 typewriter keeps first and last caret lines centered through orientation changes', async ({ page }) => {
+test('MDW-R15 typewriter keeps first and last caret lines centered through orientation changes', async ({ page }, testInfo) => {
   const editor = await openSource(page, '# First\n\n' + Array.from({ length: 120 }, (_, i) => `Line ${i + 1}.`).join('\n'));
   const mode = page.getByRole('checkbox', { name: 'Typewriter mode', exact: true });
   await mode.check();
@@ -263,15 +263,44 @@ test('MDW-R15 typewriter keeps first and last caret lines centered through orien
     const scroller = node.querySelector('.cm-scroller')!.getBoundingClientRect();
     return caret ? Math.abs(caret.y + caret.height / 2 - scroller.y - scroller.height / 2) : Infinity;
   });
+  const expectCentered = async (stage: string) => {
+    try {
+      await expect.poll(caretOffset).toBeLessThan(24);
+    } catch (error) {
+      const geometry = await page.locator('.cm-editor').evaluate((node) => {
+        const scroller = node.querySelector<HTMLElement>('.cm-scroller')!;
+        const content = node.querySelector<HTMLElement>('.cm-content')!;
+        const style = getComputedStyle(content);
+        const preview = document.querySelector<HTMLElement>('.markdown-workbench-preview');
+        const visual = window.visualViewport;
+        return {
+          typewriterMode: node.closest('.markdown-workbench-editor')?.getAttribute('data-typewriter-mode'),
+          cursors: [...node.querySelectorAll('.cm-cursor')].map(cursor => cursor.getBoundingClientRect().toJSON()),
+          scroller: { rect: scroller.getBoundingClientRect().toJSON(), scrollTop: scroller.scrollTop, clientHeight: scroller.clientHeight, scrollHeight: scroller.scrollHeight },
+          content: { fontSize: style.fontSize, lineHeight: style.lineHeight, paddingTop: style.paddingTop, paddingBottom: style.paddingBottom, renderedLines: content.querySelectorAll('.cm-line').length },
+          preview: preview ? { scrollTop: preview.scrollTop, clientHeight: preview.clientHeight, scrollHeight: preview.scrollHeight } : null,
+          editorFocused: document.activeElement === content,
+          visibility: document.visibilityState,
+          viewport: { width: innerWidth, height: innerHeight, visual: visual ? { width: visual.width, height: visual.height, offsetTop: visual.offsetTop, scale: visual.scale } : null },
+        };
+      }).catch(() => null);
+      const receipt = JSON.stringify({ stage, project: testInfo.project.name, geometry });
+      // A passing retry leaves no failure artifact in the current workflow;
+      // its log still retains this measured context from the failed attempt.
+      console.error(`MDW-R15 centering failure geometry: ${receipt}`);
+      await testInfo.attach('typewriter-centering-geometry', { body: receipt, contentType: 'application/json' }).catch(() => {});
+      throw error;
+    }
+  };
   await editor.press('ControlOrMeta+Home');
   await page.keyboard.insertText('First ');
-  await expect.poll(caretOffset).toBeLessThan(24);
+  await expectCentered('first line');
   await editor.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nLast');
-  await expect.poll(caretOffset).toBeLessThan(24);
+  await expectCentered('last line');
   await page.setViewportSize({ width: 844, height: 390 });
   await page.keyboard.insertText(' line');
-  await expect.poll(caretOffset).toBeLessThan(24);
+  await expectCentered('landscape');
   await expect(editor).toContainText('Last line');
   await mode.uncheck();
   await editor.press('ControlOrMeta+End');
