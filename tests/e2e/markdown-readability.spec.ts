@@ -92,3 +92,38 @@ test('MDW-R55 long metric labels and values fit phone orientations tablet and de
     expect(live.overflow).toBe(false);
   }
 });
+
+test('MDW-R55 Unicode compound hyphens preserve grades and exact original UTF-8 source', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await page.getByText('Document metrics', { exact: true }).click();
+  for (const hyphen of ['-', '‐', '‑']) {
+    const source = `well${hyphen}being matters.\r\n`;
+    await load(page, source);
+    await expect(metric(page, 'Words')).toHaveText('2');
+    await expect(metric(page, 'Characters')).toHaveText('16');
+    await expect(metric(page, 'Sentences')).toHaveText('1');
+    await expect(metric(page, flesch)).toHaveText('14.7');
+    await expect(metric(page, coleman)).toHaveText('16.4');
+    await expect(page.getByTestId('markdown-live-metrics')).toContainText('2 words');
+    const original = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Markdown', exact: true }).click();
+    expect((await readFile((await (await original).path())!)).equals(Buffer.from(source))).toBe(true);
+  }
+});
+
+
+test('MDW-R55 generated disclosure captions are omitted while authored captions count', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await page.getByText('Document metrics', { exact: true }).click();
+  for (const caption of ['', '<span> </span>', '[ ](https://example.com)', 'Details']) {
+    const source = `<details>\n<summary>${caption}</summary>\n\nThe cat sat.\n\n</details>`;
+    await load(page, source);
+    await expect(page.locator('.markdown-workbench-preview details > summary')).toHaveText('Details');
+    const authored = caption === 'Details';
+    await expect(metric(page, 'Words')).toHaveText(authored ? '4' : '3');
+    await expect(metric(page, 'Sentences')).toHaveText(authored ? '2' : '1');
+    const original = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Markdown', exact: true }).click();
+    expect((await readFile((await (await original).path())!)).equals(Buffer.from(source))).toBe(true);
+  }
+});

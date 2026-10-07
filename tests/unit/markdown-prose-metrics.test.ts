@@ -156,3 +156,28 @@ describe('MDW-R55 reference grades and native prose boundaries', () => {
     expect(computeProseMetrics('', { type: 'root', children: [node] }).words).toBe(3);
   });
 });
+
+
+describe('MDW-R55 typographic compound boundaries', () => {
+  it.each(['‐', '‑'])('treats Unicode %s as a compound hyphen without mutating the source', hyphen => {
+    const source = `well${hyphen}being matters.`;
+    const original = source;
+    expect(computeProseMetrics(source)).toEqual(computeProseMetrics('well-being matters.'));
+    expect(source).toBe(original);
+  });
+  it('retains en and em dashes as word separators', () => {
+    expect(computeProseMetrics('cat–dog cat—dog').words).toBe(4);
+  });
+});
+
+
+describe('MDW-R55 generated caption distinction', () => {
+  it.each(['', '<span> </span>', '[ ](https://example.com)'])('omits Details generated from %s', caption => {
+    const source = `<details>\n<summary>${caption}</summary>\n\nThe cat sat.\n\n</details>`;
+    expect(computeProseMetrics(source).words).toBe(3);
+    expect(computeProseMetrics(source).sentences).toBe(1);
+  });
+  it('keeps an explicitly authored Details caption', () => {
+    expect(computeProseMetrics('<details>\n<summary>Details</summary>\n\nThe cat sat.\n\n</details>').words).toBe(4);
+  });
+});

@@ -7,7 +7,7 @@ const READING_WORDS_PER_MINUTE = 225;
 const SPEAKING_WORDS_PER_MINUTE = 140;
 const BLOCKS = new Set(['paragraph', 'heading', 'tableCell', 'defListTerm', 'workbenchSummary']);
 const EXCLUDED = new Set(['code', 'inlineCode', 'math', 'inlineMath', 'html', 'image', 'imageReference', 'definition', 'abbreviationDefinition', 'footnoteReference']);
-const WORD_PATTERN = /[\p{L}\p{N}][\p{L}\p{M}\p{N}]*(?:['’\-][\p{L}\p{N}][\p{L}\p{M}\p{N}]*)*/gu;
+const WORD_PATTERN = /[\p{L}\p{N}][\p{L}\p{M}\p{N}]*(?:['’\-‐‑][\p{L}\p{N}][\p{L}\p{M}\p{N}]*)*/gu;
 
 /** Extract authored prose, reusing the workspace's native tree when supplied. */
 export const stripNonProseSyntax = (source: string, tree: Root = parseMarkdown(source).tree as Root): string => {
@@ -52,9 +52,9 @@ export const computeProseMetrics = (source: string, tree?: Root): ProseMetrics =
     for (let index = 0; index < matches.length; index++) {
       const word = matches[index];
       words++;
-      const english = word.length <= 128 && /^[A-Za-z]+(?:['’\-][A-Za-z]+)*$/.test(word);
+      const normalized = word.replaceAll('’', "'").replace(/[‐‑]/g, '-').toLowerCase();
+      const english = normalized.length <= 128 && /^[a-z]+(?:['\-][a-z]+)*$/.test(normalized);
       supported &&= english;
-      const normalized = word.replaceAll('’', "'").toLowerCase();
       let count = 0;
       if (english) {
         count = syllableCounts.get(normalized) ?? syllable(normalized);
