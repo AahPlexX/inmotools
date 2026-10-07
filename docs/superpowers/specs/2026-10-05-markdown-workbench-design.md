@@ -120,7 +120,7 @@ Out of scope: real-time collaboration, cloud sync and comment threads (need a se
 | MDW-R52 | Outline panel from headings with click-to-jump, filtering and the current section marked | Filter "Intro"; clicking it moves the editor to that line |
 | MDW-R53 | Words, lines and reading time in the status bar | Typing updates the live counts |
 | MDW-R54 | Metrics panel: words, characters, source characters, lines, sentences, reading and speaking time, Gunning Fog index | A two-sentence passage reports 2 sentences |
-| MDW-R55 | Flesch-Kincaid grade and Coleman-Liau index | A known passage gives its published scores |
+| MDW-R55 | Flesch-Kincaid grade and Coleman-Liau index for English prose, with unavailable empty/unsupported state and native Markdown exclusions | Official published rounded Coleman fixtures and independently counted Flesch formula fixture match; lifecycle preserves source and metrics fit narrow/rotated viewports |
 | MDW-R56 | Syntax-tree (AST) inspector panel showing the parsed tree next to the source | Selecting a node highlights its source range |
 | MDW-R57 | Diff view between the current text and a saved draft or the opened file | Edit a line; the diff shows it as changed |
 
@@ -187,6 +187,8 @@ The tool is complete when every requirement is `verified` or `prohibited`, and t
 - 2026-10-06: Typewriter mode is an independent editor option, default off, remembered locally. It centers the caret inside the source editor while typing, with padding for first/last lines and resizing; it does not alter document text or require Focus writing. Owner may override.
 
 ## Intent not recorded
+
+- MDW-R55 conservative defaults (2026-10-07; owner may override): count authored native text in paragraphs, headings, table cells, definition terms/descriptions and explicit disclosure captions. Omit metadata, code/diagrams, math, inert HTML, image destinations/alt text, URL-only links and definition syntax. Keep inline emphasis adjacent; separate excluded literals and block boundaries. Count Unicode letter/number words, with internal apostrophes/hyphens as one word; count Unicode letters/numbers as Characters and letters separately for Coleman. Sentences use terminal .!? runs with closing quotes/brackets and nonempty trailing prose, one sentence minimum per nonempty prose block; decimal dots are not sentence boundaries. Grades are English estimates, not language detection: unavailable for zero words or words containing non-ASCII letters or numerals; ordinary Latin foreign-language prose cannot be detected automatically. Apostrophe variants normalize for syllable estimation. Finite negative and high grades remain unclamped, displayed to one decimal. Existing 225/140 WPM and Fog formula/proper-noun heuristic remain; corrected prose/syllable inputs affect estimates. syllable 5.0.1 is a pinned browser heuristic corroborated on selected CMU pronunciation fixtures, not a pronunciation dictionary or comprehension assessment.
 
 - Reading view themes (MDW-R85): relation to Focus writing and Dark workspace is not settled. Owner may override.
 
