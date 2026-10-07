@@ -2,6 +2,7 @@ import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
+import remarkScripts from './script-plugin';
 import type { Root, RootContent } from 'mdast';
 import { parseFrontmatter, stripFrontmatter } from './frontmatter-engine';
 import type { ParsedDocument, SourceLineNode } from './markdown-types';
@@ -13,7 +14,7 @@ import type { ParsedDocument, SourceLineNode } from './markdown-types';
 // headings, paragraphs, tables, and code/diagram/math blocks with the
 // preview, without the cost of tracking every inline node.
 
-const createProcessor = () => unified().use(remarkParse).use(remarkGfm).use(remarkMath);
+const createProcessor = () => unified().use(remarkParse).use(remarkGfm, { singleTilde: false }).use(remarkMath).use(remarkScripts);
 
 const toSourceLineNode = (node: RootContent, index: number, lineOffset: number): SourceLineNode | null => {
   if (!node.position) return null;

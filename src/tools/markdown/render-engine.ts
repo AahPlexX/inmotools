@@ -2,6 +2,7 @@ import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
+import remarkScripts from './script-plugin';
 import remarkRehype from 'remark-rehype';
 import rehypeKatex from 'rehype-katex';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
@@ -48,8 +49,8 @@ const sanitizeSchema = {
 const createProcessor = () =>
   unified()
     .use(remarkParse)
-    .use(remarkGfm)
-    .use(remarkMath)
+    .use(remarkGfm, { singleTilde: false })
+    .use(remarkMath).use(remarkScripts)
     .use(remarkGithubAlerts)
     .use(remarkHeadingIds)
     .use(remarkEmoji)

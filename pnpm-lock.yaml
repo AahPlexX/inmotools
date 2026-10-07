@@ -501,6 +501,9 @@ importers:
       fast-check:
         specifier: 4.10.0
         version: 4.10.0
+      micromark-util-types:
+        specifier: 2.0.2
+        version: 2.0.2
       tailwindcss:
         specifier: 4.3.3
         version: 4.3.3

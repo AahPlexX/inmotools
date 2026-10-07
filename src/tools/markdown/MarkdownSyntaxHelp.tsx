@@ -7,7 +7,7 @@ const SYNTAX_GROUPS = [
   },
   {
     title: 'Emphasis',
-    examples: ['**Bold text**', '*Italic text*', '~~Strikethrough~~', '`inline code`'],
+    examples: ['**Bold text**', '*Italic text*', '~~Strikethrough~~', 'H~2~O · x^2^', 'P~a\\ cat~ (escape spaces)', '`inline code`'],
   },
   {
     title: 'Lists, quotes & structure',

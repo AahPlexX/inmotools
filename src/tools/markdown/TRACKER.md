@@ -13,7 +13,7 @@ updated: 2026-10-07
 
 ## Resume here
 
-Current ordered item: MDW-R33 subscript/superscript, then MDW-R34 abbreviations. MDW-R31 production acceptance passed 10/10, including literal escapes, formatting, portrait/landscape bounds, light/dark title contrast, guide usability and self-contained HTML/EPUB styles; TypeScript, clean build and 54 units passed. Source 8787c115 is published; integration run 37552440278 is in progress. Frozen all-Markdown regression on that source is running; do not rebuild its artifact. R29 full validation run 37551755268 is in progress; preceding seven-item full run 37538813696 passed. Tool remains incomplete; compute counts with pnpm tool:check markdown-workbench.
+Current ordered item: MDW-R33 subscript/superscript, then MDW-R34 abbreviations. As of 2026-10-07 01:01 UTC, MDW-R33 remains partial. TypeScript and all 70 focused script/parser/render/export/format units passed; clean production build passed. Next: add and run production browser acceptance for script rendering, literal boundaries, formatting, responsive bounds and actual exports. Shared manifest/lock changes add only direct dev micromark-util-types 2.0.2, already locked; full canonical browser checks remain required. MDW-R31 integrated/deployed as 1e85224354e3513485ccf583c38d4fb1b93c3a01; integration 37552674213 and Pages 37553380467 succeeded. Frozen R31 Markdown regression passed 190/190 (13.9m), and does not cover R33. R29 full validation 37551755268 was observed in progress at 00:59 UTC. Tool remains incomplete. Resume from committed source/tests; local artifacts in /workspace/inmotools-implementation-evidence are optional. Worktree ../inmotools-markdown-workbench; branch fix/markdown-workbench.
 
 ## Documents
 
@@ -64,7 +64,7 @@ Current ordered item: MDW-R33 subscript/superscript, then MDW-R34 abbreviations.
 | MDW-R30 | verified | e2e "GitHub-style alert blockquotes render as styled callouts instead of plain quotes"; unit "leaves an ordinary blockquote without a marker untouched" | |
 | MDW-R31 | verified | e2e "MDW-R31 DANGER previews preserve formatting and literal escapes through orientation changes", "MDW-R31 standalone HTML and EPUB retain the callout title, body and self-contained styling"; unit "renders %s with a title, body formatting and source anchor", "keeps an escaped %s marker literal", "retains existing alert styling in standalone HTML", "packages existing alert styling in EPUB" | Production acceptance plus alert/guide regression 10/10; light/dark contrast, 320px/landscape, source escapes and detached exports passed. Unit checks 54/54, TypeScript/build passed; full regression/release pending |
 | MDW-R32 | verified | e2e "a recognized emoji shortcode renders as its emoji in the live preview"; unit "converts a recognized emoji shortcode and leaves an unrecognized one exactly as written", "does not convert emoji-shaped text inside inline code or a fenced code block" | |
-| MDW-R33 | missing | — | |
+| MDW-R33 | partial | `script-plugin.ts`; direct type-only pin; parse/render/DOCX integration and 17-case unit baseline | |
 | MDW-R34 | missing | — | |
 | MDW-R35 | missing | — | |
 | MDW-R36 | missing | — | Raw HTML is not rendered |
@@ -172,6 +172,14 @@ Current ordered item: MDW-R33 subscript/superscript, then MDW-R34 abbreviations.
 
 - 2026-10-07 00:27 UTC: R31 implementation adds DANGER, source-aware literal markers and shared alert CSS in preview/HTML/EPUB. TypeScript passed. Unit checks: 52 passed, 2 failed; failures are unresolved. Browser baseline on unchanged R29 production failed 4/4. Current R31 is partial; production acceptance/release pending.
 
-- 2026-10-07 00:29 UTC: both remaining unit failures came from the default unit runner replacing CSS imports with empty strings, confirmed in official Vitest CSS documentation. The owned test now supplies the tracked stylesheet to verify export logic; production browser checks will verify actual Vite inline CSS. Corrected unit rerun is pending. Clean R31 production build is running.
+- 2026-10-07 00:29 UTC: both remaining unit failures came from the default unit runner replacing CSS imports with empty strings, confirmed in official Vitest CSS documentation. The owned test now supplies the tracked stylesheet to verify export logic; production browser checks will verify actual Vite inline CSS. Corrected unit rerun is pending. Clean R31 production build passed.
 
 - 2026-10-07 00:32 UTC: MDW-R31 production acceptance/alert and guide regression passed 10/10 (30.8s). Source 8787c115 published and local/remote trees equal. Cursor MDW-R33. Integration run 37552440278 and frozen full Markdown regression are in progress.
+
+- 2026-10-07 00:54 UTC: R33 baseline 10 failed/7 passed. Native parser extension, parse/render integration, DOCX script runs and syntax help implemented; type-only direct pin reuses locked 2.0.2. Current checks not yet run; do not mark verified. R31 frozen Markdown regression passed 190/190 (13.9m).
+
+- 2026-10-07 00:55 UTC: first R33 checks: 54 passed/16 failed; TypeScript failed. Corrected tokenizer context capture before returning its state and added custom script nodes to both MDast content maps. Corrected type/unit reruns are pending; R33 remains partial.
+
+- 2026-10-07 00:56 UTC: TypeScript passed after the native extension corrections; unit checks 68 passed/2 failed. Both remaining failures assumed a particular HTML entity spelling, while actual output used equivalent safe numeric entities. Corrected assertions verify semantic content and escaping; rerun pending. R31 source/records integrated as 1e85224354e3513485ccf583c38d4fb1b93c3a01, integration run 37552674213 and Pages run 37553380467 succeeded.
+
+- 2026-10-07 01:01 UTC: R33 corrected semantic assertions passed all 70 focused units (2.83s); TypeScript passed. R33 remains partial; production build passed, browser acceptance next. Current resume/evidence sections reconciled with completed R31 integration/deployment and 190/190 regression.

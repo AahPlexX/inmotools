@@ -88,7 +88,7 @@ Out of scope: real-time collaboration, cloud sync and comment threads (need a se
 | MDW-R30 | GitHub alert callouts: NOTE, TIP, IMPORTANT, WARNING and CAUTION | > [!TIP] renders a styled tip callout |
 | MDW-R31 | A DANGER callout kind, documented as a Workbench extension; alert styling persists in standalone HTML and EPUB | > [!DANGER] renders a titled danger callout with formatting; escaped markers stay literal; portrait/landscape and dark themes stay readable; detached HTML/EPUB include self-contained alert styling |
 | MDW-R32 | Emoji shortcodes (about 150) render as emoji outside code; unknown codes stay as written | :tada: renders 🎉; `:tada:` in code stays text |
-| MDW-R33 | Subscript and superscript (H~2~O, x^2^) | H~2~O renders H<sub>2</sub>O |
+| MDW-R33 | Subscript and superscript (H~2~O, x^2^) as short literal spans; unescaped spaces/newlines are excluded and double tildes retain strikethrough | Preview, HTML, EPUB and DOCX preserve script formatting; AST exposes positioned script nodes; escaped/entity-written markers, code and math remain literal; escaped spaces work; source text and auto-format retain meaning |
 | MDW-R34 | Abbreviations (`*[HTML]: HyperText Markup Language`) | HTML renders as <abbr> with the title |
 | MDW-R35 | Definition lists | Term followed by `: definition` renders <dl> |
 | MDW-R36 | Details/summary disclosure blocks | A details block renders a collapsible section |
@@ -189,3 +189,7 @@ The tool is complete when every requirement is `verified` or `prohibited`, and t
 ## Change log
 
 - **2026-10-05:** Created as-built at `947272db`; 92 requirements.
+
+
+### Script content default (2026-10-07)
+The R33 delimiters and whitespace rules follow the documented Pandoc-style notation. Span contents are literal text with character escapes/references; ordinary Markdown can wrap a span. This conservative content rule is not full Pandoc compatibility. Owner may override. No raw HTML processing is enabled. A direct dev pin `micromark-util-types@2.0.2` reuses the existing locked package to type the native parser extension.

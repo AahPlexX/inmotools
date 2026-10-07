@@ -93,6 +93,8 @@ const renderInlineRuns = (
       runs.push(...renderInlineRuns(node.children, footnoteIds, true, italics));
     } else if (node.type === 'emphasis') {
       runs.push(...renderInlineRuns(node.children, footnoteIds, bold, true));
+    } else if (node.type === 'subscript' || node.type === 'superscript') {
+      runs.push(new TextRun({ text: phrasingPlainText(node.children), subScript: node.type === 'subscript', superScript: node.type === 'superscript', bold, italics }));
     } else if (node.type === 'delete') {
       runs.push(new TextRun({ text: phrasingPlainText(node.children), strike: true, bold, italics }));
     } else if (node.type === 'inlineCode') {

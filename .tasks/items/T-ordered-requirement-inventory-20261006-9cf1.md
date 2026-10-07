@@ -88,3 +88,7 @@ Baseline: `3d64fdeff005555388cb2f593ed5c15bfa3b7756`. Existing acceptance defini
 - 2026-10-07 00:30 UTC: MDW-R31 remains partial; 54 unit checks, TypeScript and clean build passed. Next: production acceptance and Markdown regression. Current source/records are checkpointed before those checks.
 
 - 2026-10-07 00:32 UTC: MDW-R31 verified for scoped production acceptance (10/10), 54 units, TypeScript/build. Source 8787c115 is published; integration and frozen all-Markdown regression are running. Cursor MDW-R33.
+
+- 2026-10-07 00:54 UTC: cursor MDW-R33; native parser/DOCX implementation partial, checks pending. Corrected baseline 10 failed/7 passed. R31 frozen regression passed 190/190 (13.9m).
+
+- 2026-10-07 01:01 UTC: R33 corrected semantic assertions passed all 70 focused units (2.83s); TypeScript passed. R33 remains partial; production build passed, browser acceptance next. Current resume/evidence sections reconciled with completed R31 integration/deployment and 190/190 regression.
