@@ -1,0 +1,21 @@
+.markdown-disclosure {
+  min-width: 0;
+  margin-block: 1rem;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  overflow-wrap: anywhere;
+}
+.markdown-disclosure > summary {
+  min-height: 44px;
+  align-content: center;
+  cursor: pointer;
+}
+.markdown-disclosure > summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+@media print {
+  .markdown-disclosure::details-content { content-visibility: visible !important; }
+  .markdown-disclosure > :not(summary) { display: block !important; }
+}

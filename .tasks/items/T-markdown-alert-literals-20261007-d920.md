@@ -3,7 +3,7 @@ task: T-markdown-alert-literals-20261007-d920
 tool: markdown-workbench
 doc: task
 kind: fix
-state: active
+state: done
 branch: fix/markdown-workbench
 created: 2026-10-07
 updated: 2026-10-07
@@ -16,7 +16,7 @@ Associated MDW-R31 checks found escaped standard alert markers are transformed i
 
 ## Resume here
 
-Scoped fix verified and integrated/deployed as 1e85224354e3513485ccf583c38d4fb1b93c3a01. Integration 37552674213 and Pages 37553380467 succeeded. Frozen all-Markdown regression on source 8787c115 passed 190/190 (13.9m), plus 54 units, TypeScript/build and 10/10 scoped production cases. Earlier integration 37552440278 was superseded and cancelled. This task remains active pending canonical cross-tool validation on a revision containing R31; the successful R29 full run 37551755268 precedes this fix. Next: inspect the latest fix/markdown-workbench integration/full checks and close this task only after success on source containing the fix. Ordered work continues at the owning tracker cursor; read its current Resume here.
+Scoped fix integrated/deployed as 1e85224354e3513485ccf583c38d4fb1b93c3a01 and included in main f644133f28f1ff306283bd71dd61fd693561e1c2. Canonical cross-tool integration 37560176754 passed on source containing this fix (3821 unit passes/14 skips; 1676 browser passes/1 unrelated flaky/171 skips). Pages 37564223040 passed. Existing scoped production 10/10 and frozen Markdown 190/190 evidence remain valid. Closed after official GitHub MCP/log verification on 2026-10-07 03:17 UTC. Ordered continuation is at the current owning tracker cursor.
 
 ## Log
 - 2026-10-07 00:24 UTC: 10-case alert baseline: 8 failed, 2 passed. Failures cover absent DANGER rendering and escaped NOTE/TIP/IMPORTANT/WARNING/CAUTION conversion; literal code and escaped missing DANGER remain unchanged. Sources refreshed from official GitHub syntax, unified API and CommonMark 0.31.2 at 00:24 UTC.
@@ -26,3 +26,5 @@ Scoped fix verified and integrated/deployed as 1e85224354e3513485ccf583c38d4fb1b
 - 2026-10-07 00:32 UTC: scoped production checks passed 10/10 (30.8s); unit checks 54/54, TypeScript/build passed. Awaiting remaining release/regression evidence.
 
 - 2026-10-07 01:17 UTC: reconciled current resume with actual integrated/deployed R31 revision and 190/190 frozen Markdown regression. Canonical validation remains pending; no completion claim.
+
+- 2026-10-07 03:17 UTC: closed after canonical full validation and deployment on main f644133; source contains the original R31 fix.

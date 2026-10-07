@@ -4,6 +4,7 @@ import { parseFrontmatter, stripFrontmatter } from './frontmatter-engine';
 import type { Nodes, Root } from 'mdast';
 import type { ParserOptions } from 'prettier';
 import { definitionListRanges } from './definition-list-ranges';
+import { disclosureRanges } from './disclosure-ranges';
 
 export async function formatMarkdownSource(source: string, cursorOffset: number) {
   const metadata = parseFrontmatter(source);
@@ -20,9 +21,16 @@ export async function formatMarkdownSource(source: string, cursorOffset: number)
     return String.fromCharCode(markerCode++);
   };
   const marker = allocateMarker();
-  // Prettier does not parse definition lists. Make each native block opaque,
+  // Prettier does not parse the authoring extensions. Keep each block opaque,
   // including enclosing quotes/lists whose indentation must remain intact.
-  const blocks = definitionListRanges(body).map(range => ({
+  const ranges = [...definitionListRanges(body), ...disclosureRanges(body)].sort((a, b) => a.start - b.start);
+  const merged: typeof ranges = [];
+  for (const range of ranges) {
+    const last = merged.at(-1);
+    if (last && range.start <= last.end) last.end = Math.max(last.end, range.end);
+    else merged.push({ ...range });
+  }
+  const blocks = merged.map(range => ({
     ...range, marker: allocateMarker(), original: body.slice(range.start, range.end),
   }));
   let maskedBody = body;
@@ -34,8 +42,7 @@ export async function formatMarkdownSource(source: string, cursorOffset: number)
     parsers: { ...markdownPlugin.parsers, markdown: {
       ...markdownPlugin.parsers.markdown,
       async preprocess(text: string, options: ParserOptions): Promise<string> {
-        // Use Prettier's browser-safe parser. The preview parser resolves a
-        // DOM-only character decoder in browser builds and cannot run here.
+        // Use Prettier's own parser to locate the delimiters it would expand.
         const protectedOffsets = new Set<number>();
         const stack: Nodes[] = [await markdownPlugin.parsers.markdown.parse(text, options) as Root];
         while (stack.length) {
@@ -72,7 +79,7 @@ export async function formatMarkdownSource(source: string, cursorOffset: number)
     const matches = [...formatted.matchAll(new RegExp(`${block.marker}+(?:\\s+${block.marker}+)*`, 'g'))];
     const match = matches[0];
     if (matches.length !== 1 || !match || match[0].split(block.marker).length - 1 !== block.original.replace(/[\r\n]/g, '').length) {
-      throw new Error('Cannot safely preserve definition-list formatting.');
+      throw new Error('Cannot safely preserve extended Markdown formatting.');
     }
     const start = match.index;
     const end = start + match[0].length;

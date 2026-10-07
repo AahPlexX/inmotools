@@ -6,7 +6,7 @@ import type { Token } from 'micromark-util-types';
 import { scriptSyntax } from './script-plugin';
 import { abbreviationSyntax } from './abbreviation-plugin';
 
-/** Tokenize without the preview's DOM-dependent mdast character decoder. */
+/** Locate native definition-list containers from their syntax tokens. */
 export function definitionListRanges(source: string) {
   const events = postprocess(parse({ extensions: [gfm({ singleTilde: false }), math(), scriptSyntax, abbreviationSyntax, defList] })
     .document().write(preprocess()(source, 'utf8', true)));

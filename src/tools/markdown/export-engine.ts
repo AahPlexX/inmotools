@@ -21,6 +21,7 @@ import codeHighlightCss from './code-highlight.css?inline';
 import alertStyleCss from './alert-style.css?inline';
 import abbreviationStyleCss from './abbreviation-style.css?inline';
 import definitionListStyleCss from './definition-list-style.css?inline';
+import disclosureStyleCss from './disclosure-style.css?inline';
 import { bundleStylesheetAssetsForEpub, type ExportAsset } from './export-assets';
 
 const escapeHtml = (value: string): string =>
@@ -60,6 +61,7 @@ ${hasHighlightedCode(bodyHtml) ? codeHighlightCss : ''}
 ${hasAlerts(bodyHtml) ? alertStyleCss : ''}
 ${bodyHtml.includes('markdown-abbreviation-glossary') ? abbreviationStyleCss : ''}
 ${bodyHtml.includes('markdown-definition-list') ? definitionListStyleCss : ''}
+${bodyHtml.includes('markdown-disclosure') ? disclosureStyleCss : ''}
 ${options.additionalCss ?? ''}
 </style>
 </head>
@@ -204,6 +206,15 @@ const nodeToDocxElements = (
   context: DocxContext,
   state: DocxBuildState,
 ): (Paragraph | Table)[] => {
+  if (node.type === 'workbenchDisclosure') {
+    return node.children.flatMap((child, index) => nodeToDocxElements(child, resolveImage, { ...context, marker: index === 0 ? context.marker : undefined }, state));
+  }
+  if (node.type === 'workbenchSummary') {
+    const listProps = context.marker ? context.marker.ordered
+      ? { numbering: { reference: context.marker.reference as string, level: context.marker.level } }
+      : { bullet: { level: context.marker.level } } : {};
+    return [new Paragraph({ children: renderInlineRuns(node.children, state.footnoteIds, true), keepNext: true, ...listProps, ...paragraphDecoration(context.blockquoteDepth) })];
+  }
   if (node.type === 'defList' || node.type === 'defListDescription') {
     return node.children.flatMap((child) => nodeToDocxElements(child, resolveImage, { ...context, marker: undefined }, state));
   }
@@ -245,7 +256,7 @@ const nodeToDocxElements = (
     return node.children.flatMap((item) => {
       let markerPending = true;
       return item.children.flatMap((child) => {
-        const marker = markerPending && child.type === 'paragraph'
+        const marker = markerPending && (child.type === 'paragraph' || child.type === 'workbenchDisclosure')
           ? { ordered, reference, level: markerLevel }
           : undefined;
         if (marker) markerPending = false;
@@ -407,6 +418,13 @@ const XML_ENTITY_REPLACEMENTS: Record<string, string> = {
 
 export const toXhtmlFragment = (html: string): string => {
   let output = html.replace(/&([a-z][a-z0-9]+);/gi, (match, name: string) => XML_ENTITY_REPLACEMENTS[name.toLowerCase()] ?? match);
+  // A book must expose every section even in a reader without disclosure
+  // interaction. Remove exclusive grouping and use XML boolean syntax.
+  output = output.replace(/<details\b([^>]*)>/gi, (_match, attrs: string) => {
+    if (!/\bclass="[^"]*\bmarkdown-disclosure\b/.test(attrs)) return `<details${attrs}>`;
+    const rest = attrs.replace(/\s(?:open|name)(?:="[^"]*"|'[^']*'|[^\s>]+)?(?=\s|$)/gi, '');
+    return `<details${rest} open="open">`;
+  });
   output = output.replace(/<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)(\b[^>]*?)(\s*\/?)>/gi, (_match, tag: string, attrs: string) => {
     const normalized = attrs.replace(/\s(checked|disabled|required|multiple|selected|autofocus)(?=(?:\s|$))/gi, (_attr: string, name: string) => ` ${name}="${name}"`);
     return `<${tag}${normalized.trimEnd()} />`;
@@ -455,6 +473,9 @@ export const buildEpubArchive = async (
   }
   if (bodyHtml.includes('markdown-definition-list')) {
     stylesheetCss = [stylesheetCss, definitionListStyleCss].filter(Boolean).join('\n');
+  }
+  if (bodyHtml.includes('markdown-disclosure')) {
+    stylesheetCss = [stylesheetCss, disclosureStyleCss].filter(Boolean).join('\n');
   }
 
   const stylesheetPath = stylesheetCss ? 'styles/markdown.css' : undefined;
