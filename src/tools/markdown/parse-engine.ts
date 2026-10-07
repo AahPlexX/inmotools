@@ -14,7 +14,7 @@ import type { ParsedDocument, SourceLineNode } from './markdown-types';
 // headings, paragraphs, tables, and code/diagram/math blocks with the
 // preview, without the cost of tracking every inline node.
 
-const createProcessor = () => unified().use(remarkParse).use(remarkGfm, { singleTilde: false }).use(remarkMath).use(remarkScripts);
+export const createMarkdownParser = () => unified().use(remarkParse).use(remarkGfm, { singleTilde: false }).use(remarkMath).use(remarkScripts);
 
 const toSourceLineNode = (node: RootContent, index: number, lineOffset: number): SourceLineNode | null => {
   if (!node.position) return null;
@@ -30,7 +30,7 @@ export const parseMarkdown = (source: string): ParsedDocument => {
   const body = frontmatter.format === null ? source : stripFrontmatter(source);
   const lineOffset = frontmatter.format === null ? 0 : frontmatter.bodyStartLine - 1;
 
-  const tree = createProcessor().parse(body) as Root;
+  const tree = createMarkdownParser().parse(body) as Root;
 
   const nodes: SourceLineNode[] = [];
   tree.children.forEach((node, index) => {

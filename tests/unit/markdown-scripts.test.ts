@@ -4,6 +4,8 @@ import { renderMarkdown } from '../../src/tools/markdown/render-engine';
 import { parseMarkdown } from '../../src/tools/markdown/parse-engine';
 import { buildEpubArchive, buildStandaloneMarkdownHtml, renderDocxToBytes } from '../../src/tools/markdown/export-engine';
 import { formatMarkdownSource } from '../../src/tools/markdown/format-engine';
+import { buildOutline } from '../../src/tools/markdown/outline-engine';
+import { HEADING_ID_PREFIX } from '../../src/tools/markdown/heading-slug';
 
 describe('Markdown subscript and superscript', () => {
   const source = 'H~2~O and x^2^';
@@ -23,6 +25,19 @@ describe('Markdown subscript and superscript', () => {
     const html = renderMarkdown('~~deleted~~ and H~2~O').html;
     expect(html).toMatch(/<del\b[^>]*>deleted<\/del>/);
     expect(html).toMatch(/<sub\b[^>]*>2<\/sub>/);
+  });
+  it('keeps script heading text and IDs consistent between outline and preview', () => {
+    const heading = '# H~2~O and x^2^';
+    const outline = buildOutline(heading);
+    expect(outline[0].text).toBe('H2O and x2');
+    expect(renderMarkdown(heading).html).toContain(`id="${HEADING_ID_PREFIX}${outline[0].id}"`);
+  });
+  it('preserves escaped closing markers and backslashes without accepting unescaped spaces', () => {
+    const source = String.raw`P~a\~b~ x^a\^b^ P~a\\\ cat~ P~a\\ cat~`;
+    const tree = parseMarkdown(source).tree.children[0];
+    if (tree.type !== 'paragraph') throw new Error('Expected a paragraph');
+    const scripts = tree.children.filter((node) => node.type === 'subscript' || node.type === 'superscript');
+    expect(scripts.map((node) => node.children[0].value)).toEqual(['a~b', 'a^b', String.raw`a\ cat`]);
   });
   it.each(['~two words~', '^two words^', '~two\nwords~', '^two\nwords^', '^^twice^^', '^', '~'])('keeps invalid or unmatched script syntax literal: %s', (literal) => {
     const html = renderMarkdown(literal).html;

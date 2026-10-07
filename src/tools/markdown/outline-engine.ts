@@ -1,7 +1,4 @@
-import { unified } from 'unified';
-import remarkParse from 'remark-parse';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
+import { createMarkdownParser } from './parse-engine';
 import type { Root } from 'mdast';
 import type { OutlineEntry } from './markdown-types';
 import { headingText, toSlug } from './heading-slug';
@@ -18,10 +15,8 @@ import { headingText, toSlug } from './heading-slug';
 // inside a blockquote or list item is not a document section for outline
 // purposes.
 
-const createProcessor = () => unified().use(remarkParse).use(remarkGfm).use(remarkMath);
-
 export const buildOutline = (source: string): OutlineEntry[] => {
-  const tree = createProcessor().parse(source) as Root;
+  const tree = createMarkdownParser().parse(source) as Root;
   const seen = new Map<string, number>();
   const entries: OutlineEntry[] = [];
 

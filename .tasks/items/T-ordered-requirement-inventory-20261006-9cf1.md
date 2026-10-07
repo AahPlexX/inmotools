@@ -92,3 +92,11 @@ Baseline: `3d64fdeff005555388cb2f593ed5c15bfa3b7756`. Existing acceptance defini
 - 2026-10-07 00:54 UTC: cursor MDW-R33; native parser/DOCX implementation partial, checks pending. Corrected baseline 10 failed/7 passed. R31 frozen regression passed 190/190 (13.9m).
 
 - 2026-10-07 01:01 UTC: R33 corrected semantic assertions passed all 70 focused units (2.83s); TypeScript passed. R33 remains partial; production build passed, browser acceptance next. Current resume/evidence sections reconciled with completed R31 integration/deployment and 190/190 regression.
+
+- 2026-10-07 01:02 UTC: working R33 source/records published through GitHub MCP as a4d30b68b5653f3fb4593582b35faed495184d2f; fetched tree compared equal. Production artifact was built from the identical implementation. New owned browser acceptance checks literal/escape/code/math boundaries, orientation bounds, auto-format/help and actual HTML/EPUB/DOCX/AST/clipboard exports; running on port 4190. R33 remains partial until results are available.
+
+- 2026-10-07 01:02 UTC: first R33 production checks failed 4/4. Two failed a case-sensitive status assertion (actual status Markdown formatted); two confirmed DOCX export used a duplicate parser without script syntax. Workspace AST/DOCX and outline now use the same parser factory as preview; added heading-ID and escaped-marker/backslash unit checks. Correction checks/build/browser reruns pending; R33 remains partial. Earlier 70-unit/build success covers a4d30b6 only.
+
+- 2026-10-07 01:03 UTC: parser-consistency TypeScript passed; units 79 passed/1 failed because the new heading assertion omitted the existing user-content- sanitization prefix. Corrected the assertion to the shared prefix constant. Rerun/build and production acceptance pending. No heading runtime defect was established by that assertion.
+
+- 2026-10-07 01:03 UTC: common parser/export/outline correction passed TypeScript, all 80 focused units (9.56s) and clean production build. Corrected production browser acceptance is running on immutable markdown-r33-consistent-dist (port 4192). Canonical integration 37554968674 completed dependency installation successfully for the prior a4d30b6 package/lock checkpoint; its full checks remain in progress and do not certify the unpushed parser correction.
