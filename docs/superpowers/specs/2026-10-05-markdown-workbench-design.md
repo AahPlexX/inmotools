@@ -89,7 +89,7 @@ Out of scope: real-time collaboration, cloud sync and comment threads (need a se
 | MDW-R31 | A DANGER callout kind, documented as a Workbench extension; alert styling persists in standalone HTML and EPUB | > [!DANGER] renders a titled danger callout with formatting; escaped markers stay literal; portrait/landscape and dark themes stay readable; detached HTML/EPUB include self-contained alert styling |
 | MDW-R32 | Emoji shortcodes (about 150) render as emoji outside code; unknown codes stay as written | :tada: renders 🎉; `:tada:` in code stays text |
 | MDW-R33 | Subscript and superscript (H~2~O, x^2^) as short literal spans; unescaped spaces/newlines are excluded and double tildes retain strikethrough | Preview, HTML, EPUB and DOCX preserve script formatting; AST exposes positioned script nodes; escaped/entity-written markers, code and math remain literal; escaped spaces work; source text and auto-format retain meaning |
-| MDW-R34 | Abbreviations (`*[HTML]: HyperText Markup Language`) | HTML renders as <abbr> with the title |
+| MDW-R34 | One-line abbreviation definitions (`*[HTML]: HyperText Markup Language`) anywhere in the document; case-sensitive whole labels, longest matching label and first definition wins | Preview/HTML/EPUB render semantic abbr with an escaped title; definition lines are hidden; code/math/raw HTML and larger words stay literal; empty expansions omit title; DOCX keeps readable labels; auto-format preserves definitions; a collapsible glossary makes used expansions available without hover at phone/keyboard sizes |
 | MDW-R35 | Definition lists | Term followed by `: definition` renders <dl> |
 | MDW-R36 | Details/summary disclosure blocks | A details block renders a collapsible section |
 | MDW-R37 | Clicking a task checkbox in the preview toggles that line in the source | Click an open task; the source line reads - [x] |
@@ -193,3 +193,6 @@ The tool is complete when every requirement is `verified` or `prohibited`, and t
 
 ### Script content default (2026-10-07)
 The R33 delimiters and whitespace rules follow the documented Pandoc-style notation. Span contents are literal text with character escapes/references; ordinary Markdown can wrap a span. This conservative content rule is not full Pandoc compatibility. Owner may override. No raw HTML processing is enabled. A direct dev pin `micromark-util-types@2.0.2` reuses the existing locked package to type the native parser extension.
+
+### Abbreviation defaults (2026-10-07)
+One-line definitions follow the primary Markdown Extra notation, with case-sensitive labels and empty expansions allowed. Multiline titles are not part of this initial grammar. First definition wins; matching prefers the longest full label and Unicode punctuation/spacing boundaries. Code, math, raw HTML, image alt text and literal script contents are excluded. Used nonempty expansions appear in a native collapsible glossary so readers can access them without hover. These conservative choices are not a claim of full Markdown Extra compatibility; owner may override.

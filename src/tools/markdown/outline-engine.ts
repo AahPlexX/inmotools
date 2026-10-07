@@ -1,5 +1,4 @@
-import { createMarkdownParser } from './parse-engine';
-import type { Root } from 'mdast';
+import { parseMarkdownTree } from './parse-engine';
 import type { OutlineEntry } from './markdown-types';
 import { headingText, toSlug } from './heading-slug';
 
@@ -16,7 +15,7 @@ import { headingText, toSlug } from './heading-slug';
 // purposes.
 
 export const buildOutline = (source: string): OutlineEntry[] => {
-  const tree = createMarkdownParser().parse(source) as Root;
+  const tree = parseMarkdownTree(source);
   const seen = new Map<string, number>();
   const entries: OutlineEntry[] = [];
 

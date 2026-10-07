@@ -3,6 +3,7 @@ import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import remarkScripts from './script-plugin';
+import remarkAbbreviations from './abbreviation-plugin';
 import type { Root, RootContent } from 'mdast';
 import { parseFrontmatter, stripFrontmatter } from './frontmatter-engine';
 import type { ParsedDocument, SourceLineNode } from './markdown-types';
@@ -14,7 +15,12 @@ import type { ParsedDocument, SourceLineNode } from './markdown-types';
 // headings, paragraphs, tables, and code/diagram/math blocks with the
 // preview, without the cost of tracking every inline node.
 
-export const createMarkdownParser = () => unified().use(remarkParse).use(remarkGfm, { singleTilde: false }).use(remarkMath).use(remarkScripts);
+export const createMarkdownParser = () => unified().use(remarkParse).use(remarkGfm, { singleTilde: false }).use(remarkMath).use(remarkScripts).use(remarkAbbreviations);
+
+export const parseMarkdownTree = (source: string): Root => {
+  const processor = createMarkdownParser();
+  return processor.runSync(processor.parse(source), source) as Root;
+};
 
 const toSourceLineNode = (node: RootContent, index: number, lineOffset: number): SourceLineNode | null => {
   if (!node.position) return null;
@@ -30,7 +36,7 @@ export const parseMarkdown = (source: string): ParsedDocument => {
   const body = frontmatter.format === null ? source : stripFrontmatter(source);
   const lineOffset = frontmatter.format === null ? 0 : frontmatter.bodyStartLine - 1;
 
-  const tree = createMarkdownParser().parse(body) as Root;
+  const tree = parseMarkdownTree(body);
 
   const nodes: SourceLineNode[] = [];
   tree.children.forEach((node, index) => {

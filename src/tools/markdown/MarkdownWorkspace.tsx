@@ -5,7 +5,7 @@ import { requestSupportPrompt } from '../../lib/support';
 import MarkdownEditor from './MarkdownEditor';
 import MarkdownPreview from './MarkdownPreview';
 import MarkdownSyntaxHelp from './MarkdownSyntaxHelp';
-import { createMarkdownParser, parseMarkdown } from './parse-engine';
+import { parseMarkdownTree, parseMarkdown } from './parse-engine';
 import { collectMarkdownStyleSuggestions, MAX_STYLE_SUGGESTIONS } from './lint-engine';
 import { renderMarkdown } from './render-engine';
 import { renderDiagramBlocks } from './diagram-renderer';
@@ -117,7 +117,7 @@ Start writing here. Add **bold text**, tables, math like $E = mc^2$, diagrams, a
 `;
 
 const parseToMdast = (source: string): MdastRoot =>
-  createMarkdownParser().parse(source) as MdastRoot;
+  parseMarkdownTree(source);
 
 const formatBytes = (bytes: number): string =>
   bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;

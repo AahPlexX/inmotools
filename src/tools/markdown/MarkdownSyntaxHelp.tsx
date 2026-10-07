@@ -22,6 +22,10 @@ const SYNTAX_GROUPS = [
     examples: ['```js\nconst ready = true;\n```', '| Name | Value |\n| --- | --- |\n| A | 1 |'],
   },
   {
+    title: 'Abbreviations',
+    examples: ['*[HTML]: HyperText Markup Language\n\nThe HTML document.', 'Open Abbreviations below the preview for expansions.'],
+  },
+  {
     title: 'Math, diagrams & citations',
     examples: ['$E = mc^2$', '$$\nx^2 + y^2 = z^2\n$$', '```mermaid\ngraph TD\nA --> B\n```', '[@citekey]'],
   },

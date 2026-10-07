@@ -19,6 +19,7 @@ import type { Root as MdastRoot, RootContent as MdastRootContent, PhrasingConten
 import katexExportCss from 'katex/dist/katex.css?inline';
 import codeHighlightCss from './code-highlight.css?inline';
 import alertStyleCss from './alert-style.css?inline';
+import abbreviationStyleCss from './abbreviation-style.css?inline';
 import { bundleStylesheetAssetsForEpub, type ExportAsset } from './export-assets';
 
 const escapeHtml = (value: string): string =>
@@ -56,6 +57,7 @@ export const buildStandaloneMarkdownHtml = (
   .katex-error { color: #b3261e; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 ${hasHighlightedCode(bodyHtml) ? codeHighlightCss : ''}
 ${hasAlerts(bodyHtml) ? alertStyleCss : ''}
+${bodyHtml.includes('markdown-abbreviation-glossary') ? abbreviationStyleCss : ''}
 ${options.additionalCss ?? ''}
 </style>
 </head>
@@ -439,6 +441,9 @@ export const buildEpubArchive = async (
 
   if (hasAlerts(bodyHtml)) {
     stylesheetCss = [stylesheetCss, alertStyleCss].filter(Boolean).join('\n');
+  }
+  if (bodyHtml.includes('markdown-abbreviation-glossary')) {
+    stylesheetCss = [stylesheetCss, abbreviationStyleCss].filter(Boolean).join('\n');
   }
 
   const stylesheetPath = stylesheetCss ? 'styles/markdown.css' : undefined;

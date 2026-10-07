@@ -35,7 +35,7 @@ const sanitizeSchema = {
   },
   tagNames: [
     ...(defaultSchema.tagNames ?? []),
-    'input',
+    'input', 'abbr',
     'math', 'mrow', 'mi', 'mn', 'mo', 'msup', 'msub', 'msubsup', 'mfrac', 'msqrt', 'mroot',
     'mtable', 'mtr', 'mtd', 'mspace', 'mtext', 'mstyle', 'mpadded', 'menclose',
     'semantics', 'annotation',
@@ -64,6 +64,25 @@ export const renderMarkdown = (source: string): RenderResult => {
 
   const anchors: ScrollAnchor[] = [];
   const seenLines = new Set<number>();
+  const abbreviations = new Map<string, string>();
+  const collectAbbreviations = (node: HastRootContent): void => {
+    if (!isElement(node)) return;
+    if (node.tagName === 'abbr' && typeof node.properties.title === 'string' && node.properties.title) {
+      const label = node.children.filter((child) => child.type === 'text').map((child) => child.value).join('');
+      if (!abbreviations.has(label)) abbreviations.set(label, node.properties.title);
+    }
+    for (const child of node.children) collectAbbreviations(child);
+  };
+  tree.children.forEach(collectAbbreviations);
+  if (abbreviations.size) {
+    tree.children.push({ type: 'element', tagName: 'details', properties: { className: ['markdown-abbreviation-glossary'] }, children: [
+      { type: 'element', tagName: 'summary', properties: {}, children: [{ type: 'text', value: `Abbreviations (${abbreviations.size})` }] },
+      { type: 'element', tagName: 'dl', properties: {}, children: [...abbreviations].flatMap(([label, title]): Element[] => [
+        { type: 'element', tagName: 'dt', properties: {}, children: [{ type: 'text', value: label }] },
+        { type: 'element', tagName: 'dd', properties: {}, children: [{ type: 'text', value: title }] },
+      ]) },
+    ] });
+  }
   const stamp = (node: HastRootContent, nodeId: string) => {
     if (!isElement(node)) return;
     const line = node.position?.start.line;
