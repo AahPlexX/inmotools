@@ -14,6 +14,8 @@ import { highlightCodeBlocks } from './code-highlight-engine';
 import { htmlToMarkdownDocument } from './html-import-engine';
 import { computeScrollOffset, sourceLineForScrollOffset } from './scroll-sync';
 import { toggleTaskListMarker } from './task-toggle';
+import { countMarkdownTasks } from './task-progress';
+import type { Root } from 'mdast';
 import { computeProseMetrics } from './prose-metrics-engine';
 import { splitIntoSlides } from './slide-engine';
 import { buildOutline } from './outline-engine';
@@ -283,6 +285,7 @@ export default function MarkdownWorkspace() {
   }, []);
 
   const parsed = useMemo(() => parseMarkdown(source), [source]);
+  const taskProgress = useMemo(() => countMarkdownTasks(parsed.tree as Root), [parsed]);
   const [styleChecksOpen, setStyleChecksOpen] = useState(false);
   const styleChecks = useMemo(
     () => styleChecksOpen ? collectMarkdownStyleSuggestions(source, parsed) : { suggestions: [], total: 0 },
@@ -925,10 +928,14 @@ export default function MarkdownWorkspace() {
         ) : null}
       </div>
 
-      <div className="markdown-workbench-status" role="status" aria-live="polite">
-        <span data-testid="markdown-status">{status}</span>
+      <div className="markdown-workbench-status">
+        <span data-testid="markdown-status" role="status" aria-live="polite">{status}</span>
         <span className="markdown-workbench-live-metrics" data-testid="markdown-live-metrics">{proseMetrics.words} words · {source ? source.split(/\r\n|\r|\n/).length : 0} lines · {proseMetrics.readingMinutes < 1 && proseMetrics.words > 0 ? '<1' : proseMetrics.readingMinutes.toFixed(0)} min read</span>
-        <span className="markdown-workbench-autosave-status" data-testid="markdown-save-state">
+        <span className="markdown-workbench-task-progress" data-testid="markdown-task-progress" role="status" aria-live="polite" aria-atomic="true">
+          <span>{taskProgress.total ? `Tasks: ${taskProgress.completed}/${taskProgress.total} complete` : 'Tasks: none'}</span>
+          {taskProgress.total > 0 ? <progress aria-label="Completed tasks" aria-valuetext={`${taskProgress.completed} of ${taskProgress.total} tasks complete`} value={taskProgress.completed} max={taskProgress.total} /> : null}
+        </span>
+        <span className="markdown-workbench-autosave-status" data-testid="markdown-save-state" role="status" aria-live="polite">
           {lastSavedAt ? `${isDirty ? 'Unsaved changes · last saved' : 'Saved'} ${new Date(lastSavedAt).toLocaleTimeString()}` : 'Not yet saved locally'}
         </span>
       </div>

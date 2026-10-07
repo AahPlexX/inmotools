@@ -405,7 +405,7 @@ export default function MarkdownEditor({
         EditorView.updateListener.of((update) => {
           if (update.docChanged || update.selectionSet) cancelFormatting('Formatting cancelled because the document or caret changed. Run Auto-format again when ready.');
           if (update.docChanged && !isExternalSyncRef.current) {
-            const report = update.transactions.some((transaction) => transaction.annotation(formattingChange))
+            const report = update.transactions.some((transaction) => transaction.annotation(formattingChange) || transaction.isUserEvent('undo') || transaction.isUserEvent('redo'))
               ? onFormatChangeRef.current ?? onChangeRef.current : onChangeRef.current;
             report(update.state.field(sourceState).source);
           }

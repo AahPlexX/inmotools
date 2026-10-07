@@ -27,6 +27,21 @@ export const htmlToMarkdownDocument = async (html: string): Promise<string> => {
     strongDelimiter: '**',
   });
   const escapedAttribute = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  const isLeadingChild = (node: Node) => {
+    for (let previous = node.previousSibling; previous; previous = previous.previousSibling) {
+      if (previous.nodeType === 8) continue;
+      if (previous.nodeType !== 3 || previous.textContent?.trim()) return false;
+    }
+    return true;
+  };
+  service.addRule('taskCheckbox', {
+    filter: node => {
+      if (node.nodeName !== 'INPUT' || (node as HTMLInputElement).type !== 'checkbox' || !isLeadingChild(node)) return false;
+      const parent = node.parentElement;
+      return parent?.nodeName === 'LI' || (parent?.nodeName === 'P' && parent.parentElement?.nodeName === 'LI' && isLeadingChild(parent));
+    },
+    replacement: (_content, node) => `[${(node as HTMLElement).hasAttribute('checked') ? 'x' : ' '}] `,
+  });
   service.addRule('disclosureSummary', {
     filter: 'summary',
     replacement: (_content, node) => `<summary>${escapedAttribute(service.escape(node.textContent?.trim() || 'Details'))}</summary>\n\n`,
