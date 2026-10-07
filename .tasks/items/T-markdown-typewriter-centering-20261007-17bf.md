@@ -38,3 +38,5 @@ At 2026-10-07 13:54:07 UTC, diagnostic full 37576166482 on cc6580a completed suc
 - 2026-10-07 13:54:07 UTC: Retrieved official diagnostic full receipt: 3852 units/14 skips; 1697 browsers/171 skips (50.3m), zero retries. No failing diagnostic geometry and no cause/repair claim.
 
 - 2026-10-07 15:20:46 UTC: Full References integration 37637141396 passed 1711 browser cases/171 skips (46.5m), zero retry markers/flaky summaries and no original 2571.9765625px failure marker. Desktop/mobile R15 both passed. This is fresh non-reproduction evidence, not a cause or runtime fix attribution; keep active.
+
+- 2026-10-07 15:44:07 UTC: Duplicate R51 main full 37640254171 completed with one Crystal scalar-field retry and 1710 passes/171 skips; no R15 failure captured. Metadata owned 37643618750 passed 246 browsers without retries; fresh full 37643618281 remains pending. Source centering/tolerance/timeout unchanged; no cause or repair attribution.
