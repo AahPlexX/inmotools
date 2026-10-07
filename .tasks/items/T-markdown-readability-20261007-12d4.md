@@ -3,7 +3,7 @@ task: T-markdown-readability-20261007-12d4
 tool: markdown-workbench
 doc: task
 kind: fix
-state: next
+state: active
 branch: fix/markdown-workbench
 created: 2026-10-07
 updated: 2026-10-07
@@ -13,11 +13,11 @@ updated: 2026-10-07
 
 ## Request
 
-Next frozen item MDW-R55: Flesch-Kincaid grade and Coleman-Liau index, with reference-score acceptance. Associated confirmed prose-metrics defects must be repaired without changing authored text. R51 release remains pending; no R55 implementation is present.
+Next frozen item MDW-R55: Flesch-Kincaid grade and Coleman-Liau index, with reference-score acceptance. Associated confirmed prose-metrics defects must be repaired without changing authored text. References and its associated metadata repair are verified/deployed; R55 is now active.
 
 ## Resume here
 
-2026-10-07 16:10:49 UTC: R55 is the next frozen ID; no readability implementation. References and metadata display repair are scoped verified/deployed; task 42ab done. Fresh full 37643618281 on 6b1f5f1 passed 3908 units/14 skips and 1715 browsers/171 skips (43.8m), zero retries. Main record aba873b retains exact runtime d1edf246; Pages/live acceptance passed. Start from latest main, record conservative English/prose/word/sentence/letter/undefined-state defaults in the spec before coding, then implement using the current primary research/fixtures below. Existing engine has only Fog and confirmed count/suffix defects. Isolated syllable 5.0.1 API/browser/bundle checks are preparatory, not project integration; if adopting it, resolve the concrete normalize-strings MIT notice gap and pin dependencies/types/licenses. Obtain fresh required checks after implementation.
+2026-10-07 16:28:39 UTC: Active at main 5f4bd2590798467b54468b1b5c669e48a13411db. Conservative defaults are specified before implementation. Add exact syllable 5.0.1, both formulas and native-tree prose extraction; confirm reference scores, document lifecycle/source preservation and narrow/rotated viewport geometry. Shared-file authorization reason: package.json/pnpm-lock.yaml must pin the browser estimator; public/markdown/readability-LICENSE.txt must distribute upstream notices; owned unit/browser fixtures and synchronized cross-tool cursor records document acceptance. Full browser suite is required for these shared paths. normalize-strings 1.1.1 declares MIT in the primary published manifest and names its author/contributors; it supplies no separate copyright notice. Preserve that declared license/attribution accurately alongside the complete MIT terms, without inventing a year or upstream notice. No runtime implementation at this specification checkpoint.
 
 ## Confirmed baseline
 
@@ -57,3 +57,5 @@ Add both named grades with explicit English/estimated syllable limitations, unde
 - 2026-10-07 15:55:39 UTC: Isolated Vite 8.3.0 production bundle of exact syllable 5.0.1 built in 451ms (9 modules), script 17.02 kB/7.40 kB gzip on this machine. Actual Chromium desktop/touch each matched 11 API cases with zero page errors, including unsupported/numeric 0. This is isolated compatibility/bundle evidence, not a tool implementation or general device timing claim. Public types declare syllable(value: string): number. Browser runtime packages: syllable 5.0.1, pluralize 8.0.0 and normalize-strings 1.1.1, all manifest MIT. Vite build.license generated notices, but normalize-strings ships no license file and its generated section lacks notice text; resolve primary upstream terms/attribution before adoption rather than treating the manifest as a complete bundled notice. Project package/lockfiles and readability runtime remain unchanged.
 
 - 2026-10-07 16:13:37 UTC: GitHub MCP primary normalize repository listing, README, package.json and index.js at 3cf80b86967a6ff30e6fc8f925cec516e2b8156a corroborate version 1.1.1 and manifest MIT declaration; no root license file or full notice appears in the reviewed files. This is a concrete notice gap, not a claim that no license was declared. No author was contacted and no project dependency/code added. Resolve accurate notice preservation or choose an independently implementable, clearly licensed alternative before adoption; do not fabricate copyright dates or treat an isolated browser test as tool acceptance.
+
+- 2026-10-07 16:28:39 UTC: Activated R55 on current verified main; stale R51-pending request sentence corrected. Exact dependency and native counting defaults recorded before code. Package license declarations are primary evidence; absent upstream copyright notices must not be fabricated.
