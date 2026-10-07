@@ -252,8 +252,12 @@ test('document metrics show characters and lines alongside words and sentences',
   const metrics = await openPanel(page, /^Document metrics/);
   await expect(metrics).toContainText('Characters');
   await expect(metrics).toContainText('Lines');
-  await expect(metrics).toContainText('19');
-  await expect(metrics).toContainText('2');
+  const value = (label: string) => metrics.locator('div').filter({ has: page.getByText(label, { exact: true }) }).locator('dd');
+  await expect(value('Characters')).toHaveText('17');
+  await expect(value('Source characters')).toHaveText('22');
+  await expect(value('Lines')).toHaveText('2');
+  await expect(value('Words')).toHaveText('4');
+  await expect(value('Sentences')).toHaveText('2');
 });
 
 test('ATX heading levels are visibly distinct in the rendered preview', async ({ page }) => {

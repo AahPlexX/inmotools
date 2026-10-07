@@ -6,6 +6,7 @@ type Point = Position['start'];
 interface Disclosure extends Parent { type: 'workbenchDisclosure'; children: RootContent[] }
 interface Summary extends Parent { type: 'workbenchSummary'; children: PhrasingContent[] }
 declare module 'mdast' {
+  interface Data { proseAuthored?: boolean }
   interface BlockContentMap { workbenchDisclosure: Disclosure; workbenchSummary: Summary }
   interface RootContentMap { workbenchDisclosure: Disclosure; workbenchSummary: Summary }
   interface CodeData { disclosureFallback?: boolean }
@@ -39,7 +40,7 @@ const remarkDisclosures: Plugin<[], Root> = function () {
       if (node.type === 'image') return node.alt ?? '';
       return 'children' in node ? plain(node.children as Nodes[]) : '';
     }).join('');
-    const inline = (value: string): PhrasingContent[] => {
+    const inline = (value: string): { children: PhrasingContent[]; authored: boolean } => {
       const parsed = processor.parse(value) as Root;
       const first = parsed.children[0];
       const clean = (nodes: PhrasingContent[]): PhrasingContent[] => nodes.flatMap(node => {
@@ -50,7 +51,8 @@ const remarkDisclosures: Plugin<[], Root> = function () {
         return [node];
       });
       const children = first?.type === 'paragraph' && parsed.children.length === 1 ? clean(first.children) : [{ type: 'text' as const, value }];
-      return plain(children as Nodes[]).trim() ? children : [{ type: 'text', value: 'Details' }];
+      const authored = Boolean(plain(children as Nodes[]).trim());
+      return { children: authored ? children : [{ type: 'text', value: 'Details' }], authored };
     };
     const attrs = (value: string): { open: boolean; name?: string } | null => {
       let rest = value; let open = false; let name: string | undefined;
@@ -102,17 +104,17 @@ const remarkDisclosures: Plugin<[], Root> = function () {
       const endOffset = mapped(length);
       if (endOffset === undefined) return [fallback(node.value, node.position)];
       const position = { start: node.position!.start, end: point(endOffset) };
-      const caption = summary ? inline(summary[1]) : [];
+      const caption = summary ? inline(summary[1]) : { children: [], authored: false };
       // Inline caption positions belong to a separately parsed string. The
       // containing summary supplies the original source position instead.
       const removePositions = (child: Nodes) => {
         delete child.position;
         if ('children' in child) child.children.forEach(removePositions);
       };
-      caption.forEach(removePositions);
+      caption.children.forEach(removePositions);
       const boundary: Boundary = open ? { kind: 'open', node, position, ...properties! }
         : close ? { kind: 'close', node, position }
-          : { kind: 'summary', node: { type: 'workbenchSummary', children: caption, data: { hName: 'summary' }, position }, position };
+          : { kind: 'summary', node: { type: 'workbenchSummary', children: caption.children, data: { hName: 'summary', proseAuthored: caption.authored }, position }, position };
       const fragment = node.value.slice(length);
       if (!fragment.trim()) return [boundary];
       const parsed = processor.parse(fragment) as Root;
