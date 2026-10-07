@@ -17,7 +17,7 @@ Next frozen item MDW-R55: Flesch-Kincaid grade and Coleman-Liau index, with refe
 
 ## Resume here
 
-2026-10-07 15:20:46 UTC: R51 scoped release is verified at main 230f637 with full 37637141396 (1711 browser passes, no retries) and Pages deploy job success. R55 is the next frozen ID. Finish the independently checked associated metadata-display repair 42ab release before implementing grades; it has 403 units/38 production passes but is unpublished. No R55 runtime change. Read primary research and exact baseline/fixture counts below, record conservative defaults in the spec, then implement and obtain fresh required checks.
+2026-10-07 15:20:46 UTC: R51 scoped release is verified at main 230f637 with full 37637141396 (1711 browser passes, no retries) and Pages deploy job success. R55 is the next frozen ID. Finish the independently checked associated metadata-display repair 42ab release before implementing grades; it has 403 units/38 production passes and is published as d1edf246; fresh required full/main/Pages checks pending. No R55 runtime change. Read primary research and exact baseline/fixture counts below, record conservative defaults in the spec, then implement and obtain fresh required checks.
 
 ## Confirmed baseline
 
