@@ -1,0 +1,22 @@
+.markdown-abbreviation-glossary {
+  margin-block: 1rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  overflow-wrap: anywhere;
+}
+.markdown-abbreviation-glossary > summary {
+  min-height: 44px;
+  align-content: center;
+  cursor: pointer;
+}
+.markdown-abbreviation-glossary > summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.markdown-abbreviation-glossary dt { font-weight: bold; }
+.markdown-abbreviation-glossary dd { margin: 0.25rem 0 0.75rem; }
+@media print {
+  .markdown-abbreviation-glossary::details-content { content-visibility: visible !important; }
+  .markdown-abbreviation-glossary > dl { display: block !important; }
+}

@@ -1,0 +1,79 @@
+diff --git a/dev/lib/syntax.js b/dev/lib/syntax.js
+index e4132e609320eeb12351dc24e1647beb60973476..88ea503076c40c843dcbb464ee88ed61e8c37052 100644
+--- a/dev/lib/syntax.js
++++ b/dev/lib/syntax.js
+@@ -11,6 +11,7 @@ import Debug from 'debug';
+ const debug = Debug('micromark-extension-definition-list:syntax');
+ const ignorablePrefixTypes = new Set([
+     types.linePrefix,
++    types.listItemIndent,
+     types.blockQuotePrefix,
+     types.blockQuoteMarker,
+     types.blockQuotePrefixWhitespace,
+@@ -209,6 +210,7 @@ function createDefTermEvent(events, chunkFlowIndex, defListStartIndex, flagBlock
+     let flowExitIndex;
+     for (let i = chunkFlowIndex; i >= 0; i--) {
+         const event = events[i];
++        if (ignorablePrefixTypes.has(event[1].type)) continue;
+         if (event[1].type !== types.chunkFlow) {
+             newDefListStartIndex = i + 1;
+             break;
+@@ -338,10 +340,17 @@ function checkPossibleDefTerm(events) {
+                 if (flagBlockQuote && !lazyLines[tmpToken.end.line]) {
+                     return false;
+                 }
++                let candidateHead;
++                for (let j = flowEvents.length - 1; j >= 0; j--) {
++                    const candidate = flowEvents[j];
++                    if (candidate[0] === 'enter' && candidate[1].type === 'tableHead') {
++                        candidateHead = candidate[1];
++                        break;
++                    }
++                }
+                 return (tmpToken.type === types.paragraph ||
+                     tmpToken.type === types.chunkContent ||
+-                    tmpToken.type === 'tableHead' ||
+-                    tmpToken.type === 'tableRow');
++                    ((tmpToken.type === 'tableHead' || tmpToken.type === 'tableRow') && candidateHead !== undefined && candidateHead.end === undefined));
+             }
+         }
+     }
+diff --git a/lib/syntax.js b/lib/syntax.js
+index b793e9f26005f4cfb0194502c8a752aae1292085..52a5b10fb533d843bc292c84dc76f5fad1ebe5c2 100644
+--- a/lib/syntax.js
++++ b/lib/syntax.js
+@@ -5,7 +5,7 @@ import { tokenTypes } from './types.js';
+ import { formatEvents, formatEvent, code2Str } from './utils.js';
+ import { analyzeDefTermFlow, subtokenizeDefTerm } from './defTermFlowToken.js';
+ import { splice } from 'micromark-util-chunked';
+-const ignorablePrefixTypes = new Set(["linePrefix", "blockQuotePrefix", "blockQuoteMarker", "blockQuotePrefixWhitespace"]);
++const ignorablePrefixTypes = new Set(["linePrefix", "listItemIndent", "blockQuotePrefix", "blockQuoteMarker", "blockQuotePrefixWhitespace"]);
+ const defListConstruct = {
+   name: 'defList',
+   tokenize: tokenizeDefListStart,
+@@ -193,6 +193,7 @@ function createDefTermEvent(events, chunkFlowIndex, defListStartIndex, flagBlock
+   let flowExitIndex;
+   for (let i = chunkFlowIndex; i >= 0; i--) {
+     const event = events[i];
++    if (ignorablePrefixTypes.has(event[1].type)) continue;
+     if (event[1].type !== "chunkFlow") {
+       newDefListStartIndex = i + 1;
+       break;
+@@ -305,7 +306,16 @@ function checkPossibleDefTerm(events) {
+         if (flagBlockQuote && !lazyLines[tmpToken.end.line]) {
+           return false;
+         }
+-        return tmpToken.type === "paragraph" || tmpToken.type === "chunkContent" || tmpToken.type === 'tableHead' || tmpToken.type === 'tableRow';
++        let candidateHead;
++        for (let j = flowEvents.length - 1; j >= 0; j--) {
++          const candidate = flowEvents[j];
++          if (candidate[0] === 'enter' && candidate[1].type === 'tableHead') {
++            candidateHead = candidate[1];
++            break;
++          }
++        }
++        return tmpToken.type === "paragraph" || tmpToken.type === "chunkContent" ||
++          ((tmpToken.type === "tableHead" || tmpToken.type === "tableRow") && candidateHead !== undefined && candidateHead.end === undefined);
+       }
+     }
+   }

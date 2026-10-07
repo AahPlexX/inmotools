@@ -3,6 +3,7 @@ import * as markdownPlugin from 'prettier/plugins/markdown';
 import { parseFrontmatter, stripFrontmatter } from './frontmatter-engine';
 import type { Nodes, Root } from 'mdast';
 import type { ParserOptions } from 'prettier';
+import { definitionListRanges } from './definition-list-ranges';
 
 export async function formatMarkdownSource(source: string, cursorOffset: number) {
   const metadata = parseFrontmatter(source);
@@ -13,9 +14,21 @@ export async function formatMarkdownSource(source: string, cursorOffset: number)
   // the original delimiters: single tildes also belong to authoring extensions.
   // A same-length unused character keeps formatWithCursor's offsets correct.
   let markerCode = 0xE000;
-  while (body.includes(String.fromCharCode(markerCode)) && markerCode <= 0xF8FF) markerCode++;
-  if (markerCode > 0xF8FF) throw new Error('No safe formatting marker available.');
-  const marker = String.fromCharCode(markerCode);
+  const allocateMarker = () => {
+    while (markerCode <= 0xF8FF && body.includes(String.fromCharCode(markerCode))) markerCode++;
+    if (markerCode > 0xF8FF) throw new Error('No safe formatting marker available.');
+    return String.fromCharCode(markerCode++);
+  };
+  const marker = allocateMarker();
+  // Prettier does not parse definition lists. Make each native block opaque,
+  // including enclosing quotes/lists whose indentation must remain intact.
+  const blocks = definitionListRanges(body).map(range => ({
+    ...range, marker: allocateMarker(), original: body.slice(range.start, range.end),
+  }));
+  let maskedBody = body;
+  for (const block of [...blocks].reverse()) {
+    maskedBody = maskedBody.slice(0, block.start) + block.original.replace(/[^\r\n]/g, block.marker) + maskedBody.slice(block.end);
+  }
   const preservingPlugin = {
     ...markdownPlugin,
     parsers: { ...markdownPlugin.parsers, markdown: {
@@ -47,13 +60,29 @@ export async function formatMarkdownSource(source: string, cursorOffset: number)
       },
     } },
   };
-  const result = await formatWithCursor(body, {
+  const result = await formatWithCursor(maskedBody, {
     parser: 'markdown', plugins: [preservingPlugin],
     proseWrap: 'preserve', embeddedLanguageFormatting: 'off',
     cursorOffset: Math.max(0, cursor - prefix.length),
   });
+  let formatted = result.formatted.replaceAll(marker, '~');
+  let mappedCursor = result.cursorOffset;
+  const bodyCursor = Math.max(0, cursor - prefix.length);
+  for (const block of blocks) {
+    const matches = [...formatted.matchAll(new RegExp(`${block.marker}+(?:\\s+${block.marker}+)*`, 'g'))];
+    const match = matches[0];
+    if (matches.length !== 1 || !match || match[0].split(block.marker).length - 1 !== block.original.replace(/[\r\n]/g, '').length) {
+      throw new Error('Cannot safely preserve definition-list formatting.');
+    }
+    const start = match.index;
+    const end = start + match[0].length;
+    if (bodyCursor >= block.start && bodyCursor <= block.end) mappedCursor = start + bodyCursor - block.start;
+    else if (mappedCursor >= end) mappedCursor += block.original.length - match[0].length;
+    else if (mappedCursor > start) throw new Error('Cannot safely retain the formatting cursor.');
+    formatted = formatted.slice(0, start) + block.original + formatted.slice(end);
+  }
   return {
-    formatted: prefix + result.formatted.replaceAll(marker, '~'),
-    cursorOffset: cursor < prefix.length ? cursor : prefix.length + result.cursorOffset,
+    formatted: prefix + formatted,
+    cursorOffset: cursor < prefix.length ? cursor : prefix.length + mappedCursor,
   };
 }

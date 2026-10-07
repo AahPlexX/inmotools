@@ -1,15 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
-import { unified } from 'unified';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import remarkParse from 'remark-parse';
 import type { Root as MdastRoot } from 'mdast';
 import { downloadBytes, downloadText } from '../../lib/download';
 import { requestSupportPrompt } from '../../lib/support';
 import MarkdownEditor from './MarkdownEditor';
 import MarkdownPreview from './MarkdownPreview';
 import MarkdownSyntaxHelp from './MarkdownSyntaxHelp';
-import { parseMarkdown } from './parse-engine';
+import { parseMarkdownTree, parseMarkdown } from './parse-engine';
 import { collectMarkdownStyleSuggestions, MAX_STYLE_SUGGESTIONS } from './lint-engine';
 import { renderMarkdown } from './render-engine';
 import { renderDiagramBlocks } from './diagram-renderer';
@@ -121,7 +117,7 @@ Start writing here. Add **bold text**, tables, math like $E = mc^2$, diagrams, a
 `;
 
 const parseToMdast = (source: string): MdastRoot =>
-  unified().use(remarkParse).use(remarkGfm).use(remarkMath).parse(source) as MdastRoot;
+  parseMarkdownTree(source);
 
 const formatBytes = (bytes: number): string =>
   bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;

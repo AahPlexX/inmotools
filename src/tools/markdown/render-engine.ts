@@ -1,7 +1,5 @@
-import { unified } from 'unified';
-import remarkParse from 'remark-parse';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
+import { createMarkdownParser } from './parse-engine';
+import { defListHastHandlers } from 'remark-definition-list';
 import remarkRehype from 'remark-rehype';
 import rehypeKatex from 'rehype-katex';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
@@ -38,7 +36,7 @@ const sanitizeSchema = {
   },
   tagNames: [
     ...(defaultSchema.tagNames ?? []),
-    'input',
+    'input', 'abbr',
     'math', 'mrow', 'mi', 'mn', 'mo', 'msup', 'msub', 'msubsup', 'mfrac', 'msqrt', 'mroot',
     'mtable', 'mtr', 'mtd', 'mspace', 'mtext', 'mstyle', 'mpadded', 'menclose',
     'semantics', 'annotation',
@@ -46,14 +44,11 @@ const sanitizeSchema = {
 };
 
 const createProcessor = () =>
-  unified()
-    .use(remarkParse)
-    .use(remarkGfm)
-    .use(remarkMath)
+  createMarkdownParser()
     .use(remarkGithubAlerts)
     .use(remarkHeadingIds)
     .use(remarkEmoji)
-    .use(remarkRehype)
+    .use(remarkRehype, { handlers: defListHastHandlers })
     // rehype-katex never throws for a malformed expression: it renders a
     // `.katex-error` span in place of the broken expression instead, which is
     // exactly the "labeled error block instead of a blank preview" behavior
@@ -70,6 +65,26 @@ export const renderMarkdown = (source: string): RenderResult => {
 
   const anchors: ScrollAnchor[] = [];
   const seenLines = new Set<number>();
+  const abbreviations = new Map<string, string>();
+  const collectAbbreviations = (node: HastRootContent): void => {
+    if (!isElement(node)) return;
+    if (node.tagName === 'dl') node.properties.className = ['markdown-definition-list'];
+    if (node.tagName === 'abbr' && typeof node.properties.title === 'string' && node.properties.title) {
+      const label = node.children.filter((child) => child.type === 'text').map((child) => child.value).join('');
+      if (!abbreviations.has(label)) abbreviations.set(label, node.properties.title);
+    }
+    for (const child of node.children) collectAbbreviations(child);
+  };
+  tree.children.forEach(collectAbbreviations);
+  if (abbreviations.size) {
+    tree.children.push({ type: 'element', tagName: 'details', properties: { className: ['markdown-abbreviation-glossary'] }, children: [
+      { type: 'element', tagName: 'summary', properties: {}, children: [{ type: 'text', value: `Abbreviations (${abbreviations.size})` }] },
+      { type: 'element', tagName: 'dl', properties: {}, children: [...abbreviations].flatMap(([label, title]): Element[] => [
+        { type: 'element', tagName: 'dt', properties: {}, children: [{ type: 'text', value: label }] },
+        { type: 'element', tagName: 'dd', properties: {}, children: [{ type: 'text', value: title }] },
+      ]) },
+    ] });
+  }
   const stamp = (node: HastRootContent, nodeId: string) => {
     if (!isElement(node)) return;
     const line = node.position?.start.line;

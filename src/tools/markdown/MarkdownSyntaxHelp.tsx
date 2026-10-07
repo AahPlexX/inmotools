@@ -7,7 +7,7 @@ const SYNTAX_GROUPS = [
   },
   {
     title: 'Emphasis',
-    examples: ['**Bold text**', '*Italic text*', '~~Strikethrough~~', '`inline code`'],
+    examples: ['**Bold text**', '*Italic text*', '~~Strikethrough~~', 'H~2~O · x^2^', 'P~a\\ cat~ (escape spaces)', '`inline code`'],
   },
   {
     title: 'Lists, quotes & structure',
@@ -20,6 +20,14 @@ const SYNTAX_GROUPS = [
   {
     title: 'Code & tables',
     examples: ['```js\nconst ready = true;\n```', '| Name | Value |\n| --- | --- |\n| A | 1 |'],
+  },
+  {
+    title: 'Definition lists',
+    examples: ['Term\n: Definition', 'Term\n: First definition\n: Second definition', 'Term\n\n:   First paragraph.\n\n    Continued paragraph.'],
+  },
+  {
+    title: 'Abbreviations',
+    examples: ['*[HTML]: HyperText Markup Language\n\nThe HTML document.', 'Open Abbreviations below the preview for expansions.'],
   },
   {
     title: 'Math, diagrams & citations',

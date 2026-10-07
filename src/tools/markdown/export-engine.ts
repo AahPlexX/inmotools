@@ -19,6 +19,8 @@ import type { Root as MdastRoot, RootContent as MdastRootContent, PhrasingConten
 import katexExportCss from 'katex/dist/katex.css?inline';
 import codeHighlightCss from './code-highlight.css?inline';
 import alertStyleCss from './alert-style.css?inline';
+import abbreviationStyleCss from './abbreviation-style.css?inline';
+import definitionListStyleCss from './definition-list-style.css?inline';
 import { bundleStylesheetAssetsForEpub, type ExportAsset } from './export-assets';
 
 const escapeHtml = (value: string): string =>
@@ -56,6 +58,8 @@ export const buildStandaloneMarkdownHtml = (
   .katex-error { color: #b3261e; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 ${hasHighlightedCode(bodyHtml) ? codeHighlightCss : ''}
 ${hasAlerts(bodyHtml) ? alertStyleCss : ''}
+${bodyHtml.includes('markdown-abbreviation-glossary') ? abbreviationStyleCss : ''}
+${bodyHtml.includes('markdown-definition-list') ? definitionListStyleCss : ''}
 ${options.additionalCss ?? ''}
 </style>
 </head>
@@ -93,6 +97,8 @@ const renderInlineRuns = (
       runs.push(...renderInlineRuns(node.children, footnoteIds, true, italics));
     } else if (node.type === 'emphasis') {
       runs.push(...renderInlineRuns(node.children, footnoteIds, bold, true));
+    } else if (node.type === 'subscript' || node.type === 'superscript') {
+      runs.push(new TextRun({ text: phrasingPlainText(node.children), subScript: node.type === 'subscript', superScript: node.type === 'superscript', bold, italics }));
     } else if (node.type === 'delete') {
       runs.push(new TextRun({ text: phrasingPlainText(node.children), strike: true, bold, italics }));
     } else if (node.type === 'inlineCode') {
@@ -198,6 +204,12 @@ const nodeToDocxElements = (
   context: DocxContext,
   state: DocxBuildState,
 ): (Paragraph | Table)[] => {
+  if (node.type === 'defList' || node.type === 'defListDescription') {
+    return node.children.flatMap((child) => nodeToDocxElements(child, resolveImage, { ...context, marker: undefined }, state));
+  }
+  if (node.type === 'defListTerm') {
+    return [new Paragraph({ children: renderInlineRuns(node.children, state.footnoteIds, true), keepNext: true, ...paragraphDecoration(context.blockquoteDepth) })];
+  }
   if (node.type === 'heading') {
     const level = [HeadingLevel.HEADING_1, HeadingLevel.HEADING_2, HeadingLevel.HEADING_3,
       HeadingLevel.HEADING_4, HeadingLevel.HEADING_5, HeadingLevel.HEADING_6][node.depth - 1];
@@ -437,6 +449,12 @@ export const buildEpubArchive = async (
 
   if (hasAlerts(bodyHtml)) {
     stylesheetCss = [stylesheetCss, alertStyleCss].filter(Boolean).join('\n');
+  }
+  if (bodyHtml.includes('markdown-abbreviation-glossary')) {
+    stylesheetCss = [stylesheetCss, abbreviationStyleCss].filter(Boolean).join('\n');
+  }
+  if (bodyHtml.includes('markdown-definition-list')) {
+    stylesheetCss = [stylesheetCss, definitionListStyleCss].filter(Boolean).join('\n');
   }
 
   const stylesheetPath = stylesheetCss ? 'styles/markdown.css' : undefined;

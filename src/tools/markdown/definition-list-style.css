@@ -1,0 +1,7 @@
+.markdown-definition-list > dt { font-weight: bold; overflow-wrap: anywhere; }
+.markdown-definition-list > dd {
+  margin: 0.25rem 0 0.75rem 1rem;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.markdown-definition-list > dd > :first-child { margin-top: 0; }
