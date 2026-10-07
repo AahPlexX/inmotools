@@ -41,6 +41,16 @@ describe('Markdown definition lists', () => {
     expect(html).toContain(': Value');
     expect(html).toContain(': Without a term.');
   });
+  it('keeps definition-like lines inside display math and indented code literal', () => {
+    expect(renderMarkdown('$$\nTerm\n: Value\n$$').html).not.toMatch(/<dl\b/);
+    const html = renderMarkdown('Term\n\n    : literal code').html;
+    expect(html).not.toMatch(/<dl\b/);
+    expect(html).toContain('<pre');
+  });
+  it('renders an empty definition without a parser exception or losing its term', () => {
+    const html = renderMarkdown('Term\n:');
+    expect(html.html).toContain('Term');
+  });
   it('preserves a GFM single-column table row beginning with an unescaped colon', () => {
     const html = renderMarkdown('head\n| - |\nrow1\n: row2').html;
     expect(html).toMatch(/<td\b[^>]*>: row2<\/td>/);

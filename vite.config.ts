@@ -2,9 +2,17 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 export default defineConfig({
   base: '/inmotools/',
+  resolve: {
+    // The package's browser entry uses document at module load. Its official
+    // default/worker implementation also works in local formatting workers.
+    alias: [{ find: /^decode-named-character-reference$/, replacement: require.resolve('decode-named-character-reference') }],
+  },
   plugins: [
     react(),
     tailwindcss(),
