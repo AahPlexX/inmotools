@@ -9,6 +9,7 @@ Local editor for writing, previewing, and exporting Markdown. Documents, drafts,
 - Tables with local formulas and a dimension picker, math, Mermaid and Graphviz diagrams, GitHub alerts, subscripts/superscripts, abbreviation definitions with a glossary, definition lists, native disclosure sections, emoji shortcodes, and citations (APA, IEEE, Chicago, MLA).
 - Click a task checkbox in the preview to toggle that line; document task progress shows completed/total and includes nested tasks.
 - Resolved prose citations generate References in preview and rendered exports; code/metadata literals and uncited library entries are excluded. Original Markdown remains unchanged.
+- Prose counts, reading/speaking estimates, Gunning Fog and English Flesch–Kincaid/Coleman–Liau grade estimates; code, math and metadata are excluded.
 - Open `.md`, `.markdown`, `.txt`, or local HTML. Paste or drop an image to embed it as a data URI (5 MB cap).
 - Export Markdown, rendered Markdown, standalone HTML, print/PDF, DOCX, structural EPUB, or a syntax-tree JSON file.
 - Drafts live in IndexedDB. Editor settings live in `localStorage` under `inmotools.markdown-workbench.prefs`.
@@ -17,7 +18,7 @@ Local editor for writing, previewing, and exporting Markdown. Documents, drafts,
 
 Read [TRACKER.md](TRACKER.md) **Resume here** first, then the [current spec](../../../docs/superpowers/specs/2026-10-05-markdown-workbench-design.md), [active tool task](../../../.tasks/items/T-markdown-workbench-20261006-ea9f.md), and [verification evidence](VERIFICATION.md). The [ordered inventory](../../../.tasks/items/T-ordered-requirement-inventory-20261006-9cf1.md) preserves the original cross-tool sequence. Update the tracker, current task, inventory cursor and evidence together when behavior or check status changes.
 
-2026-10-07 16:28:39 UTC: R55 active at verified main 5f4bd259. Specification defaults precede code; task T-markdown-readability-20261007-12d4 records primary research, unchanged baselines, dependency/license choice and required full-suite scope. Implement native prose extraction and both grades, then obtain fresh checks/integration/deployment. No R55 implementation yet; previous R51/metadata acceptance remains historical valid evidence. Frozen cursor R55; tool remains incomplete 79/92. R15, compound citation annotations and Crystal retry causes remain open.
+2026-10-07 16:37:09 UTC: R55 implemented locally on main 2410e7a after specification checkpoint b567675. Both English grades, native-tree prose boundaries, truthful letter/number Characters and corrected syllables are present. Local acceptance: 436 Markdown/recovery unit passes (15.11s), TypeScript/build success and 4/4 production browser cases (26.2s), desktop/touch, zero retries/skips. Publish through GitHub MCP; exact package/lock/public-notice changes require fresh full integration before main/Pages/live acceptance and task completion. Frozen cursor remains R55; next is R56 after release. R15 cause, compound citation annotation loss and Crystal retry remain open; no unrelated tool advanced.
 
 ## Historical fixes
 

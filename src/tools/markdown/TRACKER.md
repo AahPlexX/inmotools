@@ -13,7 +13,7 @@ updated: 2026-10-07
 
 ## Resume here
 
-2026-10-07 16:28:39 UTC: R55 active at verified main 5f4bd259. Specification defaults precede code; task T-markdown-readability-20261007-12d4 records primary research, unchanged baselines, dependency/license choice and required full-suite scope. Implement native prose extraction and both grades, then obtain fresh checks/integration/deployment. No R55 implementation yet; previous R51/metadata acceptance remains historical valid evidence. Frozen cursor R55; tool remains incomplete 79/92. R15, compound citation annotations and Crystal retry causes remain open.
+2026-10-07 16:37:09 UTC: R55 implemented locally on main 2410e7a after specification checkpoint b567675. Both English grades, native-tree prose boundaries, truthful letter/number Characters and corrected syllables are present. Local acceptance: 436 Markdown/recovery unit passes (15.11s), TypeScript/build success and 4/4 production browser cases (26.2s), desktop/touch, zero retries/skips. Publish through GitHub MCP; exact package/lock/public-notice changes require fresh full integration before main/Pages/live acceptance and task completion. Frozen cursor remains R55; next is R56 after release. R15 cause, compound citation annotation loss and Crystal retry remain open; no unrelated tool advanced.
 
 ## Documents
 
@@ -85,8 +85,8 @@ updated: 2026-10-07
 | MDW-R51 | verified | tests/e2e/markdown-references.spec.ts; tests/unit/markdown-citation.test.ts; tests/unit/markdown-bibliography.test.ts | Main 230f637 is tree-identical; full 37637141396 passed 3896 units/14 skips and 1711 browsers/171 skips, zero retries. Pages deploy job 112857318705 succeeded; live actual exports 2/2 pass. Associated tasks 50cd/6e82/a67d/291b done; compound annotation limitation remains backlog d713. |
 | MDW-R52 | verified | e2e "builds a clickable outline from the document headings", "outline supports filtering and marks the current source section" | |
 | MDW-R53 | verified | e2e "live counts stay visible and a preview task click edits the source" | |
-| MDW-R54 | verified | e2e "document metrics show characters and lines alongside words and sentences"; unit "counts words and sentences in a simple two-sentence passage", "computes a Gunning Fog index from words, sentences, and complex words" | Associated native prose/character/syllable defects are confirmed in next R55 task 12d4; this row retains its existing scoped count cases, not universal count accuracy. |
-| MDW-R55 | missing | — | Gunning Fog exists |
+| MDW-R54 | verified | e2e "document metrics show characters and lines alongside words and sentences"; unit "counts words and sentences in a simple two-sentence passage", "computes a Gunning Fog index from words, sentences, and complex words" | Associated native prose/character/syllable defects are repaired in active R55 candidate 12d4, with local native-boundary/CMU/reference acceptance; fresh full release is pending. Counts and sentence/syllable boundaries remain heuristic. |
+| MDW-R55 | implemented | unit "matches official CS50 2026 published rounded Coleman grades using letters alone", "matches the independently counted monosyllabic Flesch formula without clamping"; e2e "MDW-R55 reference grades update through editing Undo reset draft restore and exact source export", "MDW-R55 long metric labels and values fit phone orientations tablet and desktop without overlap" | Local acceptance passed; required fresh full integration/main/Pages/live checks pending. English heuristic scope, unavailable unsupported input. |
 | MDW-R56 | missing | — | AST JSON export exists |
 | MDW-R57 | missing | — | |
 | MDW-R58 | verified | e2e "opens a local Markdown file without uploading it", "file selection validates Markdown or plain text instead of trusting accept alone", "dropping a .md file over the editor still opens it as a whole new document" | |

@@ -299,7 +299,7 @@ export default function MarkdownWorkspace() {
     () => styleChecksOpen ? collectMarkdownStyleSuggestions(source, parsed) : { suggestions: [], total: 0 },
     [source, parsed, styleChecksOpen],
   );
-  const proseMetrics = useMemo(() => computeProseMetrics(source), [source]);
+  const proseMetrics = useMemo(() => computeProseMetrics(source, parsed.tree as Root), [source, parsed]);
   const slides = useMemo(() => splitIntoSlides(source), [source]);
   const outline = useMemo(() => buildOutline(source), [source]);
   const filteredOutline = useMemo(() => {
@@ -993,7 +993,7 @@ export default function MarkdownWorkspace() {
 
       <details className="markdown-workbench-panel">
         <summary>Document metrics</summary>
-        <dl className="markdown-workbench-metrics">
+        <dl className="markdown-workbench-metrics" data-testid="markdown-document-metrics">
           <div><dt>Words</dt><dd>{proseMetrics.words}</dd></div>
           <div><dt>Characters</dt><dd>{proseMetrics.characters}</dd></div>
           <div><dt>Source characters</dt><dd>{source.length}</dd></div>
@@ -1001,9 +1001,11 @@ export default function MarkdownWorkspace() {
           <div><dt>Sentences</dt><dd>{proseMetrics.sentences}</dd></div>
           <div><dt>Reading time (estimate)</dt><dd>{proseMetrics.readingMinutes.toFixed(1)} min</dd></div>
           <div><dt>Speaking time (estimate)</dt><dd>{proseMetrics.speakingMinutes.toFixed(1)} min</dd></div>
+          <div><dt>Flesch–Kincaid grade (English estimate)</dt><dd>{proseMetrics.fleschKincaidGrade === null ? 'Not available' : proseMetrics.fleschKincaidGrade.toFixed(1)}</dd></div>
+          <div><dt>Coleman–Liau index (English estimate)</dt><dd>{proseMetrics.colemanLiauIndex === null ? 'Not available' : proseMetrics.colemanLiauIndex.toFixed(1)}</dd></div>
           <div><dt>Fog index (heuristic)</dt><dd>{proseMetrics.fogIndex.toFixed(1)}</dd></div>
         </dl>
-        <p className="markdown-workbench-hint">Characters counts letters and numbers in the prose, skipping spaces and Markdown marks. Source characters is the raw document length. Reading time, speaking time, and the Fog index are rule-of-thumb estimates, not a measure of any one reader.</p>
+        <p className="markdown-workbench-hint">Characters counts letters and numbers in the prose, skipping spaces and Markdown marks. Source characters is the raw document length. Reading time, speaking time, and the Fog index are rule-of-thumb estimates, not a measure of any one reader. Readability grades estimate English school levels; syllables and sentence boundaries are heuristic. Grades are unavailable for empty prose or words with numerals, non-ASCII letters, or more than 128 characters. Language is not detected automatically. <a href={`${import.meta.env.BASE_URL}markdown/readability-LICENSE.txt`} target="_blank" rel="noopener noreferrer">Readability library notices</a>.</p>
       </details>
 
       {parsed.frontmatter.format !== null ? (

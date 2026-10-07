@@ -6,6 +6,7 @@ type Point = Position['start'];
 interface Disclosure extends Parent { type: 'workbenchDisclosure'; children: RootContent[] }
 interface Summary extends Parent { type: 'workbenchSummary'; children: PhrasingContent[] }
 declare module 'mdast' {
+  interface Data { proseAuthored?: boolean }
   interface BlockContentMap { workbenchDisclosure: Disclosure; workbenchSummary: Summary }
   interface RootContentMap { workbenchDisclosure: Disclosure; workbenchSummary: Summary }
   interface CodeData { disclosureFallback?: boolean }
@@ -112,7 +113,7 @@ const remarkDisclosures: Plugin<[], Root> = function () {
       caption.forEach(removePositions);
       const boundary: Boundary = open ? { kind: 'open', node, position, ...properties! }
         : close ? { kind: 'close', node, position }
-          : { kind: 'summary', node: { type: 'workbenchSummary', children: caption, data: { hName: 'summary' }, position }, position };
+          : { kind: 'summary', node: { type: 'workbenchSummary', children: caption, data: { hName: 'summary', proseAuthored: Boolean(summary?.[1].trim()) }, position }, position };
       const fragment = node.value.slice(length);
       if (!fragment.trim()) return [boundary];
       const parsed = processor.parse(fragment) as Root;

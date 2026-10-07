@@ -84,6 +84,10 @@ export interface ProseMetrics {
   readonly words: number;
   readonly sentences: number;
   readonly characters: number;
+  readonly letters: number;
+  readonly syllables: number;
+  readonly fleschKincaidGrade: number | null;
+  readonly colemanLiauIndex: number | null;
   readonly complexWords: number;
   readonly readingMinutes: number;
   readonly speakingMinutes: number;
