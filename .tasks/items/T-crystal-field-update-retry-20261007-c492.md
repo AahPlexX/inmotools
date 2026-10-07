@@ -26,3 +26,5 @@ At 2026-10-07 15:44:07 UTC, completed main full run 37640254171 on References so
 ## Log
 
 - 2026-10-07 15:44:07 UTC: Confirmed sole retry from official completed logs and unchanged Crystal app/test diff. Backlog recorded during cross-tool full verification; no other tool advanced or modified.
+
+- 2026-10-07 16:10:49 UTC: Current later metadata full 37643618281 passed all 1715 browser cases without retries, including this unchanged Crystal case. Fresh non-reproduction does not explain the earlier retry or establish a repair; keep backlog for its ordered review.
