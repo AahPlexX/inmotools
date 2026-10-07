@@ -21,5 +21,20 @@ export const htmlToMarkdownDocument = async (html: string): Promise<string> => {
     emDelimiter: '*',
     strongDelimiter: '**',
   });
+  service.addRule('definitionList', {
+    filter: 'dl',
+    replacement: (content) => `\n\n${content.trim()}\n\n`,
+  });
+  service.addRule('definitionTerm', {
+    filter: 'dt',
+    replacement: (content) => `\n\n${content.trim()}\n`,
+  });
+  service.addRule('definitionDescription', {
+    filter: 'dd',
+    replacement: (content) => {
+      const [first, ...rest] = content.trim().split('\n');
+      return `\n:   ${first}\n${rest.map((line) => line ? `    ${line}` : '').join('\n')}\n`;
+    },
+  });
   return service.turndown(document.body).trim();
 };

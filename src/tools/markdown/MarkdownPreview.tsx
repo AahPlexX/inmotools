@@ -8,6 +8,7 @@ import type { ScrollAnchor } from './markdown-types';
 import './code-highlight.css';
 import './alert-style.css';
 import './abbreviation-style.css';
+import './definition-list-style.css';
 
 export interface MarkdownPreviewProps {
   readonly preparedSource: string;

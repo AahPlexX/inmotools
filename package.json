@@ -108,6 +108,7 @@
     "rehype-katex": "7.0.1",
     "rehype-parse": "9.0.1",
     "rehype-sanitize": "6.0.0",
+    "remark-definition-list": "2.0.1",
     "remark-gfm": "4.0.1",
     "remark-math": "6.0.0",
     "remark-parse": "11.0.0",

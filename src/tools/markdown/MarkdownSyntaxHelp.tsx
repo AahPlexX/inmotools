@@ -22,6 +22,10 @@ const SYNTAX_GROUPS = [
     examples: ['```js\nconst ready = true;\n```', '| Name | Value |\n| --- | --- |\n| A | 1 |'],
   },
   {
+    title: 'Definition lists',
+    examples: ['Term\n: Definition', 'Term\n: First definition\n: Second definition', 'Term\n\n:   First paragraph.\n\n    Continued paragraph.'],
+  },
+  {
     title: 'Abbreviations',
     examples: ['*[HTML]: HyperText Markup Language\n\nThe HTML document.', 'Open Abbreviations below the preview for expansions.'],
   },

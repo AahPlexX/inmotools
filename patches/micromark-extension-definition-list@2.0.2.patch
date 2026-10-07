@@ -1,0 +1,46 @@
+diff --git a/dev/lib/syntax.js b/dev/lib/syntax.js
+index e4132e609320eeb12351dc24e1647beb60973476..85de4b4412e77b5404288a32671b2438ab8e89f3 100644
+--- a/dev/lib/syntax.js
++++ b/dev/lib/syntax.js
+@@ -338,10 +338,17 @@ function checkPossibleDefTerm(events) {
+                 if (flagBlockQuote && !lazyLines[tmpToken.end.line]) {
+                     return false;
+                 }
++                let candidateHead;
++                for (let j = flowEvents.length - 1; j >= 0; j--) {
++                    const candidate = flowEvents[j];
++                    if (candidate[0] === 'enter' && candidate[1].type === 'tableHead') {
++                        candidateHead = candidate[1];
++                        break;
++                    }
++                }
+                 return (tmpToken.type === types.paragraph ||
+                     tmpToken.type === types.chunkContent ||
+-                    tmpToken.type === 'tableHead' ||
+-                    tmpToken.type === 'tableRow');
++                    ((tmpToken.type === 'tableHead' || tmpToken.type === 'tableRow') && candidateHead !== undefined && candidateHead.end === undefined));
+             }
+         }
+     }
+diff --git a/lib/syntax.js b/lib/syntax.js
+index b793e9f26005f4cfb0194502c8a752aae1292085..d62d9629e40d3ad417b6c5f9deccaf03bb854548 100644
+--- a/lib/syntax.js
++++ b/lib/syntax.js
+@@ -305,7 +305,16 @@ function checkPossibleDefTerm(events) {
+         if (flagBlockQuote && !lazyLines[tmpToken.end.line]) {
+           return false;
+         }
+-        return tmpToken.type === "paragraph" || tmpToken.type === "chunkContent" || tmpToken.type === 'tableHead' || tmpToken.type === 'tableRow';
++        let candidateHead;
++        for (let j = flowEvents.length - 1; j >= 0; j--) {
++          const candidate = flowEvents[j];
++          if (candidate[0] === 'enter' && candidate[1].type === 'tableHead') {
++            candidateHead = candidate[1];
++            break;
++          }
++        }
++        return tmpToken.type === "paragraph" || tmpToken.type === "chunkContent" ||
++          ((tmpToken.type === "tableHead" || tmpToken.type === "tableRow") && candidateHead !== undefined && candidateHead.end === undefined);
+       }
+     }
+   }

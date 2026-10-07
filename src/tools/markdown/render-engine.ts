@@ -1,4 +1,5 @@
 import { createMarkdownParser } from './parse-engine';
+import { defListHastHandlers } from 'remark-definition-list';
 import remarkRehype from 'remark-rehype';
 import rehypeKatex from 'rehype-katex';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
@@ -47,7 +48,7 @@ const createProcessor = () =>
     .use(remarkGithubAlerts)
     .use(remarkHeadingIds)
     .use(remarkEmoji)
-    .use(remarkRehype)
+    .use(remarkRehype, { handlers: defListHastHandlers })
     // rehype-katex never throws for a malformed expression: it renders a
     // `.katex-error` span in place of the broken expression instead, which is
     // exactly the "labeled error block instead of a blank preview" behavior
@@ -67,6 +68,7 @@ export const renderMarkdown = (source: string): RenderResult => {
   const abbreviations = new Map<string, string>();
   const collectAbbreviations = (node: HastRootContent): void => {
     if (!isElement(node)) return;
+    if (node.tagName === 'dl') node.properties.className = ['markdown-definition-list'];
     if (node.tagName === 'abbr' && typeof node.properties.title === 'string' && node.properties.title) {
       const label = node.children.filter((child) => child.type === 'text').map((child) => child.value).join('');
       if (!abbreviations.has(label)) abbreviations.set(label, node.properties.title);

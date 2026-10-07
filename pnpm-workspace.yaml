@@ -9,3 +9,6 @@ minimumReleaseAgeExclude:
 overrides:
   '@colorhythm/libraw-wasm>typed-cstruct': 0.11.0
   lodash-es: 4.18.1
+
+patchedDependencies:
+  micromark-extension-definition-list@2.0.2: patches/micromark-extension-definition-list@2.0.2.patch
