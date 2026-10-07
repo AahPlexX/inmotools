@@ -3,7 +3,7 @@ task: T-markdown-citation-locators-20261007-d713
 tool: markdown-workbench
 doc: task
 kind: fix
-state: active
+state: backlog
 branch: fix/markdown-workbench
 created: 2026-10-07
 updated: 2026-10-07
