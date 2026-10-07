@@ -16,7 +16,7 @@ Local editor for writing, previewing, and exporting Markdown. Documents, drafts,
 
 Read [TRACKER.md](TRACKER.md) **Resume here** first, then the [current spec](../../../docs/superpowers/specs/2026-10-05-markdown-workbench-design.md), [active tool task](../../../.tasks/items/T-markdown-workbench-20261006-ea9f.md), and [verification evidence](VERIFICATION.md). The [ordered inventory](../../../.tasks/items/T-ordered-requirement-inventory-20261006-9cf1.md) preserves the original cross-tool sequence. Update the tracker, current task, inventory cursor and evidence together when behavior or check status changes.
 
-As of 2026-10-07, the current ordered item is MDW-R38; MDW-R51 follows it. Disclosures and the earlier quoted-task/source-history repair are deployed. Task progress and associated HTML-import/mixed-history fixes pass scoped acceptance and are published with integration/full validation running. The tracker records exact revisions, receipts and the associated typewriter investigation. Refresh those records and GitHub results before continuing. Older audits and the dated fixes below are historical evidence.
+As of 2026-10-07, the current ordered item is MDW-R51; MDW-R55 follows it. Disclosures, task progress and associated HTML-task/history fixes pass scoped acceptance and are deployed at main 58be2be. Fresh full-site validation remains running, so associated tasks stay active. The tracker records exact revisions, receipts, citation-boundary baseline and the open typewriter investigation. Refresh those records and GitHub results before continuing. Older audits and the dated fixes below are historical evidence.
 
 ## Historical fixes
 
