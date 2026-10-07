@@ -84,7 +84,7 @@ const tokenize: Tokenizer = function (effects, ok, nok) {
   }
 };
 
-const syntax: SyntaxExtension = { flow: { 42: { name: 'workbenchAbbreviationDefinition', tokenize } } };
+export const abbreviationSyntax: SyntaxExtension = { flow: { 42: { name: 'workbenchAbbreviationDefinition', tokenize } } };
 const fromMarkdown: FromMarkdownExtension = {
   enter: {
     workbenchAbbreviationDefinition(token) { this.enter({ type: 'abbreviationDefinition', label: '', value: '' }, token); },
@@ -167,7 +167,7 @@ function applyAbbreviations(tree: Root) {
 
 const remarkAbbreviations: Plugin<[], Root> = function () {
   const data = this.data();
-  (data.micromarkExtensions ??= []).push(syntax);
+  (data.micromarkExtensions ??= []).push(abbreviationSyntax);
   (data.fromMarkdownExtensions ??= []).push(fromMarkdown);
   return applyAbbreviations;
 };

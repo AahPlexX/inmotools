@@ -61,6 +61,22 @@ describe('Markdown definition lists', () => {
     const html = renderMarkdown('Term\n\n:   head\n    | - |\n    row1\n    : row2').html;
     expect(html).toMatch(/<td\b[^>]*>: row2<\/td>/);
   });
+  it('recognizes definition lists inside bullet and numbered items without crossing item boundaries', () => {
+    for (const marker of ['- ', '1. ']) {
+      const indent = ' '.repeat(marker.length);
+      const html = renderMarkdown(`${marker}Term\n\n${indent}: Definition\n\n${marker}Plain item`).html;
+      expect(html).toMatch(/<dt\b[^>]*>Term<\/dt>/);
+      expect(html.match(/<dl\b/g)).toHaveLength(1);
+      expect(html).toContain('Plain item');
+    }
+    expect(renderMarkdown('- Term\n- : Literal next item').html).not.toMatch(/<dl\b/);
+  });
+  it('retains multiple terms and continued descriptions inside a list item', () => {
+    const html = renderMarkdown('- Term one\n  Term two\n\n  : First\n    continued.\n  : Second').html;
+    expect(html.match(/<dt\b/g)).toHaveLength(2);
+    expect(html.match(/<dd\b/g)).toHaveLength(2);
+    expect(html).toContain('continued.');
+  });
   it('preserves inline scripts and abbreviations inside definitions', () => {
     const html = renderMarkdown('*[HTML]: Expansion\n\nWater\n: H~2~O in HTML.').html;
     expect(html).toMatch(/<dd\b/);
@@ -83,6 +99,29 @@ describe('Markdown definition lists', () => {
     const { formatted } = await formatMarkdownSource(text, 0);
     const normalize = (tree: unknown) => JSON.stringify(tree, (key, value) => key === 'position' ? undefined : value);
     expect(normalize(parseMarkdown(formatted).tree)).toBe(normalize(parseMarkdown(text).tree));
+  });
+  it.each([
+    '> Term\n>\n> :   head\n>     | - |\n>     : row',
+    '- Term\n\n  :   head\n      | - |\n      : row',
+    'Term\r\n\r\n:   A 😀 **definition** &amp; H~2~O.\r\n\r\n    - nested',
+  ])('preserves native container text and a caret inside it: %s', async (block) => {
+    const prefix = '* outside\n\n';
+    const source = prefix + block + '\n\n* after';
+    const cursor = source.indexOf('head') >= 0 ? source.indexOf('head') : source.indexOf('😀');
+    const result = await formatMarkdownSource(source, cursor);
+    expect(result.formatted).toContain(block);
+    expect(result.formatted).toContain('- outside');
+    expect(result.formatted).toContain('- after');
+    expect(result.formatted.slice(result.cursorOffset, result.cursorOffset + 4)).toBe(source.slice(cursor, cursor + 4));
+    expect(result.formatted).not.toMatch(/[\uE000-\uF8FF]/);
+  });
+  it('maps a caret after multiple definition blocks and preserves frontmatter and marker collisions', async () => {
+    const prefix = '---\ntitle: Definitions\n---\n';
+    const source = prefix + '\n* outside\n\nFirst\n: E000 literal \uE000.\n\n# Between\n\nSecond\n: Another definition.\n\n* after';
+    const result = await formatMarkdownSource(source, source.indexOf('after'));
+    expect(result.formatted.startsWith(prefix)).toBe(true);
+    expect(result.formatted).toContain('E000 literal \uE000.');
+    expect(result.formatted.slice(result.cursorOffset)).toMatch(/^after/);
   });
   it('preserves definition markup in HTML and EPUB and readable structure in DOCX', async () => {
     const html = renderMarkdown(source).html;

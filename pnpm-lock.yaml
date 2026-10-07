@@ -110,7 +110,7 @@ overrides:
   lodash-es: 4.18.1
 
 patchedDependencies:
-  micromark-extension-definition-list@2.0.2: e8f1fab20f1171c0ed326d45dab8f9a8b16a2431adebde5979b7ad24aeab21f0
+  micromark-extension-definition-list@2.0.2: 8d4dc3fc68f26daa9f4c4a940b1c275471a602fcec4a5401e6811a81ead6838e
 
 importers:
 
@@ -323,6 +323,18 @@ importers:
       meshoptimizer:
         specifier: 1.2.0
         version: 1.2.0
+      micromark:
+        specifier: 4.0.2
+        version: 4.0.2(supports-color@7.2.0)
+      micromark-extension-definition-list:
+        specifier: 2.0.2
+        version: 2.0.2(patch_hash=8d4dc3fc68f26daa9f4c4a940b1c275471a602fcec4a5401e6811a81ead6838e)
+      micromark-extension-gfm:
+        specifier: 3.0.0
+        version: 3.0.0
+      micromark-extension-math:
+        specifier: 3.1.0
+        version: 3.1.0
       ml-matrix:
         specifier: 6.15.0
         version: 6.15.0
@@ -11473,7 +11485,7 @@ snapshots:
       mdast-util-from-markdown: 2.0.3(supports-color@7.2.0)
       mdast-util-to-hast: 13.2.1
       mdast-util-to-markdown: 2.1.2
-      micromark-extension-definition-list: 2.0.2(patch_hash=e8f1fab20f1171c0ed326d45dab8f9a8b16a2431adebde5979b7ad24aeab21f0)
+      micromark-extension-definition-list: 2.0.2(patch_hash=8d4dc3fc68f26daa9f4c4a940b1c275471a602fcec4a5401e6811a81ead6838e)
       unist-builder: 4.0.0
     transitivePeerDependencies:
       - supports-color
@@ -11662,7 +11674,7 @@ snapshots:
       micromark-util-symbol: 2.0.1
       micromark-util-types: 2.0.2
 
-  micromark-extension-definition-list@2.0.2(patch_hash=e8f1fab20f1171c0ed326d45dab8f9a8b16a2431adebde5979b7ad24aeab21f0):
+  micromark-extension-definition-list@2.0.2(patch_hash=8d4dc3fc68f26daa9f4c4a940b1c275471a602fcec4a5401e6811a81ead6838e):
     dependencies:
       micromark-core-commonmark: 2.0.3
       micromark-factory-space: 2.0.1
@@ -12302,7 +12314,7 @@ snapshots:
     dependencies:
       hast-util-definition-list: 2.1.0(supports-color@7.2.0)
       mdast-util-definition-list: 2.0.1(supports-color@7.2.0)
-      micromark-extension-definition-list: 2.0.2(patch_hash=e8f1fab20f1171c0ed326d45dab8f9a8b16a2431adebde5979b7ad24aeab21f0)
+      micromark-extension-definition-list: 2.0.2(patch_hash=8d4dc3fc68f26daa9f4c4a940b1c275471a602fcec4a5401e6811a81ead6838e)
     transitivePeerDependencies:
       - supports-color
 

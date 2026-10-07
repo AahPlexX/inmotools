@@ -61,7 +61,7 @@ function tokenizer(marker: number, kind: 'workbenchSubscript' | 'workbenchSupers
   };
 }
 
-const syntax: SyntaxExtension = {
+export const scriptSyntax: SyntaxExtension = {
   text: {
     126: { name: 'workbenchSubscript', tokenize: tokenizer(126, 'workbenchSubscript') },
     94: { name: 'workbenchSuperscript', tokenize: tokenizer(94, 'workbenchSuperscript') },
@@ -97,7 +97,7 @@ const fromMarkdown: FromMarkdownExtension = {
 
 const remarkScripts: Plugin<[], Root> = function () {
   const data = this.data();
-  (data.micromarkExtensions ??= []).push(syntax);
+  (data.micromarkExtensions ??= []).push(scriptSyntax);
   (data.fromMarkdownExtensions ??= []).push(fromMarkdown);
 };
 export default remarkScripts;

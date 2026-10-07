@@ -72,6 +72,24 @@ test('MDW-R35 actual HTML, EPUB, DOCX and AST exports retain terms and definitio
   expect(JSON.stringify(ast)).toContain('"type":"defList"');
 });
 
+test('MDW-R35 worker formatting preserves nested definition tables and list containers with Undo', async ({ page }) => {
+  const source = '* outside\n\nTerm\n\n:   head\n    | - |\n    row1\n    : row2\n\n- Nested term\n\n  :   Meaning with H~2~O.\n\n* after';
+  const editor = await openSource(page, source);
+  const preview = page.locator('.markdown-workbench-preview');
+  await expect(preview.locator('.markdown-definition-list')).toHaveCount(2);
+  await expect(preview.locator('table td')).toHaveText(['row1', ': row2']);
+  await page.getByRole('button', { name: 'Auto-format', exact: true }).click();
+  await expect(page.getByTestId('markdown-status')).toContainText('Markdown formatted.');
+  await expect(editor).toContainText('- outside');
+  await expect(editor).toContainText('    : row2');
+  await expect(preview.locator('.markdown-definition-list')).toHaveCount(2);
+  await expect(preview.locator('table td')).toHaveText(['row1', ': row2']);
+  await expect(preview.locator('sub')).toHaveText('2');
+  await editor.press('ControlOrMeta+z');
+  await expect(editor).toContainText('* outside');
+  await expect(preview.locator('table td')).toHaveText(['row1', ': row2']);
+});
+
 test('MDW-R35 local HTML import preserves definition terms and nested definition blocks', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
   await page.setInputFiles('input[type="file"][accept*=".html"]', {
