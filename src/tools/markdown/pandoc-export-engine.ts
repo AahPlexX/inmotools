@@ -11,8 +11,8 @@ import { substituteFormulaValues } from './table-formula-engine';
 // forms Pandoc reads. What Pandoc cannot do is evaluate table formulas or find the bibliography, so the
 // export (1) replaces formula cells with their values and (2) embeds the cited entries in the YAML
 // metadata `references` field, which Pandoc's Citations chapter documents as an alternative to a
-// bibliography file. A CSL style cannot be embedded in metadata; Pandoc then uses its default style
-// unless the user passes --csl.
+// bibliography file. The selected Workbench CSL stylesheet is not embedded; Pandoc selects an
+// external stylesheet through --csl or csl/citation-style metadata.
 //
 // Existing YAML metadata is kept as written: the references are appended to that block, and nothing is
 // added when the block already has its own `references` field (the author's entries win).
