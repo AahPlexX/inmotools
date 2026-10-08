@@ -6,7 +6,7 @@ kind: fix
 state: active
 branch: fix/markdown-workbench
 created: 2026-10-06
-updated: 2026-10-07
+updated: 2026-10-08
 ---
 
 # Complete ordered Markdown requirement inventory with current verification and resumable records
@@ -16,7 +16,7 @@ Work through the reviewed requirement inventory in its recorded order, implement
 
 ## Resume here
 
-Cursor: MDW-R72 done (CSV and Markdown table conversion); R71 done. Last R71 commit cb03d426. R72 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next MDW-R81.
+Cursor: MDW-R81 done (plain text export, Export as > Plain text); R72 done and integrated on main (cd84084d). R81 local checks before integration: 11 unit cases, TypeScript, production build and 4 browser cases (2 tests on desktop and touch) pass; not yet pushed or integrated. Next MDW-R82 (Pandoc-compatible Markdown export), then R83, R85, R86.
 
 ## Log
 - 2026-10-06: scope outside the tool folder is limited to owned Markdown unit/browser acceptance tests and generated documentation indexes. New tests are necessary to verify the existing and added requirements; full browser checks are running against the built `770d69e` checkpoint. Combined acceptance passed 10/10 (32.1s), build passed; release/regression pending. Dated sources and portable commands are in `src/tools/markdown/VERIFICATION.md`.
@@ -230,3 +230,5 @@ Cursor: MDW-R72 done (CSV and Markdown table conversion); R71 done. Last R71 com
 - 2026-10-07 17:01:21 UTC: Final R55 hyphen/generated-caption repairs passed all 443 Markdown/recovery units (15.49s), TypeScript/clean build and 12/12 combined production browsers (59.8s), desktop/touch, no retries/skips. Counter normalizes U+002D/U+2010/U+2011 compounds without editing source; generated Details from empty/removed markup is excluded while authored Details counts. Independent exact legacy R54 assertions are retained. Current repaired source is ready for GitHub MCP publication; older 13a456e/7c4a94a receipts do not validate these repairs. Publish candidate then one immediate source-record checkpoint and allow final full integration to finish without further record-only pushes. Verify exact official full receipt/main tree/Pages/live acceptance before R55 completion or R56 advancement. Cursor R55, 79/92 incomplete; R15/citation/Crystal concerns remain open.
 
 - 2026-10-07 17:02:50 UTC: Final R55 runtime/test checkpoint 64e17739586fac7c92a38ea94ef436fc11312d2b is published through GitHub MCP and fetched tree equals locally validated 406af5f. It includes both grades, native boundary/count/syllable fixes, exact legacy R54 assertions, Unicode hyphen equivalence and actual generated-caption decisions. Local 443 units (15.49s), TypeScript/clean production build and 12/12 combined browsers (59.8s), zero retries/skips, passed. Fresh full integration 37655869959 is pending on exact source. This immediate documentation-only checkpoint supersedes that initial request; obtain the latest integration head/official full receipt without further record-only pushes. Runtime/tests must remain identical to 64e1773. Earlier R55 full requests apply to older source and cannot establish final repair acceptance. Main still 2410e7a; no final R55 main/Pages/full-success claim. After full success compare main tree, verify Pages and live cases, then finish R55/advance R56. Frozen cursor R55; tool incomplete 79/92. R15/citation/Crystal concerns remain open.
+
+- 2026-10-08: Resumed on a new branch fix/markdown-workbench from main cd84084d (R72 integrated, all remote branches merged, no open pull requests). MDW-R81 implemented: text-export-engine.ts walks the prepared syntax tree (shared with DOCX and AST) and an Export as > Plain text button downloads the .txt. Conventions are in the spec under Intent not recorded. Local checks: 11 unit cases, TypeScript, production build and 4 browser cases pass (two tests on desktop and touch). No red baseline was captured for the new button. Not yet pushed or integrated; integration and the full browser run decide whether R81 stays verified. Next MDW-R82.

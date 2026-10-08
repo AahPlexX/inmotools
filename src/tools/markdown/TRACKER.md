@@ -6,14 +6,14 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-markdown-workbench-design.md
 tracker: src/tools/markdown/TRACKER.md
-updated: 2026-10-07
+updated: 2026-10-08
 ---
 
 # Markdown Workbench — tracker
 
 ## Resume here
 
-Cursor: MDW-R72 done (CSV and Markdown table conversion); R71 done. Last R71 commit cb03d426. R72 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next MDW-R81.
+Cursor: MDW-R81 done (plain text export, Export as > Plain text); R72 done and integrated on main (cd84084d). R81 local checks before integration: 11 unit cases, TypeScript, production build and 4 browser cases (2 tests on desktop and touch) pass; not yet pushed or integrated. Next MDW-R82 (Pandoc-compatible Markdown export), then R83, R85, R86.
 
 ## Documents
 
@@ -112,7 +112,7 @@ Cursor: MDW-R72 done (CSV and Markdown table conversion); R71 done. Last R71 com
 | MDW-R78 | verified | e2e "downloads a DOCX and a structural EPUB", "EPUB export packages the fenced-code token stylesheet with highlighted markup", "Source-view EPUB packages rendered Mermaid SVG instead of its code fence"; unit "stores the mimetype file uncompressed as the EPUB specification requires" | |
 | MDW-R79 | verified | e2e "exposes every export control and downloads Markdown, HTML and AST JSON"; unit "serializes the parsed syntax tree losslessly to formatted JSON" | |
 | MDW-R80 | verified | e2e "Copy HTML preserves fenced-code token classes in the copied rendered fragment", "Source-view Copy HTML awaits rendered Mermaid instead of copying its code fence" | |
-| MDW-R81 | missing | — | |
+| MDW-R81 | verified | e2e "MDW-R81 Export TXT downloads the text without Markdown marks", "MDW-R81 Export TXT follows later edits and leaves the Markdown export as typed"; unit "MDW-R81 plain text export" | Export as > Plain text downloads `<name>.txt`: the words of the prepared document without Markdown marks. Conventions for lists, links, tables, quotes, alerts, code and footnotes are in the spec under "Intent not recorded". |
 | MDW-R82 | missing | — | |
 | MDW-R83 | partial | `.tasks/items/T-repository-dark-contrast-20261004-b7d2.md` | The workspace has its own Dark workspace switch; the 2026-10-04 `E2E_THEME=dark` axe run found color-contrast violations in this workspace |
 | MDW-R84 | verified | e2e "dark workspace is readable and reversible without changing document content" | |

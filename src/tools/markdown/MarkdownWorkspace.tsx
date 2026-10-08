@@ -54,6 +54,8 @@ import {
   buildStandaloneMarkdownHtml,
   renderDocxToBytes,
 } from './export-engine';
+import { stripFrontmatter } from './frontmatter-engine';
+import { buildPlainText } from './text-export-engine';
 import { bundleHtmlImages, inlineStylesheetAssets } from './export-assets';
 import { createTableFormulaRunner, TableFormulaRunCancelled, type TableFormulaRunner } from './table-formula-runner';
 import {
@@ -920,6 +922,12 @@ export default function MarkdownWorkspace() {
     setStatus(`Exported ${filenameStem}.ast.json for the prepared document (formulas evaluated, citations formatted).`);
   };
 
+  const exportText = () => {
+    downloadText(buildPlainText(parseToMdast(stripFrontmatter(prepareExportSource()), generatedReferences)), `${filenameStem}.txt`, 'text/plain;charset=utf-8');
+    setStatus(`Exported ${filenameStem}.txt with the words only: no Markdown marks, formulas evaluated and citations formatted.`);
+    noteExport('Exported your document locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
+  };
+
   const exportDocx = async () => {
     setStatus('Generating DOCX…');
     try {
@@ -1225,7 +1233,8 @@ export default function MarkdownWorkspace() {
           <div className="markdown-workbench-toolbar-group markdown-workbench-export-group">
             <button type="button" onClick={exportMarkdown} title="Download the source you typed, with formulas and citation markers left as written.">Markdown</button>
             <button type="button" disabled={citationExportBlocked} onClick={exportRenderedMarkdown} title="Download Markdown with formulas evaluated, citations formatted and References included. Available when citation formatting finishes.">Rendered Markdown</button>
-            <button type="button" disabled={citationExportBlocked} onClick={() => void exportHtml()} title="Download one HTML file with the rendered document, diagrams, and images bundled in. Available when citation formatting finishes.">Standalone HTML</button>
+            <button type="button" disabled={citationExportBlocked} onClick={exportText} title="Download the text without any Markdown marks. Lists keep their bullets and numbers, links keep their address in brackets, and tables use tabs. Available when citation formatting finishes.">Plain text</button>
+            <button type="button" disabled={citationExportBlocked} onClick={() => void exportHtml()}title="Download one HTML file with the rendered document, diagrams, and images bundled in. Available when citation formatting finishes.">Standalone HTML</button>
             <button type="button" disabled={citationExportBlocked} onClick={printDocument} title="Print the rendered preview, or save it as PDF from the print dialog. Switch out of Source view first. Available when citation formatting finishes.">Print / PDF</button>
             <button type="button" disabled={citationExportBlocked} onClick={() => void exportDocx()} title="Download a Word file. Math stays as plain text. Available when citation formatting finishes.">DOCX</button>
             <button type="button" disabled={citationExportBlocked} onClick={() => void exportEpub()} title="Package a structural EPUB on this device. It is not EPUBCheck-validated. Available when citation formatting finishes.">EPUB (structural)</button>

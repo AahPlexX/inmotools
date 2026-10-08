@@ -5,7 +5,7 @@ kind: fix
 state: active
 branch: fix/markdown-workbench
 created: 2026-10-06
-updated: 2026-10-07
+updated: 2026-10-08
 ---
 
 # Ordered requirement implementation
@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-Cursor: MDW-R72 done (CSV and Markdown table conversion); R71 done. Last R71 commit cb03d426. R72 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next MDW-R81.
+Cursor: MDW-R81 done (plain text export, Export as > Plain text); R72 done and integrated on main (cd84084d). R81 local checks before integration: 11 unit cases, TypeScript, production build and 4 browser cases (2 tests on desktop and touch) pass; not yet pushed or integrated. Next MDW-R82 (Pandoc-compatible Markdown export), then R83, R85, R86.
 
 ## Frozen inventory order
 
