@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-Cursor: MDW-R82 done (Pandoc Markdown export, Export as > Pandoc Markdown), integration pending. Its first integration run 37799815383 FAILED on the R71 drafts-ZIP test (4 drafts instead of 3), so nothing from R82 is on main yet. Root cause found from the CI artifact: a stale autosave timer re-saved a deleted draft; fixed with a regression test written first (task T-markdown-drafts-zip-flake-20261008-d7f3, done). Local checks after the fix: TypeScript, drafts-ZIP spec 18 passed over 3 repeats, 162 passed in the other draft/autosave/export specs. R82 local checks: 11 unit cases (a real pandoc 3.12.1 conversion runs only with PANDOC set), production build, 4 browser cases. One unreproduced first-load mobile page error is recorded as T-markdown-mobile-export-pageerror-20261008-6b82. Not yet re-integrated. Next MDW-R83 (follow the site-wide theme; dark colour contrast), then R85, R86.
+Cursor: MDW-R82 done and integrated on main together with the R71 autosave fix (source 2b25f14c, integrated as e86726be; official integration run 37806390763 succeeded with 4008 unit passes/15 skips and 433 browser passes in 14.4m, no failures and no retried tests). An earlier R82 attempt, run 37799815383, failed on the R71 drafts-ZIP test and is explained in T-markdown-drafts-zip-flake-20261008-d7f3 (done). No full-site or Pages claim beyond that run (Pages run 37808527553 on e50cc8ea was still in progress when this was written). One unreproduced first-load mobile page error stays open as T-markdown-mobile-export-pageerror-20261008-6b82. Next MDW-R83 (follow the site-wide theme; dark colour contrast), then R85, R86.
 
 ## Frozen inventory order
 
