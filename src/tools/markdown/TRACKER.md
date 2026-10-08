@@ -13,7 +13,7 @@ updated: 2026-10-08
 
 ## Resume here
 
-Cursor: MDW-R86 done and integrated on main (source 06acd39b, integrated as b23da452; official integration run 37818805279 succeeded with 364 unit files passed (2 skipped) and 314 browser passes in 9.6m). Local evidence for R86: the layout test table now includes 1920 and 2560 px (18 passed on desktop and mobile across nine widths) and a new test checks that the split view is side by side at 861 px and stacked at 859 px (2 passed); both passed on first run, so no code change was needed. This completes the Markdown Workbench requirement inventory; next is position 2 of the ordered inventory, pdf-sanitizer (PDF-R02 first).
+2026-10-08: frozen Markdown inventory through R86 is integrated on main 6a27d901 (R86 source 06acd39b; official integration 37818805279 succeeded). Associated compound-citation loss remains confirmed in current source and is active in task d713 / added MDW-R93. Repair and verify this gap before PDF-R02; preserve unresolved R15 typewriter and mobile export pageerror tasks. Readability R55 is integrated and its old pending handoff is superseded by completed official run 37656063666. No R93 runtime change or completed repair claim yet.
 
 ## Documents
 
@@ -85,7 +85,7 @@ Cursor: MDW-R86 done and integrated on main (source 06acd39b, integrated as b23d
 | MDW-R51 | verified | tests/e2e/markdown-references.spec.ts; tests/unit/markdown-citation.test.ts; tests/unit/markdown-bibliography.test.ts | Main 230f637 is tree-identical; full 37637141396 passed 3896 units/14 skips and 1711 browsers/171 skips, zero retries. Pages deploy job 112857318705 succeeded; live actual exports 2/2 pass. Associated tasks 50cd/6e82/a67d/291b done; compound annotation limitation remains backlog d713. |
 | MDW-R52 | verified | e2e "builds a clickable outline from the document headings", "outline supports filtering and marks the current source section" | |
 | MDW-R53 | verified | e2e "live counts stay visible and a preview task click edits the source" | |
-| MDW-R54 | verified | e2e "document metrics show characters and lines alongside words and sentences"; unit "counts words and sentences in a simple two-sentence passage", "computes a Gunning Fog index from words, sentences, and complex words" | Associated native prose/character/syllable defects are repaired in active R55 candidate 12d4, with local native-boundary/CMU/reference acceptance; fresh full release is pending. Counts and sentence/syllable boundaries remain heuristic. |
+| MDW-R54 | verified | e2e "document metrics show characters and lines alongside words and sentences"; unit "counts words and sentences in a simple two-sentence passage", "computes a Gunning Fog index from words, sentences, and complex words" | Associated native prose/character/syllable defects integrated in R55; completed official full integration 37656063666 validates source 54ddea527. Counts and sentence/syllable boundaries remain heuristic. |
 | MDW-R55 | verified | unit "matches official CS50 2026 published rounded Coleman grades using letters alone", "matches the independently counted monosyllabic Flesch formula without clamping"; e2e "MDW-R55 reference grades update through editing Undo reset draft restore and exact source export", "MDW-R55 long metric labels and values fit phone orientations tablet and desktop without overlap" | English heuristic scope; unsupported input is reported unavailable. Verified on main 0ddb7cff: 8/8 e2e (desktop+mobile), CS50 reference unit. |
 | MDW-R56 | verified | e2e "MDW-R56 keyboard tree selection highlights the node source range and follows edits", "MDW-R56 large documents render a bounded window of tree rows"; unit "expands level by level with levels, positions and source ranges", "caps the row count for very large documents and reports truncation" | Syntax tree panel (tree role, arrow/Home/End/Enter keys); only expanded branches and a 28px row window are rendered, 20000-row cap. Highlight is a CodeMirror decoration that follows edits. |
 | MDW-R57 | verified | e2e "MDW-R57 an edited line shows as changed against the opened file", "MDW-R57 compares the current text with a saved draft and updates as the text changes"; unit "shows an edited line as one change with one line removed and one added" | Compare changes panel: baseline is the opened file or a saved draft; unified read-only @codemirror/merge view (loaded on demand) plus a line-change summary. Line endings are ignored. |
@@ -123,16 +123,15 @@ Cursor: MDW-R86 done and integrated on main (source 06acd39b, integrated as b23d
 | MDW-R89 | verified | e2e "markdown page copy reads like product guidance rather than implementation notes" | |
 | MDW-R90 | verified | e2e "toolbar clearly groups workspace, document, editor and export controls" | |
 | MDW-R91 | verified | unit "inlines referenced HTML images for a genuinely standalone export", "turns referenced images into EPUB package assets" | |
+| MDW-R93 | missing | task d713 | Compound annotation loss confirmed; specified before implementation. |
 | MDW-R92 | verified | unit "runtime-caches lazy Mermaid diagram chunks that are intentionally excluded from precache" | |
 
 ## Open work
 
-1. Editing: unresolved typewriter centering concern in [task 17bf](../../../.tasks/items/T-markdown-typewriter-centering-20261007-17bf.md); retain its original diagnostic capture and expectation.
-2. Citations: compound annotation loss in [task d713](../../../.tasks/items/T-markdown-citation-locators-20261007-d713.md), repair with MDW-R82.
-3. Navigation and metrics: MDW-R55, MDW-R56, MDW-R57; confirmed associated count/syllable defects are in [next R55 task](../../../.tasks/items/T-markdown-readability-20261007-12d4.md).
-4. Files and storage: none open.
-5. Export: MDW-R81, MDW-R82.
-6. Non-functional: MDW-R83, MDW-R85, MDW-R86.
+1. MDW-R93: repair compound citation annotation loss in [task d713](../../../.tasks/items/T-markdown-citation-locators-20261007-d713.md).
+2. MDW-R15: unresolved typewriter centering concern in [task 17bf](../../../.tasks/items/T-markdown-typewriter-centering-20261007-17bf.md); retain the original diagnostics and expectations.
+3. MDW-R82: unexplained one-off mobile export page errors in [task 6b82](../../../.tasks/items/T-markdown-mobile-export-pageerror-20261008-6b82.md); retain message capture and reproduction.
+
 
 ## Known limitations
 

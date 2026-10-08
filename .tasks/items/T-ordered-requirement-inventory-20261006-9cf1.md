@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-Cursor: MDW-R86 done and integrated on main (source 06acd39b, integrated as b23da452; official integration run 37818805279 succeeded with 364 unit files passed (2 skipped) and 314 browser passes in 9.6m). Local evidence for R86: the layout test table now includes 1920 and 2560 px (18 passed on desktop and mobile across nine widths) and a new test checks that the split view is side by side at 861 px and stacked at 859 px (2 passed); both passed on first run, so no code change was needed. This completes the Markdown Workbench requirement inventory; next is position 2 of the ordered inventory, pdf-sanitizer (PDF-R02 first).
+2026-10-08: frozen Markdown inventory through R86 integrated on main 6a27d901; associated compound citation loss is still confirmed and active in task d713 / MDW-R93. Complete the lossless cluster repair and reconcile the R15 typewriter/mobile export pageerror concerns before declaring Markdown bug-free. The next frozen tool is position 2, pdf-sanitizer, PDF-R02 first. Existing R55-R86 integration receipts remain valid; no inventory IDs are reordered.
 
 ## Frozen inventory order
 
