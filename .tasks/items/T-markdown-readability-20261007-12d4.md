@@ -3,10 +3,10 @@ task: T-markdown-readability-20261007-12d4
 tool: markdown-workbench
 doc: task
 kind: fix
-state: active
+state: done
 branch: fix/markdown-workbench
 created: 2026-10-07
-updated: 2026-10-07
+updated: 2026-10-08
 ---
 
 # Add readability grades using native prose boundaries
@@ -17,7 +17,7 @@ Next frozen item MDW-R55: Flesch-Kincaid grade and Coleman-Liau index, with refe
 
 ## Resume here
 
-2026-10-07 17:02:50 UTC: Final R55 runtime/test checkpoint 64e17739586fac7c92a38ea94ef436fc11312d2b is published through GitHub MCP and fetched tree equals locally validated 406af5f. It includes both grades, native boundary/count/syllable fixes, exact legacy R54 assertions, Unicode hyphen equivalence and actual generated-caption decisions. Local 443 units (15.49s), TypeScript/clean production build and 12/12 combined browsers (59.8s), zero retries/skips, passed. Fresh full integration 37655869959 is pending on exact source. This immediate documentation-only checkpoint supersedes that initial request; obtain the latest integration head/official full receipt without further record-only pushes. Runtime/tests must remain identical to 64e1773. Earlier R55 full requests apply to older source and cannot establish final repair acceptance. Main still 2410e7a; no final R55 main/Pages/full-success claim. After full success compare main tree, verify Pages and live cases, then finish R55/advance R56. Frozen cursor R55; tool incomplete 79/92. R15/citation/Crystal concerns remain open.
+2026-10-08: completed. Official integration 37656063666 on exact documentation head 54ddea527b364d35b8484ecbaa2c221225ffcb75 completed successfully at 2026-10-07 17:57:09 UTC; its logs report 3948 unit passes / 14 skips, and 1722 browser passes / 171 skips / one Crystal symmetry-break retry. The retry is not a readability fix claim. Final runtime/tests 64e177395 were integrated as 0ddb7cff and remain on current main 6a27d901. R55 is already verified in the current tracker; later R56-R86 work is also integrated. The Oct7 pending Resume and log entries below are historical and superseded. Current active associated Markdown work is compound citations task d713, followed by PDF-R02 after outstanding Markdown concerns are handled.
 
 ## Confirmed baseline
 
@@ -79,3 +79,5 @@ Add both named grades with explicit English/estimated syllable limitations, unde
 - 2026-10-07 17:01:21 UTC: Final R55 hyphen/generated-caption repairs passed all 443 Markdown/recovery units (15.49s), TypeScript/clean build and 12/12 combined production browsers (59.8s), desktop/touch, no retries/skips. Counter normalizes U+002D/U+2010/U+2011 compounds without editing source; generated Details from empty/removed markup is excluded while authored Details counts. Independent exact legacy R54 assertions are retained. Current repaired source is ready for GitHub MCP publication; older 13a456e/7c4a94a receipts do not validate these repairs. Publish candidate then one immediate source-record checkpoint and allow final full integration to finish without further record-only pushes. Verify exact official full receipt/main tree/Pages/live acceptance before R55 completion or R56 advancement. Cursor R55, 79/92 incomplete; R15/citation/Crystal concerns remain open.
 
 - 2026-10-07 17:02:50 UTC: Final R55 runtime/test checkpoint 64e17739586fac7c92a38ea94ef436fc11312d2b is published through GitHub MCP and fetched tree equals locally validated 406af5f. It includes both grades, native boundary/count/syllable fixes, exact legacy R54 assertions, Unicode hyphen equivalence and actual generated-caption decisions. Local 443 units (15.49s), TypeScript/clean production build and 12/12 combined browsers (59.8s), zero retries/skips, passed. Fresh full integration 37655869959 is pending on exact source. This immediate documentation-only checkpoint supersedes that initial request; obtain the latest integration head/official full receipt without further record-only pushes. Runtime/tests must remain identical to 64e1773. Earlier R55 full requests apply to older source and cannot establish final repair acceptance. Main still 2410e7a; no final R55 main/Pages/full-success claim. After full success compare main tree, verify Pages and live cases, then finish R55/advance R56. Frozen cursor R55; tool incomplete 79/92. R15/citation/Crystal concerns remain open.
+
+- 2026-10-08: reconciled old pending handoff with exact completed official job 112911273900 and current main. Signed log download returned HTTP 403; GitHub MCP job log content successfully provided the receipt. No runtime edit or rerun attributed to this record correction.
