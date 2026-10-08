@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-Cursor: MDW-R85 done and integrated on main (source 9327a836, integrated as a45a0595; official integration run 37816803431 succeeded with 364 unit files passed (2 skipped) and 308 browser passes in 8.6m, no failed or retried tests). Local evidence for R85: new spec markdown-reading-theme 4 passed on desktop and mobile (the contrast test found 11 findings before the fixes), markdown-theme 7 passed on mobile, 208 other Markdown and accessibility browser tests passed; the only failures are four MDW-R29 clipboard tests on this Windows host (clipboard returns CRLF), identical on untouched main. Next MDW-R86 (layout 320 to 2560 px; 1920 and 2560 have no test).
+Cursor: MDW-R86 implemented on fix/markdown-workbench, not yet integrated (R85 is on main as a45a0595, run 37816803431). Local evidence for R86: the layout test table now includes 1920 and 2560 px (18 passed on desktop and mobile across nine widths) and a new test checks that the split view is side by side at 861 px and stacked at 859 px (2 passed); both passed on first run, so no code change was needed. This completes the Markdown Workbench requirement inventory; next is position 2 of the ordered inventory, pdf-sanitizer (PDF-R02 first).
 
 ## Frozen inventory order
 

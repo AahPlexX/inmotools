@@ -402,3 +402,11 @@ Source: branch fix/markdown-workbench from main plus the uncommitted R85 change.
 - After the fix: markdown-reading-theme 4 passed on desktop-chromium and 4 on mobile-chromium; markdown-theme 3 passed on mobile. Then markdown-workbench, markdown-workbench-ux, markdown-alerts, markdown-code-controls, markdown-mermaid, markdown-inventory and accessibility specs on both projects: 208 passed, 4 failed (the MDW-R29 clipboard tests, markdown-inventory.spec.ts lines 13 and 34, on this Windows host only; baseline identical on untouched main, see the R83 section). tsc -p tsconfig.app.json clean.
 - Scope and limits: contrast is checked for the preview pane only, on one rich document, for the three reading themes under the light and dark site themes. Exports and print are deliberately unchanged. Mermaid diagram colours in Sepia are not separately scanned.
 - Integration receipt (2026-10-08): official run 37816803431 on source 9327a836 succeeded; main a45a0595. 364 unit files passed (2 skipped); 308 browser tests passed in 8.6m; no failed or retried test in the log.
+
+## MDW-R86 responsive layout — 2026-10-08
+
+Source: branch fix/markdown-workbench from main a45a0595 plus tests only. Reproduce: pnpm exec playwright test tests/e2e/markdown-workbench.spec.ts -g "stays readable without overflow|MDW-R86" --workers=1 --retries=0.
+
+- Baseline: widths 1920 and 2560 px had no test, nor did the 860 px split boundary. They were added before any claim; both passed on first run, so the layout was already correct and no source change was made.
+- Result: layout table 18 passed (9 widths x desktop and mobile projects); split boundary 2 passed (side by side at 861 px, stacked at 859 px).
+- Scope and limits: checks the default view with panels closed; other panel and dialog states at extreme widths are not separately scanned.
