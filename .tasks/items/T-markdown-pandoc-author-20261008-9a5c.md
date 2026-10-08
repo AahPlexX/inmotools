@@ -3,7 +3,7 @@ task: T-markdown-pandoc-author-20261008-9a5c
 tool: markdown-workbench
 doc: task
 kind: fix
-state: next
+state: active
 branch: fix/markdown-workbench
 created: 2026-10-08
 updated: 2026-10-08
@@ -17,7 +17,7 @@ Associated MDW-R82 export gap: embed all supported author-in-text sources, not j
 
 ## Resume here
 
-2026-10-08 21:29:32 UTC: next associated implementation. Compound-citation/keyboard full validation 37840159373 succeeded on d9ac316; tasks d713/628f are done. No R94 implementation. On immutable production build of published source d9ac316, with a loaded CSL-JSON alpha book record, source `@alpha [p. 14] discusses the claim.` exports exactly that body without YAML references. Status incorrectly implies no cited source was found despite the loaded alpha record. Source inspection: buildPandocMarkdown uses extractCitekeys, which scans only bracketed markers. The current official Pandoc manual explicitly documents author-in-text `@smith04 [p. 33]`. Keep R93 preview's bracketed-cluster scope intact; a Pandoc-export-specific extraction path must recognize the broader grammar without fabricating reference IDs from emails, escapes, code, links or metadata. R15/startup concerns remain open; next frozen tool after associated Markdown work is PDF-R02.
+2026-10-08 21:38:28 UTC: active associated implementation; source still unchanged at this research checkpoint. Compound-citation/keyboard full validation 37840159373 succeeded on d9ac316; tasks d713/628f are done. No R94 implementation. On immutable production build of published source d9ac316, with a loaded CSL-JSON alpha book record, source `@alpha [p. 14] discusses the claim.` exports exactly that body without YAML references. Status incorrectly implies no cited source was found despite the loaded alpha record. Source inspection: buildPandocMarkdown uses extractCitekeys, which scans only bracketed markers. The current official Pandoc manual explicitly documents author-in-text `@smith04 [p. 33]`. Keep R93 preview's bracketed-cluster scope intact; a Pandoc-export-specific extraction path must recognize the broader grammar without fabricating reference IDs from emails, escapes, code, links or metadata. R15/startup concerns remain open; next frozen tool after associated Markdown work is PDF-R02.
 
 ## Acceptance and boundaries
 
@@ -43,3 +43,10 @@ Additional native-boundary baseline: actual production downloads on unchanged ma
 
 
 Released-reader wildcard probe: with alpha and beta YAML references, body `See @*.` produced `See .` and a citation-with-no-printed-form warning, while metadata nocite: "@*" included both bibliography records. Do not turn the reader's wildcard token into an ordinary resolved ID or automatic include-all export without a separately specified contract. The original metadata/literal exclusions remain authoritative for this tool.
+
+
+2026-10-08 21:38:28 UTC: final previous release records integrated on main ddfd06b; Pages 37847673837 succeeded. Task-start invoked from the existing tool worktree tried to create a doubled worktree path and failed because its branch already exists; no work was discarded or extra worktree created. Continue the existing owned worktree and activate this selected queued task; publish the claim via GitHub MCP.
+
+Further actual 3.12.1 reader probes confirm that adjacent closing emphasis/strong markup blocks author-in-text citations, while strikeout and inline-code endings do not. Example-list labels such as a line beginning @alpha. consume author-in-text references to that label; an explicit bracketed [@alpha] still cites the bibliography. Native extraction must preserve that distinction or conservatively identify unsupported syntax rather than silently treating every @ occurrence as a citation. Probe _@alpha_ yields the simple key alpha_ because underscore is a key character, not a delimiter in that context. These measured boundaries guide export extraction only, without rewriting the source or broadening preview citation support.
+
+- 2026-10-08: task-start from primary repository /workspace/inmotools correctly resumed the existing worktree. Selected queued task 9a5c activated without duplication; previous wrong-working-directory invocation is retained above.
