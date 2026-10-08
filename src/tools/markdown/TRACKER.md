@@ -13,7 +13,7 @@ updated: 2026-10-08
 
 ## Resume here
 
-2026-10-08 20:31:39 UTC: final compound-citation and keyboard-focus runtime/tests d9ac316996072b002c59ff92eaa8ee9b98d14400 are published through GitHub MCP; fetched tree equals the locally checked tree. Local final citation suite passed 534 Markdown/recovery units (one optional Pandoc skip), TypeScript/build and final keyboard/citation/R15 production acceptance passed 8/8 desktop/touch (125.9s), zero retries/skips; earlier combined References/Pandoc/TXT acceptance passed 28/28 (185.0s). Required fresh full validation 37840159373 runs on exact source d9ac316. This immediate record-only checkpoint supersedes initial owned integration 37840057312; let the latest integration and independent full validation complete without further record-only pushes. Main currently 64c6c5c, so no released/full-pass claim. Obtain official receipts, compare main runtime/tests, verify Pages/live, then close d713 and 628f. R15 cause and one-off mobile export pageerror remain unestablished; repeats and fresh full diagnostics may supply evidence but non-reproduction is not a fix. Next frozen tool: pdf-sanitizer, PDF-R02.
+2026-10-08 20:53:16 UTC: citation/keyboard runtime d9ac316996072b002c59ff92eaa8ee9b98d14400 is integrated on main f526d76621edf35e3647186ff13756dcbfcc64c3. Official integration 37840304306 on record head 7525aa2 succeeded: 4039 unit passes/15 skips, 320 browser passes (10.4m), no browser retries/skips. Main runtime/tests match the validated source. Required independent full validation 37840159373 remains active on d9ac316; main Pages 37842135029 succeeded on f526d766 and live production acceptance passed 6/6 desktop/touch (87.0s), zero retries/skips, including actual downloads, keyboard accessibility and viewport warning bounds. Obtain the remaining exact full receipt before closing d713 and 628f. Local acceptance remains 534 units/one optional skip, TypeScript/build, 8/8 final browsers and 28/28 export regression. Material stress evidence: 79/80 mobile export repeats, one separate startup-editor visibility timeout; subsequent isolated startup 40/40 and R15 mobile 12/12 passed, neither is a root-cause fix. Tasks 6b82 and 17bf stay open. Next associated item MDW-R94 / task 9a5c fixes confirmed missing author-in-text bibliography embedding in Pandoc export. Next frozen tool remains pdf-sanitizer, PDF-R02, after associated Markdown work. Do not repeat completed R55-R86 or R93 implementation.
 
 ## Documents
 
@@ -125,19 +125,21 @@ updated: 2026-10-08
 | MDW-R91 | verified | unit "inlines referenced HTML images for a genuinely standalone export", "turns referenced images into EPUB package assets" | |
 | MDW-R92 | verified | unit "runtime-caches lazy Mermaid diagram chunks that are intentionally excluded from precache" | |
 | MDW-R93 | verified | unit "formats the confirmed annotation-loss reproduction as one APA cluster", "keeps distinct locators for the same key within one compound marker"; e2e "MDW-R93 compound annotations reach preview and all actual prepared exports while original source survives", "MDW-R93 annotation-only edits and Undo refresh clusters through every bundled style", "MDW-R93 unresolved and complex annotations stay visible with wrapping phone and tablet notices" | Local acceptance passed; integration/full/main/Pages still required. Complex native-prose syntax remains authored with a notice; complete Pandoc grammar is not claimed. |
+| MDW-R94 | missing | task 9a5c | Current Pandoc export omits loaded author-in-text bibliography entries; actual download baseline recorded. |
 
 ## Open work
 
-1. MDW-R93 / MDW-R87: finish official full release receipts for the locally verified compound-citation and keyboard-focus repairs in [task d713](../../../.tasks/items/T-markdown-citation-locators-20261007-d713.md).
-2. MDW-R15: unresolved typewriter centering concern in [task 17bf](../../../.tasks/items/T-markdown-typewriter-centering-20261007-17bf.md); retain the original diagnostics and expectations.
-3. MDW-R82: unexplained one-off mobile export page errors in [task 6b82](../../../.tasks/items/T-markdown-mobile-export-pageerror-20261008-6b82.md); retain message capture and reproduction.
-
+1. MDW-R93 / MDW-R87: finish the independent full validation receipt for locally/integrated/live verified compound citations and keyboard focus; tasks [d713](../../../.tasks/items/T-markdown-citation-locators-20261007-d713.md) and [628f](../../../.tasks/items/T-markdown-keyboard-focus-20261008-628f.md).
+2. MDW-R94 / MDW-R82: author-in-text Pandoc references in [task 9a5c](../../../.tasks/items/T-markdown-pandoc-author-20261008-9a5c.md), next associated implementation after release receipts.
+3. MDW-R15: unexplained intermittent centering in [task 17bf](../../../.tasks/items/T-markdown-typewriter-centering-20261007-17bf.md); preserve diagnostics and the original expectation.
+4. MDW-R82: unexplained page errors and a distinct startup timeout in [task 6b82](../../../.tasks/items/T-markdown-mobile-export-pageerror-20261008-6b82.md); preserve the original assertion and each run's artifacts.
 
 ## Known limitations
 
 - DOCX math is plain text; EPUB is not EPUBCheck-validated; PDF uses the browser print dialog.
 - Vancouver citation style is not offered (dependent CSL styles).
 - Plain bracketed citation prefixes, suffixes, common English locators and suppress-author are formatted as clusters. Complex forced locators or inline-marked annotations detected in native prose remain visible as authored markers with a notice; complete Pandoc citation grammar is not implemented. Original and Pandoc Markdown retain source markers.
+- Pandoc auto-embedded references currently cover native bracketed markers; author-in-text sources are omitted (task 9a5c / MDW-R94). Until repaired, an external bibliography is needed for that Pandoc syntax.
 - Images embedded by paste or drop are capped at 5 MB.
 
 ## Verification evidence
