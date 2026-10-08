@@ -51,8 +51,9 @@ export const deleteDraft = async (store: DraftStore, id: string): Promise<void> 
 };
 
 const DB_NAME = 'inmotools.markdown-workbench';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'drafts';
+export const SNAPSHOT_STORE_NAME = 'snapshots';
 
 // A real, browser-only IndexedDB-backed implementation of DraftStore.
 // IndexedDB has no equivalent in the plain Node-based Vitest environment
@@ -60,18 +61,23 @@ const STORE_NAME = 'drafts';
 // behavior is exercised through the tool's own end-to-end test and manual
 // verification, not a Vitest unit test - the shaping and orchestration
 // logic above it is what carries unit test coverage.
+export const openMarkdownDb = (): Promise<IDBDatabase> =>
+  new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(STORE_NAME)) {
+        request.result.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+      if (!request.result.objectStoreNames.contains(SNAPSHOT_STORE_NAME)) {
+        request.result.createObjectStore(SNAPSHOT_STORE_NAME, { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+
 export const createIndexedDbDraftStore = (): DraftStore => {
-  const openDb = (): Promise<IDBDatabase> =>
-    new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-      request.onupgradeneeded = () => {
-        if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-          request.result.createObjectStore(STORE_NAME, { keyPath: 'id' });
-        }
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+  const openDb = openMarkdownDb;
 
   return {
     async list() {

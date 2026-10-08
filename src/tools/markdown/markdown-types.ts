@@ -118,6 +118,14 @@ export interface DraftRecord {
   readonly updatedAt: number;
 }
 
+export interface SnapshotRecord {
+  readonly id: string;
+  readonly draftId: string;
+  readonly name: string;
+  readonly text: string;
+  readonly createdAt: number;
+}
+
 export interface StorageUsageEstimate {
   readonly usageBytes: number | null;
   readonly quotaBytes: number | null;
