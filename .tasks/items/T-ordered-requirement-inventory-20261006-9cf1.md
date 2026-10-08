@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-Cursor: MDW-R82 done and integrated on main together with the R71 autosave fix (source 2b25f14c, integrated as e86726be; official integration run 37806390763 succeeded with 4008 unit passes/15 skips and 433 browser passes in 14.4m, no failures and no retried tests). An earlier R82 attempt, run 37799815383, failed on the R71 drafts-ZIP test and is explained in T-markdown-drafts-zip-flake-20261008-d7f3 (done). No full-site or Pages claim beyond that run (Pages run 37808527553 on e50cc8ea was still in progress when this was written). One unreproduced first-load mobile page error stays open as T-markdown-mobile-export-pageerror-20261008-6b82. Next MDW-R83 (follow the site-wide theme; dark colour contrast), then R85, R86.
+Cursor: MDW-R83 done locally (dark site theme colour contrast), on top of R82 and the R71 autosave fix integrated on main (e86726be, run 37806390763). R83 local checks before integration: new e2e spec markdown-theme (6 passed; baseline before the fix: the dark contrast test failed on both projects with one element, a pressed toolbar button at 2.38:1), the repository dark scan for this route (2 passed), the default-theme scan (2 passed), and the Markdown UX, inventory and theme specs (108 passed). Four MDW-R29 code-copy tests fail on this Windows host identically on untouched main cd84084d because the system clipboard returns CRLF, so they are not caused by R83. Not yet pushed or integrated. Next MDW-R85 (reading view themes for the preview), then R86 (layout from 320 to 2560 px) and the R86 coverage for 1920 and 2560.
 
 ## Frozen inventory order
 
