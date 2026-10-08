@@ -505,3 +505,7 @@
 .markdown-workbench-tab-close { min-width: 36px; padding: 0 8px; }
 .markdown-workbench-draft-actions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; margin-top: 8px; }
 .markdown-table-builder-form textarea { width: 100%; min-width: 0; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); font: 16px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; resize: vertical; }
+
+/* MDW-R83: under the dark site theme the accent is pale (#7aa7ff), so a pressed toolbar button takes the page colour
+   as its text. The shared rule sets white text, which measured 2.38:1 on that accent; the page colour is about 7.9:1. */
+:root[data-theme="dark"] .markdown-workbench-toolbar button[aria-pressed="true"] { color: var(--paper); }
