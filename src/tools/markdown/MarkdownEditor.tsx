@@ -326,6 +326,7 @@ export default function MarkdownEditor({
     const buildAttributes = (size: number, spell: boolean) => [
       EditorView.contentAttributes.of({
         'aria-label': 'Markdown source',
+        tabindex: '0',
         spellcheck: spell ? 'true' : 'false',
         style: `font-size:${size}px`,
       }),
@@ -515,6 +516,7 @@ export default function MarkdownEditor({
       effects: attributesCompartment.reconfigure([
         EditorView.contentAttributes.of({
           'aria-label': 'Markdown source',
+          tabindex: '0',
           spellcheck: spellcheck ? 'true' : 'false',
           style: `font-size:${fontSize}px`,
         }),

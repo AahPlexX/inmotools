@@ -13,7 +13,7 @@ declare module 'citeproc' {
     constructor(sys: CiteprocSys, style: string, lang?: string, forceLang?: boolean);
     updateItems(idList: string[]): void;
     processCitationCluster(
-      citation: { citationID?: string; citationItems: { id: string; locator?: string; label?: string }[]; properties: { noteIndex: number } },
+      citation: { citationID?: string; citationItems: { id: string; locator?: string; label?: string; prefix?: string; suffix?: string; 'suppress-author'?: boolean }[]; properties: { noteIndex: number } },
       citationsPre: [string, number][],
       citationsPost: [string, number][],
     ): [unknown, [number, string, string][]];

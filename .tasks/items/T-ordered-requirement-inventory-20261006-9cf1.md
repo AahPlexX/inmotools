@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-2026-10-08: frozen Markdown inventory through R86 integrated on main 6a27d901; associated compound citation loss is still confirmed and active in task d713 / MDW-R93. Complete the lossless cluster repair and reconcile the R15 typewriter/mobile export pageerror concerns before declaring Markdown bug-free. The next frozen tool is position 2, pdf-sanitizer, PDF-R02 first. Existing R55-R86 integration receipts remain valid; no inventory IDs are reordered.
+2026-10-08 20:31:39 UTC: final compound-citation and keyboard-focus runtime/tests d9ac316996072b002c59ff92eaa8ee9b98d14400 are published through GitHub MCP; fetched tree equals the locally checked tree. Local final citation suite passed 534 Markdown/recovery units (one optional Pandoc skip), TypeScript/build and final keyboard/citation/R15 production acceptance passed 8/8 desktop/touch (125.9s), zero retries/skips; earlier combined References/Pandoc/TXT acceptance passed 28/28 (185.0s). Required fresh full validation 37840159373 runs on exact source d9ac316. This immediate record-only checkpoint supersedes initial owned integration 37840057312; let the latest integration and independent full validation complete without further record-only pushes. Main currently 64c6c5c, so no released/full-pass claim. Obtain official receipts, compare main runtime/tests, verify Pages/live, then close d713 and 628f. R15 cause and one-off mobile export pageerror remain unestablished; repeats and fresh full diagnostics may supply evidence but non-reproduction is not a fix. Next frozen tool: pdf-sanitizer, PDF-R02.
 
 ## Frozen inventory order
 

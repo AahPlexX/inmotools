@@ -1,6 +1,7 @@
 import { Engine } from 'citeproc';
 import type { CitationEntry, CitationLibrary, CitationResolution, CitationStyleId, ParsedDocument } from './markdown-types';
-import { mapCitationProse, isEscaped } from './citation-source';
+import { mapCitationProse } from './citation-source';
+import { extractCitationMarkers, replaceCitationMarkers, type CitationMarkerText } from './citation-marker';
 import { prepareBibliography, plainCitationText } from './bibliography-engine';
 
 // Citation formatting via citeproc-js, driven by a defined set of bundled
@@ -188,6 +189,8 @@ export interface FormattedCitations {
   readonly bibliographyHtml: string[];
   readonly bibliographyMarkdown: string;
   readonly unresolved: string[];
+  readonly markerText?: CitationMarkerText;
+  readonly unsupported?: string[];
 }
 
 // --- In-text citation extraction and substitution ---
@@ -197,26 +200,10 @@ export interface FormattedCitations {
 // [@smith2024, p. 14]). Multiple keys inside one bracket are separated by
 // semicolons ([@a; @b]).
 
-const CITATION_MARKER = /\[[^\]]*@[\w:.#$%&\-+?<>~/]+[^\]]*\]/g;
-const CITEKEY_IN_MARKER = /@([\w:.#$%&\-+?<>~/]+)/g;
-
 export const mapOutsideCode = mapCitationProse;
 
-// Every distinct citekey referenced by the document, in first-appearance
-// order, ignoring markers inside code.
-export const extractCitekeys = (source: string, parsed?: ParsedDocument): string[] => {
-  const keys = new Set<string>();
-  mapOutsideCode(source, (segment) => {
-    for (const marker of segment.matchAll(CITATION_MARKER)) {
-      if (isEscaped(segment, marker.index)) continue;
-      for (const key of marker[0].matchAll(CITEKEY_IN_MARKER)) {
-        if (!isEscaped(marker[0], key.index)) keys.add(key[1]);
-      }
-    }
-    return segment;
-  }, parsed);
-  return [...keys];
-};
+export const extractCitekeys = (source: string, parsed?: ParsedDocument): string[] =>
+  [...new Set(extractCitationMarkers(source, parsed).flatMap(marker => marker.keys))];
 
 // citeproc renders in-text citations as an HTML fragment for some styles
 // (italics, small-caps spans). Markdown rendering in this tool never allows
@@ -231,37 +218,38 @@ export const extractCitekeys = (source: string, parsed?: ParsedDocument): string
 export const substituteInTextCitations = (
   source: string,
   inText: ReadonlyMap<string, string>,
+  markerText?: CitationMarkerText,
 ): string => {
-  if (inText.size === 0) return source;
-  const renderedMarkers = new Map<string, string>();
-  return mapOutsideCode(source, (segment) =>
-    segment.replace(CITATION_MARKER, (marker: string, offset: number) => {
-      if (isEscaped(segment, offset)) return marker;
-      const keys = [...marker.matchAll(CITEKEY_IN_MARKER)].filter(match => !isEscaped(marker, match.index)).map((match) => match[1]);
-      if (keys.length === 0) return marker;
-      const rendered = keys.map((key) => inText.get(key));
-      if (rendered.some((value) => value === undefined)) return marker;
-      const fragment = rendered.join('; ');
-      const cached = renderedMarkers.get(fragment);
-      if (cached !== undefined) return cached;
-      const text = plainCitationText(fragment);
-      renderedMarkers.set(fragment, text);
-      return text;
-    }),
-  );
+  const occurrences = new Map<string, number>();
+  return replaceCitationMarkers(source, marker => {
+    if (markerText !== undefined) {
+      const index = occurrences.get(marker.raw) ?? 0;
+      occurrences.set(marker.raw, index + 1);
+      const rendered = markerText.get(marker.raw)?.[index];
+      return rendered === undefined ? marker.raw : plainCitationText(rendered);
+    }
+    // Legacy key-only callers cannot safely format annotations or clusters.
+    if (marker.items?.length !== 1 || marker.raw !== `[@${marker.items[0].id}]`) return marker.raw;
+    const rendered = inText.get(marker.items[0].id);
+    return rendered === undefined ? marker.raw : plainCitationText(rendered);
+  });
 };
 
 export const formatCitations = async (
   library: CitationLibrary,
   citekeys: string[],
   style: CitationStyleId,
+  source?: string,
 ): Promise<FormattedCitations> => {
   const resolutions = resolveCitekeys(library, citekeys);
   const resolvedKeys = [...new Set(resolutions.filter((r) => r.resolved).map((r) => r.citekey))];
   const unresolved = resolutions.filter((r) => !r.resolved).map((r) => r.citekey);
 
+  const markers = source === undefined ? null : extractCitationMarkers(source);
+  const unsupported = markers?.filter(marker => marker.items === null).map(marker => marker.raw) ?? [];
   if (resolvedKeys.length === 0) {
-    return { inText: new Map(), bibliographyHtml: [], bibliographyMarkdown: '', unresolved };
+    return { inText: new Map(), bibliographyHtml: [], bibliographyMarkdown: '', unresolved,
+      ...(markers ? { markerText: new Map(), unsupported: [...new Set(unsupported)] } : {}) };
   }
 
   const styleXml = await loadCitationStyle(style);
@@ -274,6 +262,29 @@ export const formatCitations = async (
 
   const engine = new Engine(sys, styleXml);
   engine.updateItems(resolvedKeys);
+
+  if (markers) {
+    const markerText = new Map<string, string[]>();
+    const eligible = markers.filter(marker => marker.items && marker.keys.every(key => library.entries.has(key)));
+    const preceding: [string, number][] = [];
+    const rendered = new Map<number, string>();
+    eligible.forEach((marker, index) => {
+      const citationID = `document-${index}`;
+      const [, updates] = engine.processCitationCluster({ citationID, citationItems: marker.items!, properties: { noteIndex: 0 } }, preceding, []);
+      for (const [clusterIndex, text] of updates) rendered.set(clusterIndex, text);
+      preceding.push([citationID, 0]);
+    });
+    eligible.forEach((marker, index) => {
+      const text = rendered.get(index);
+      if (text === undefined) throw new Error('Citation cluster produced no text.');
+      const occurrences = markerText.get(marker.raw) ?? [];
+      occurrences.push(text);
+      markerText.set(marker.raw, occurrences);
+    });
+    const bibliography = engine.makeBibliography();
+    const prepared = prepareBibliography(bibliography ? bibliography[1] : []);
+    return { inText: new Map(), markerText, unsupported: [...new Set(unsupported)], bibliographyHtml: prepared.html, bibliographyMarkdown: prepared.markdown, unresolved };
+  }
 
   const inText = new Map<string, string>();
   const preceding: [string, number][] = [];

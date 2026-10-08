@@ -193,12 +193,12 @@ describe('in-text citation substitution', () => {
     expect(substituteInTextCitations('See [@smith2024].', inText)).toBe('See (Smith, 2024).');
   });
 
-  it('replaces a marker carrying a locator, including the locator text', () => {
-    expect(substituteInTextCitations('See [@smith2024, p. 14].', inText)).toBe('See (Smith, 2024).');
+  it('preserves annotated markers when a legacy key-only formatter cannot retain the locator', () => {
+    expect(substituteInTextCitations('See [@smith2024, p. 14].', inText)).toBe('See [@smith2024, p. 14].');
   });
 
-  it('joins multiple keys from one bracket', () => {
-    expect(substituteInTextCitations('[@smith2024; @doe2023]', inText)).toBe('(Smith, 2024); (Doe, 2023)');
+  it('preserves compound markers without a cluster formatter', () => {
+    expect(substituteInTextCitations('[@smith2024; @doe2023]', inText)).toBe('[@smith2024; @doe2023]');
   });
 
   it('leaves an unresolved marker exactly as written so it stays visible', () => {

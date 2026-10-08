@@ -13,7 +13,7 @@ updated: 2026-10-08
 
 ## Resume here
 
-2026-10-08: frozen Markdown inventory through R86 is integrated on main 6a27d901 (R86 source 06acd39b; official integration 37818805279 succeeded). Associated compound-citation loss remains confirmed in current source and is active in task d713 / added MDW-R93. Repair and verify this gap before PDF-R02; preserve unresolved R15 typewriter and mobile export pageerror tasks. Readability R55 is integrated and its old pending handoff is superseded by completed official run 37656063666. No R93 runtime change or completed repair claim yet.
+2026-10-08 20:31:39 UTC: final compound-citation and keyboard-focus runtime/tests d9ac316996072b002c59ff92eaa8ee9b98d14400 are published through GitHub MCP; fetched tree equals the locally checked tree. Local final citation suite passed 534 Markdown/recovery units (one optional Pandoc skip), TypeScript/build and final keyboard/citation/R15 production acceptance passed 8/8 desktop/touch (125.9s), zero retries/skips; earlier combined References/Pandoc/TXT acceptance passed 28/28 (185.0s). Required fresh full validation 37840159373 runs on exact source d9ac316. This immediate record-only checkpoint supersedes initial owned integration 37840057312; let the latest integration and independent full validation complete without further record-only pushes. Main currently 64c6c5c, so no released/full-pass claim. Obtain official receipts, compare main runtime/tests, verify Pages/live, then close d713 and 628f. R15 cause and one-off mobile export pageerror remain unestablished; repeats and fresh full diagnostics may supply evidence but non-reproduction is not a fix. Next frozen tool: pdf-sanitizer, PDF-R02.
 
 ## Documents
 
@@ -118,17 +118,17 @@ updated: 2026-10-08
 | MDW-R84 | verified | e2e "dark workspace is readable and reversible without changing document content" | |
 | MDW-R85 | verified | e2e "MDW-R85 choosing Sepia changes the preview background, High contrast changes it again, Default restores it", "MDW-R85 the reading theme is remembered after a reload and leaves the document alone", "MDW-R85 every reading theme meets colour contrast on a rich document under the light site theme" and "... under the dark site theme" (4 passed on desktop and mobile on 2026-10-08) | A "Reading theme" select (Default, Sepia, High contrast) restyles the preview only; the editor, exports and print keep their own appearance. It is remembered with the editor preferences. It takes precedence over Dark workspace in the preview. The contrast test also found dark-site-theme code colours in the default preview that R83 had not covered; they are fixed here. |
 | MDW-R86 | verified | e2e "stays readable without overflow or collisions at <name>" (nine widths: 320, 390, 844, 768, 1024, 1280, 1440, 1920, 2560 px; 18 passed on desktop and mobile on 2026-10-08), "MDW-R86 the split view puts the panes side by side from 861 px and stacks them at 859 px" | The new widths and the 860 px split boundary passed on first run; no code change. Checks: no horizontal page scroll, no overlapping text, no clipped containers, no serious axe violation |
-| MDW-R87 | verified | e2e "stays readable without overflow or collisions at <name>"; e2e (`tests/e2e/accessibility.spec.ts`) "has no serious or critical axe violations at <route>" | |
+| MDW-R87 | verified | e2e "stays readable without overflow or collisions at <name>"; e2e (`tests/e2e/accessibility.spec.ts`) "has no serious or critical axe violations at <route>" | Associated explicit source tabindex=0 repair is covered by unrestricted axe and keyboard round-trip in MDW-R93 browser acceptance; task 628f. |
 | MDW-R88 | verified | e2e "catalog link, exact alias, and generic route open the same local workspace" | |
 | MDW-R89 | verified | e2e "markdown page copy reads like product guidance rather than implementation notes" | |
 | MDW-R90 | verified | e2e "toolbar clearly groups workspace, document, editor and export controls" | |
 | MDW-R91 | verified | unit "inlines referenced HTML images for a genuinely standalone export", "turns referenced images into EPUB package assets" | |
-| MDW-R93 | missing | task d713 | Compound annotation loss confirmed; specified before implementation. |
 | MDW-R92 | verified | unit "runtime-caches lazy Mermaid diagram chunks that are intentionally excluded from precache" | |
+| MDW-R93 | verified | unit "formats the confirmed annotation-loss reproduction as one APA cluster", "keeps distinct locators for the same key within one compound marker"; e2e "MDW-R93 compound annotations reach preview and all actual prepared exports while original source survives", "MDW-R93 annotation-only edits and Undo refresh clusters through every bundled style", "MDW-R93 unresolved and complex annotations stay visible with wrapping phone and tablet notices" | Local acceptance passed; integration/full/main/Pages still required. Complex native-prose syntax remains authored with a notice; complete Pandoc grammar is not claimed. |
 
 ## Open work
 
-1. MDW-R93: repair compound citation annotation loss in [task d713](../../../.tasks/items/T-markdown-citation-locators-20261007-d713.md).
+1. MDW-R93 / MDW-R87: finish official full release receipts for the locally verified compound-citation and keyboard-focus repairs in [task d713](../../../.tasks/items/T-markdown-citation-locators-20261007-d713.md).
 2. MDW-R15: unresolved typewriter centering concern in [task 17bf](../../../.tasks/items/T-markdown-typewriter-centering-20261007-17bf.md); retain the original diagnostics and expectations.
 3. MDW-R82: unexplained one-off mobile export page errors in [task 6b82](../../../.tasks/items/T-markdown-mobile-export-pageerror-20261008-6b82.md); retain message capture and reproduction.
 
@@ -137,7 +137,7 @@ updated: 2026-10-08
 
 - DOCX math is plain text; EPUB is not EPUBCheck-validated; PDF uses the browser print dialog.
 - Vancouver citation style is not offered (dependent CSL styles).
-- Compound citation prefixes, suffixes and locators are currently lost in rendered citations; original source survives. Confirmed unchanged/current behavior and required checks are in [task d713](../../../.tasks/items/T-markdown-citation-locators-20261007-d713.md); repair with R82 or the final associated-tool bug pass.
+- Plain bracketed citation prefixes, suffixes, common English locators and suppress-author are formatted as clusters. Complex forced locators or inline-marked annotations detected in native prose remain visible as authored markers with a notice; complete Pandoc citation grammar is not implemented. Original and Pandoc Markdown retain source markers.
 - Images embedded by paste or drop are capped at 5 MB.
 
 ## Verification evidence
