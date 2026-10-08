@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-Cursor: MDW-R81 done (plain text export, Export as > Plain text); R72 done and integrated on main (cd84084d). R81 local checks before integration: 11 unit cases, TypeScript, production build and 4 browser cases (2 tests on desktop and touch) pass; not yet pushed or integrated. Next MDW-R82 (Pandoc-compatible Markdown export), then R83, R85, R86.
+Cursor: MDW-R81 done and integrated on main (source a7e93467, integrated as 5e7f49d9; official integration run 37794937029 succeeded with 3998 unit passes/14 skips and 426 browser passes in 14.1m). One R71 drafts-ZIP desktop failure passed on retry and is recorded as T-markdown-drafts-zip-flake-20261008-d7f3; no full-suite or Pages claim beyond that run (Pages run 37797172770 on d4e359ab was still in progress when this was written). Next MDW-R82 (Pandoc-compatible Markdown export), then R83, R85, R86.
 
 ## Frozen inventory order
 
