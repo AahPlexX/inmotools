@@ -919,10 +919,12 @@ export default function MarkdownWorkspace() {
       ? 'Your own references block was kept as written.'
       : embedded > 0
         ? `${embedded} cited source${embedded === 1 ? '' : 's'} embedded as YAML references.`
-        : 'No cited source was found in your bibliography, so none was embedded.';
+        : result.unsupportedCitationSyntax
+          ? 'No sources were auto-embedded.'
+          : 'No cited source was found in your bibliography, so none was embedded.';
     const absent = !result.keptExistingReferences && missing > 0 ? ` ${missing} cited key${missing === 1 ? ' is' : 's are'} not in your bibliography: ${result.unresolvedKeys.join(', ')}.` : '';
     const unsupported = !result.keptExistingReferences && result.unsupportedCitationSyntax ? ' Some citation keys cross markup and were not auto-embedded. Pass a bibliography file to Pandoc.' : '';
-    setStatus(`Exported ${filenameStem}.pandoc.md for Pandoc with table formulas evaluated and citation markers kept as written. ${bibliography}${absent}${unsupported} Pandoc uses its default citation style unless you pass --csl.`);
+    setStatus(`Exported ${filenameStem}.pandoc.md for Pandoc with table formulas evaluated and citation markers kept as written. ${bibliography}${absent}${unsupported} Choose a Pandoc citation style with --csl or csl/citation-style metadata.`);
     noteExport('Exported your document locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
   };
 
@@ -1483,7 +1485,7 @@ export default function MarkdownWorkspace() {
       </details>
 
       <details className="markdown-workbench-panel">
-        <summary>Citations ({citekeys.length} referenced)</summary>
+        <summary>Citations ({citekeys.length} preview {citekeys.length === 1 ? 'key' : 'keys'})</summary>
         <p className="markdown-workbench-hint">Resolved document citations add a References section to preview and rendered exports. Original Markdown keeps your citation markers. Code examples, metadata and uncited library entries are excluded.</p>
         {citationsPending ? <p className="markdown-workbench-hint" role="status">Formatting citations… Rendered exports will be available when this finishes.</p> : null}
         {citationFormatFailed ? <p className="markdown-workbench-citation-warning" role="alert">Couldn’t format these citations. Check the bibliography or choose another style. Original Markdown is available.</p> : null}
