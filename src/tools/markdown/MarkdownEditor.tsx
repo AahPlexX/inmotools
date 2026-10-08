@@ -12,6 +12,9 @@ import { markdownSyntaxCompletions } from './markdown-completions';
 import { buildOutline } from './outline-engine';
 import { HEADING_ID_PREFIX } from './heading-slug';
 import MarkdownTableBuilder from './MarkdownTableBuilder';
+import type { Root } from 'mdast';
+import { findTableAtLine } from './csv-table-engine';
+import { parseMarkdown } from './parse-engine';
 import { astHighlightField, astHighlightTheme, selectAstRange, setAstHighlight } from './ast-highlight';
 import type { AstRange } from './ast-inspector-engine';
 
@@ -725,7 +728,17 @@ export default function MarkdownEditor({
       <MarkdownAction id="image" label="Image" help="Insert image Markdown using a URL. You can also paste or drop a local image to embed it." onClick={() => insertPattern('![', '](https://example.com/image.png)', 'alt text')} />
       <MarkdownAction id="task" label="Task" help="Insert an unchecked GitHub-style task-list item." onClick={() => insertPattern('\n\n- [ ] ', '\n', 'task')} />
       <MarkdownAction id="table" label="Table" help="Insert a two-column Markdown table starter." onClick={() => insertPattern('\n\n', '\n', '| Column | Value |\n| --- | --- |\n| Item | Text |', false)} />
-      <MarkdownTableBuilder onInsert={(table) => insertPattern('\n\n', '\n', table, false)} />
+      <MarkdownTableBuilder
+        onInsert={(table) => insertPattern('\n\n', '\n', table, false)}
+        readCursorTable={() => {
+          const view = viewRef.current;
+          if (!view) return null;
+          const source = view.state.doc.toString();
+          const parsed = parseMarkdown(source);
+          const lineOffset = parsed.frontmatter.format === null ? 0 : parsed.frontmatter.bodyStartLine - 1;
+          return findTableAtLine(parsed.tree as Root, source, view.state.doc.lineAt(view.state.selection.main.head).number, lineOffset);
+        }}
+      />
       <button type="button" onClick={autoFormat} disabled={formatting} title="Align tables and normalize Markdown spacing locally. Code and frontmatter stay intact; Undo restores the source.">{formatting ? 'Formatting…' : 'Auto-format'}</button>
       {formatting ? <button type="button" onClick={() => cancelFormatting('Formatting cancelled. Your source is unchanged.')}>Cancel formatting</button> : null}
       <MarkdownAction id="find" label="Find / replace" help="Open the editor’s find and replace controls for this document." onClick={() => { const view = viewRef.current; if (view) openSearchPanel(view); }} />
