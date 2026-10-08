@@ -13,7 +13,7 @@ updated: 2026-10-07
 
 ## Resume here
 
-Cursor: MDW-R70 done (document tabs); R69 done. Last R69 commit dda8d15e. R70 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next MDW-R71.
+Cursor: MDW-R71 done (drafts ZIP export and import); R70 done. Last R70 commit b623def4. R71 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next MDW-R72.
 
 ## Documents
 
@@ -102,7 +102,7 @@ Cursor: MDW-R70 done (document tabs); R69 done. Last R69 commit dda8d15e. R70 ch
 | MDW-R68 | verified | e2e "MDW-R68 leaving with unsaved changes asks for confirmation and a clean document does not", "MDW-R68 closing the page with unsaved changes raises the browser confirmation dialog" | `beforeunload` is cancelled only while the text or name differs from the last saved draft. |
 | MDW-R69 | verified | e2e "MDW-R69 the first saved version can be restored after a second save", "MDW-R69 versions survive a reload, belong to their draft and a restore keeps the replaced text"; unit "keeps the first version when a second manual save follows", "keeps only the newest versions per draft and leaves other drafts alone" | Versions in IndexedDB store `snapshots`: every manual save, automatic saves at most once a minute, no identical consecutive text, newest 20 per draft. Restore keeps the replaced text as a version. |
 | MDW-R70 | verified | e2e "MDW-R70 two opened documents keep their own text when switching tabs", "MDW-R70 New tab, keyboard switching and closing a tab", "MDW-R70 many tabs with long names stay inside the viewport"; unit "MDW-R70 document tabs" | Tab bar shows with two or more documents; New tab and Open in new tab keep the current document open. A tab is saved as a draft before it is left; open tabs are not restored after reload. Limit 10 tabs. |
-| MDW-R71 | missing | — | |
+| MDW-R71 | verified | e2e "MDW-R71 three drafts export to a ZIP with three .md files and import back", "MDW-R71 a file that is not a ZIP is refused and the export reports when there is nothing to export"; unit "MDW-R71 drafts ZIP" | Export all drafts (ZIP) in the Local drafts panel downloads markdown-drafts.zip (fflate, fixed entry time, same bytes for the same drafts). Import adds .md/.markdown/.txt files as new drafts and skips same name and text. Limits 500 files, 5 MB each, 50 MB total. |
 | MDW-R72 | missing | — | |
 | MDW-R73 | verified | e2e "the document name drives every export filename and defaults from the document title"; unit "slugifies a plain document title" | |
 | MDW-R74 | verified | e2e "exposes every export control and downloads Markdown, HTML and AST JSON", "the rendered Markdown export carries evaluated formulas while the plain export keeps the source" | |
@@ -130,7 +130,7 @@ Cursor: MDW-R70 done (document tabs); R69 done. Last R69 commit dda8d15e. R70 ch
 1. Editing: unresolved typewriter centering concern in [task 17bf](../../../.tasks/items/T-markdown-typewriter-centering-20261007-17bf.md); retain its original diagnostic capture and expectation.
 2. Citations: compound annotation loss in [task d713](../../../.tasks/items/T-markdown-citation-locators-20261007-d713.md), repair with MDW-R82.
 3. Navigation and metrics: MDW-R55, MDW-R56, MDW-R57; confirmed associated count/syllable defects are in [next R55 task](../../../.tasks/items/T-markdown-readability-20261007-12d4.md).
-4. Files and storage: MDW-R71, MDW-R72.
+4. Files and storage: MDW-R72.
 5. Export: MDW-R81, MDW-R82.
 6. Non-functional: MDW-R83, MDW-R85, MDW-R86.
 

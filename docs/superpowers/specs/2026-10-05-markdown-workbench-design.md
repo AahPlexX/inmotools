@@ -133,6 +133,8 @@ MDW-R69 detail: each saved draft keeps earlier versions in IndexedDB (store `sna
 
 MDW-R70 detail: a tab bar appears once more than one document is open. "New tab" starts a blank document and "Open in new tab" opens a file, each leaving the current document open; "Open document" and "New" still replace the document in the current tab. Switching keeps each tab's text, undo steps, name and draft link. A tab's document is saved as a local draft before it is left, so closing a tab or reloading keeps the draft in the draft list; open tabs themselves are not restored after a reload. Choosing a draft that is already open in a tab switches to that tab. At most 10 tabs; the tab strip wraps and long names are shortened. Tabs are keyboard operable (Arrow keys, Home, End).
 
+MDW-R71 detail: the "Local drafts and storage" panel has "Export all drafts (ZIP)" and "Import drafts (ZIP)". Export first saves the current document if it changed, then downloads `markdown-drafts.zip` with one `<draft name>.md` per saved draft (UTF-8; characters not allowed in file names are removed; equal names get ` (2)`, ` (3)`). Entries are sorted by name, have a fixed modification time and the same compression, so the same drafts give the same bytes. Import reads every `.md`, `.markdown` and `.txt` file in any ZIP (folders, hidden files, `__MACOSX` and other types are ignored) and adds each as a new local draft named after the file; a document whose name and text match a saved draft is skipped, and the status reports both counts. Limits: 500 documents, 5 MB per document, 50 MB in total; a file that is not a ZIP is refused with a message. Import does not change the document being edited.
+
 ### Files and storage
 
 | ID | Requirement | Acceptance test |

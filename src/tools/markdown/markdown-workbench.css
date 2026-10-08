@@ -503,3 +503,4 @@
 .markdown-workbench-tab button { min-height: 36px; border: 0; border-radius: 0; background: transparent; color: var(--ink); }
 .markdown-workbench-tab [role="tab"] { min-width: 0; max-width: 180px; padding: 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .markdown-workbench-tab-close { min-width: 36px; padding: 0 8px; }
+.markdown-workbench-draft-actions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; margin-top: 8px; }

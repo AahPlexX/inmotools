@@ -259,6 +259,7 @@ export default function MarkdownWorkspace() {
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const bibInputRef = useRef<HTMLInputElement | null>(null);
+  const zipInputRef = useRef<HTMLInputElement | null>(null);
   const persistedTextRef = useRef<string>(DEFAULT_SOURCE);
   const persistedDocumentNameRef = useRef('');
   const previewPendingRef = useRef(false);
@@ -1085,6 +1086,63 @@ export default function MarkdownWorkspace() {
       .catch(() => setStatus('Could not delete that local draft.'));
   };
 
+  const exportAllDrafts = async () => {
+    const store = draftStoreRef.current;
+    if (!store) {
+      setStatus('Local draft storage is unavailable in this browser.');
+      return;
+    }
+    try {
+      if (!await persistCurrentIfDirty(sourceRef.current, effectiveTitleRef.current, documentNameRef.current)) {
+        setStatus('Could not save the current document, so the drafts were not exported.');
+        return;
+      }
+      const all = await listDrafts(store);
+      if (all.length === 0) {
+        setStatus('There are no local drafts to export yet.');
+        return;
+      }
+      const { buildDraftsZip, DRAFTS_ZIP_FILENAME } = await import('./draft-zip-engine');
+      downloadBytes(buildDraftsZip(all), DRAFTS_ZIP_FILENAME, 'application/zip');
+      setStatus(`Exported ${all.length} draft${all.length === 1 ? '' : 's'} as ${DRAFTS_ZIP_FILENAME}.`);
+    } catch {
+      setStatus('Exporting the drafts failed.');
+    }
+  };
+
+  const importDraftsZip = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    const store = draftStoreRef.current;
+    if (!file) return;
+    if (!store) {
+      setStatus('Local draft storage is unavailable in this browser.');
+      return;
+    }
+    try {
+      const { DraftZipError, planDraftImport, readDocumentsFromZip } = await import('./draft-zip-engine');
+      let documents;
+      try {
+        documents = readDocumentsFromZip(new Uint8Array(await file.arrayBuffer()));
+      } catch (error) {
+        setStatus(error instanceof DraftZipError ? error.message : 'Could not read that file in this browser.');
+        return;
+      }
+      if (documents.length === 0) {
+        setStatus('That ZIP has no .md, .markdown or .txt documents to import.');
+        return;
+      }
+      const { created, skipped } = planDraftImport(await listDrafts(store), documents, Date.now());
+      for (const draft of created) await saveDraft(store, draft);
+      setDrafts(await listDrafts(store));
+      refreshStorageEstimate();
+      const already = skipped > 0 ? ` ${skipped} already saved with the same text.` : '';
+      setStatus(`Imported ${created.length} draft${created.length === 1 ? '' : 's'} from ${file.name}.${already}`);
+    } catch {
+      setStatus('Importing the drafts failed. Nothing more was added.');
+    }
+  };
+
   const restoreSnapshot = (snapshot: SnapshotRecord) => {
     const draftId = draftIdRef.current;
     if (!draftId || snapshot.draftId !== draftId) return;
@@ -1451,6 +1509,11 @@ export default function MarkdownWorkspace() {
             ))}
           </ul>
         ) : <p className="markdown-workbench-hint">No local drafts saved yet.</p>}
+        <div className="markdown-workbench-draft-actions">
+          <button type="button" onClick={() => void exportAllDrafts()} title="Download every local draft as one ZIP with a .md file per draft.">Export all drafts (ZIP)</button>
+          <button type="button" onClick={() => zipInputRef.current?.click()} title="Add the .md, .markdown and .txt files in a ZIP as local drafts. Drafts already saved with the same name and text are skipped.">Import drafts (ZIP)</button>
+          <input ref={zipInputRef} className="markdown-workbench-file-input" type="file" accept=".zip,application/zip,application/x-zip-compressed" onChange={(event) => void importDraftsZip(event)} aria-label="Import drafts from a ZIP file" />
+        </div>
         <h3 className="markdown-workbench-subheading">Versions of this draft ({snapshots.length})</h3>
         {snapshots.length > 0 ? (
           <ul className="markdown-workbench-draft-list" data-testid="markdown-snapshot-list">
