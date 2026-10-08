@@ -17,7 +17,9 @@ Associated bug investigation from the ordered tool audit: preserve MDW-R15 first
 
 ## Resume here
 
-2026-10-08: cause remains unestablished; no centering runtime, tolerance or timeout repair is claimed. Current main 64c6c5c includes the completed R55-R86 work and the original test diagnostics. Completed R55 full integration 37656063666 on 54ddea527 passed R15 without a centering failure or diagnostic marker (the sole retry was a separate Crystal symmetry-break test). Current associated work is citation task d713, followed by the pending R15/mobile-export reproductions; next frozen tool is PDF-R02. Run the original retries-disabled reproduction and inspect fresh full logs for failing geometry before attributing cause or closure. Earlier pending R55 instructions below are superseded.
+2026-10-08 21:29:32 UTC: additional official full validation 37840159373 on d9ac316 succeeded: 4039 units/15 skips and 1788 browser passes/171 skips/one unrelated Photo image.decode retry. Original Markdown centering and export cases passed both profiles without retry. This is non-reproduction, not a root-cause fix; retain this task and its original expectation/artifact limitations. Latest deployed runtime/test tree matches main 57293d5.
+
+Cause remains unestablished; no centering runtime, tolerance or timeout repair is claimed. The latest 12-repeat mobile run also passed without retry (1.3m). Keep the original centering assertion and historical geometry below. Do not repeat passing checks without a concrete new hypothesis or changed source/evidence. If a future run emits failing geometry, preserve its trace in a separate output directory before another check and compare it with the documented historical failures. The completed citation/keyboard tasks are not centering fixes; next associated implementation is MDW-R94/task 9a5c, then the frozen PDF-R02 cursor after associated Markdown work.
 
 ## Log
 
