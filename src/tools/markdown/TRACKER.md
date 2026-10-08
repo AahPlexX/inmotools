@@ -13,7 +13,7 @@ updated: 2026-10-08
 
 ## Resume here
 
-Cursor: MDW-R81 done and integrated on main (source a7e93467, integrated as 5e7f49d9; official integration run 37794937029 succeeded with 3998 unit passes/14 skips and 426 browser passes in 14.1m). One R71 drafts-ZIP desktop failure passed on retry and is recorded as T-markdown-drafts-zip-flake-20261008-d7f3; no full-suite or Pages claim beyond that run (Pages run 37797172770 on d4e359ab was still in progress when this was written). Next MDW-R82 (Pandoc-compatible Markdown export), then R83, R85, R86.
+Cursor: MDW-R82 done locally (Pandoc Markdown export, Export as > Pandoc Markdown), on top of R81 integrated on main (5e7f49d9, run 37794937029). R82 local checks before integration: 11 unit cases (10 in CI mode, plus a real pandoc 3.12.1 conversion run with PANDOC set), TypeScript, production build and 4 browser cases on desktop and touch; one first-load mobile page error did not reproduce and is recorded as T-markdown-mobile-export-pageerror-20261008-6b82. Not yet pushed or integrated. Next MDW-R83 (follow the site-wide theme; dark colour contrast), then R85, R86.
 
 ## Documents
 
@@ -113,7 +113,7 @@ Cursor: MDW-R81 done and integrated on main (source a7e93467, integrated as 5e7f
 | MDW-R79 | verified | e2e "exposes every export control and downloads Markdown, HTML and AST JSON"; unit "serializes the parsed syntax tree losslessly to formatted JSON" | |
 | MDW-R80 | verified | e2e "Copy HTML preserves fenced-code token classes in the copied rendered fragment", "Source-view Copy HTML awaits rendered Mermaid instead of copying its code fence" | |
 | MDW-R81 | verified | e2e "MDW-R81 Export TXT downloads the text without Markdown marks", "MDW-R81 Export TXT follows later edits and leaves the Markdown export as typed"; unit "MDW-R81 plain text export" | Export as > Plain text downloads `<name>.txt`: the words of the prepared document without Markdown marks. Conventions for lists, links, tables, quotes, alerts, code and footnotes are in the spec under "Intent not recorded". |
-| MDW-R82 | missing | — | |
+| MDW-R82 | verified | e2e "MDW-R82 Pandoc Markdown embeds the cited sources as YAML references and keeps the body as written", "MDW-R82 Pandoc Markdown without a bibliography leaves the document as written and says so"; unit "MDW-R82 Pandoc-compatible Markdown export" including "MDW-R82 pandoc reads the export as the same headings and citations and resolves the bibliography" | Export as > Pandoc Markdown downloads `<name>.pandoc.md`: body as authored, formulas evaluated, cited sources embedded as YAML `references`. The real-pandoc unit runs only when `PANDOC` names a binary (CI installs none); it passed locally with pandoc 3.12.1. Defaults and limits (no CSL style embedded) are in the spec under "Intent not recorded". |
 | MDW-R83 | partial | `.tasks/items/T-repository-dark-contrast-20261004-b7d2.md` | The workspace has its own Dark workspace switch; the 2026-10-04 `E2E_THEME=dark` axe run found color-contrast violations in this workspace |
 | MDW-R84 | verified | e2e "dark workspace is readable and reversible without changing document content" | |
 | MDW-R85 | missing | — | |
