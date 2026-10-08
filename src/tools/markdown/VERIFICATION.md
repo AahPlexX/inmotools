@@ -410,3 +410,4 @@ Source: branch fix/markdown-workbench from main a45a0595 plus tests only. Reprod
 - Baseline: widths 1920 and 2560 px had no test, nor did the 860 px split boundary. They were added before any claim; both passed on first run, so the layout was already correct and no source change was made.
 - Result: layout table 18 passed (9 widths x desktop and mobile projects); split boundary 2 passed (side by side at 861 px, stacked at 859 px).
 - Scope and limits: checks the default view with panels closed; other panel and dialog states at extreme widths are not separately scanned.
+- Integration receipt (2026-10-08): official run 37818805279 on source 06acd39b succeeded; main b23da452. 364 unit files passed (2 skipped); 314 browser tests passed in 9.6m.

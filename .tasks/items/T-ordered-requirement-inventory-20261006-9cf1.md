@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-Cursor: MDW-R86 implemented on fix/markdown-workbench, not yet integrated (R85 is on main as a45a0595, run 37816803431). Local evidence for R86: the layout test table now includes 1920 and 2560 px (18 passed on desktop and mobile across nine widths) and a new test checks that the split view is side by side at 861 px and stacked at 859 px (2 passed); both passed on first run, so no code change was needed. This completes the Markdown Workbench requirement inventory; next is position 2 of the ordered inventory, pdf-sanitizer (PDF-R02 first).
+Cursor: MDW-R86 done and integrated on main (source 06acd39b, integrated as b23da452; official integration run 37818805279 succeeded with 364 unit files passed (2 skipped) and 314 browser passes in 9.6m). Local evidence for R86: the layout test table now includes 1920 and 2560 px (18 passed on desktop and mobile across nine widths) and a new test checks that the split view is side by side at 861 px and stacked at 859 px (2 passed); both passed on first run, so no code change was needed. This completes the Markdown Workbench requirement inventory; next is position 2 of the ordered inventory, pdf-sanitizer (PDF-R02 first).
 
 ## Frozen inventory order
 
