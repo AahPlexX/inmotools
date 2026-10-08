@@ -3,10 +3,10 @@ task: T-markdown-citation-locators-20261007-d713
 tool: markdown-workbench
 doc: task
 kind: fix
-state: backlog
+state: active
 branch: fix/markdown-workbench
 created: 2026-10-07
-updated: 2026-10-07
+updated: 2026-10-08
 ---
 
 # Preserve compound citation prefixes, suffixes and locators
@@ -17,7 +17,9 @@ Confirmed associated Pandoc/citation gap for MDW-R82 and MDW-R47: formatted comp
 
 ## Resume here
 
-At 2026-10-07 14:38:21 UTC, source `See [see @alpha, p. 14; compare @beta, chap. 2].` renders as `See (Alpha, 2026); (Beta, 2025).` on both unchanged R38 runtime 7025c67d and the final metadata-repaired R51 immutable build. Prefixes and locators disappear from rendered text. This is pre-existing behavior, not an R51 regression. R51 generated bibliography correctly lists both resolved IDs; this observation does not invalidate its basic-key References acceptance or claim full Pandoc syntax support. Do not cancel fresh full integration 37637141396 on a3885a9 for record-only notes. Carry this backlog task in the next records publication, and repair it with the frozen Pandoc item R82 or the final associated-tool bug pass before declaring the tool complete. R55 remains the next ordered implementation item after R51 main/Pages. No citation-marker runtime/test changes were made for this finding.
+2026-10-08 20:14 UTC: resumed on current main 6a27d901658f27fbbf90d79f0e73ad7a1b4232d3 after R86 completed the frozen 92-item Markdown inventory. Its Pandoc export preserves authored annotations, but citation-engine.ts still replaces entire annotated markers with key-only formatting. Repair this associated semantic-loss bug before advancing to PDF-R02. Specify MDW-R93 for document-order compound clusters, plain prefixes/suffixes, common locators, suppress-author, braced keys and a lossless unsupported-syntax fallback with a visible notice. Source/downloads and native code/metadata boundaries must survive. Locator/prefix edits must invalidate asynchronous formatting, even when keys are unchanged. No new dependency.
+
+Shared scope reason: owned Markdown unit/browser regression tests outside the tool folder and current ordered-inventory/task/index records need updates to prove annotation preservation and remove stale pending R55/R56/R57/R81-R86 notes. Run the full browser suite under GOVERNANCE.md as well as focused checks. R15 typewriter and mobile export pageerror tasks remain unresolved; do not close them from successful retries.
 
 ## Reproduction
 
@@ -33,3 +35,5 @@ Current substituteInTextCitations extracts only keys, joins their independently 
 
 - 2026-10-07 14:38:21 UTC: Actual current and unchanged R38 browser baselines both show annotation loss. Finding recorded for the ordered Pandoc/associated tool repair; no runtime change and no fixed claim.
 - 2026-10-07: claimed `fix/markdown-workbench`.
+
+- 2026-10-08 20:14 UTC: current Pandoc manual and developer-primary citeproc running/CSL-JSON documentation fetched live (HTTP 200). The documentation header reports older 1.1.73; verify fields/results against the installed 2.4.63 implementation and exact bundled styles. No runtime edit yet.
