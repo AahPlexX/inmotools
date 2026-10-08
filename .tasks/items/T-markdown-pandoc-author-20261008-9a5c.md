@@ -3,7 +3,7 @@ task: T-markdown-pandoc-author-20261008-9a5c
 tool: markdown-workbench
 doc: task
 kind: fix
-state: active
+state: done
 branch: fix/markdown-workbench
 created: 2026-10-08
 updated: 2026-10-08
@@ -17,7 +17,7 @@ Associated MDW-R82 export gap: embed all supported author-in-text sources, not j
 
 ## Resume here
 
-2026-10-08 23:43:25 UTC: R94 core task9a5c/requirement remains active/partial solely pending full37856784792 on ed970297 (records/units/build passed; full browsers running). Its local552 units,20 production cases, owned330 and live10/10 are accepted. Wording taskb9e1 is done on runtime7f16c60, current record-only main ee258df2e901818788a3a7eb0b859e242c3737c4: owned37858786373 passed4055 units/16 skips and330 browsers10.5m without retries/skips; Pages37859956828 and8 actual live wording cycles/32 geometry checks passed. Completion records33026cb integrated through37860334793; record-only Pages37860471992 was queued at23:38, refresh before claiming its result. New confirmed preview-boundary taskc4d2 is backlog and the next associated repair: live Contact [name@alpha] formats a false Alpha citation/reference, whereas released Pandoc3.12.1 reports no Cite nodes and the repaired Pandoc download remains literal. No preview fix claimed. Keep current runtime frozen and await its exact full receipt; a later preview-parser change needs separate baseline/regressions/full validation. Tasks17bf/6b82 remain unresolved. Next frozen tool PDF-R02 after associated Markdown repairs.
+2026-10-08 23:54:53 UTC: R94 is verified and task9a5c done. Required full [37856784792](https://github.com/AahPlexX/inmotools/actions/runs/37856784792), validate job113582773567, succeeded on immutable core ed970297: 4055 unit passes/16 optional skips; 1799 browser passes/171 skips (52.7m), zero retries. All ten R94 browser cases passed; no centering diagnostic was logged. Core local552 units with real Pandoc, TypeScript/build,20 production, owned330 and live10 remain accepted. Deployed wording runtime7f16c60 has only three text changes and an engine comment beyond core; its separate owned37858786373 (4055/16 units,330 browsers,no retries/skips), Pages37859956828 and8 live export cycles/32 geometry checks passed; taskb9e1 done. Latest fetched record main5d2446d and Pages37861295012 succeeded with unchanged runtime/tests. Next associated requirement R95 is missing, taskc4d2 next: live email-like bracket falsely formats Alpha in preview although native Pandoc has no Cite and repaired Pandoc export is literal. Sixteen released-reader probes distinguish word/period/formatting boundaries and authored hyphens from suppression; no preview fix claimed. Tasks17bf/6b82 remain unresolved; current full success is non-reproduction, not a cause/fix. Next frozen tool PDF-R02 after associated Markdown repairs. Do not repeat completed unchanged gates for these final records.
 
 ## Acceptance and boundaries
 
@@ -69,3 +69,12 @@ Further actual 3.12.1 reader probes confirm that adjacent closing emphasis/stron
 - Production 20/20, 2.2m, zero retries/skips: new five-case R94 spec plus existing R82 and R93 specs on desktop/touch, served from the immutable final artifact at port 4221. Actual downloads and portrait/landscape/tablet/desktop bounds are covered. Artifacts: pandoc-author-final-browser.log/json and unique pandoc-author-final-results directory. Preserve these before another run.
 - Added edge regressions first failed against the previous candidate: three native-boundary assertions, one example-number-wrap assertion and one native-literal-cut assertion. Fixed without weakening assertions. Primary sources: released Pandoc Parsing/Citations.hs and Parsing/Lists.hs; signed wrapping confirmed against released reader and current official https://tc39.es/ecma262/#sec-bigint.asintn (HTTP 200, 2026-10-08). Numeric conversion processes bounded chunks under the existing ES2022 target.
 - Earlier Chicago timeout cause remains unknown; sequential final gates pass without changing its assertion or timeout. This is not a root-cause fix claim. Full shared browser validation, successful integration/main Pages, and live acceptance are still required before closing this task or verifying R94.
+
+
+## Final release acceptance
+
+2026-10-08 23:54:53 UTC: [full37856784792](https://github.com/AahPlexX/inmotools/actions/runs/37856784792), job113582773567, completed success on exact core sourceed970297dc21076a6b9e0317ee3e90074758366c. Official completed logs:4055 unit passes/16 optional skips;366 unit files passed/2 skipped;1799 browser passes/171 skips52.7m,zero retries. All ten new R94 profile/case combinations passed. Original R15 cases and previously flaky Photo white-balance case passed without retry; no centering diagnostic. This does not establish causes or repairs for those separate observations. Feature-ref Pages jobs skipped intentionally; main Pages/live releases are separately accepted below.
+
+Core source integrated main68b31b1 through37856777714 (4055/16 units;330 browsers10.7m,no browser retries/skips). Main Pages37858018047 succeeded;actual live R94 ten cases passed44.6s without retries/skips. Local552 units included both real-Pandoc cases without optional skips, plus types/build and20 production cases. Later wording source7f16c60 differs only in three UI strings and an engine comment, with extractor/export data/tests/dependencies/CSS unchanged; its own integration37858786373 and Pages37859956828 succeeded, with8 actual live wording export cycles and32 geometry checks. It is not attributed to the older exact-core full receipt.
+
+Latest record-only main5d2446d, integration37861180104 and Pages37861295012 succeeded. R94 closes; native preview false-positive R95 remains missing in separate taskc4d2, now next. Original centering17bf and mobile startup/page-error6b82 stay open with unknown causes. Complete mandatory records/link/branch checks before final publication; do not dispatch another unchanged full run for documentation.

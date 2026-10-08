@@ -17,7 +17,7 @@ Associated citation QoL: accurately label the preview-only key count and Pandoc 
 
 ## Resume here
 
-2026-10-08 23:34:25 UTC: done. Wording source7f16c6090679f0c6d4959c057c4f786bf62c7fd0 is integrated/deployed on main0051a4d05632d1fc212c9a2b5bdcb4c75f3b5a3c. Owned integration37858786373, Pages37859956828 and eight actual live desktop/touch export cycles passed. The preview-key label, unsupported-source status and metadata style hint are corrected; source bytes and export entries remain unchanged. Core full37856784792 is still pending on ed970297 and is tracked separately in active task9a5c; it does not validate these later strings.
+2026-10-08 23:34:25 UTC: done. Wording source7f16c6090679f0c6d4959c057c4f786bf62c7fd0 is integrated/deployed on main0051a4d05632d1fc212c9a2b5bdcb4c75f3b5a3c. Owned integration37858786373, Pages37859956828 and eight actual live desktop/touch export cycles passed. The preview-key label, unsupported-source status and metadata style hint are corrected; source bytes and export entries remain unchanged. Core full37856784792 later succeeded on ed970297 and is recorded separately in done task9a5c; it does not validate these later strings.
 
 ## Acceptance
 
@@ -45,4 +45,4 @@ Code diff against immutable ed970297 is limited to three MarkdownWorkspace UI wo
 - [Owned integration37858786373](https://github.com/AahPlexX/inmotools/actions/runs/37858786373), job113589294735:4055 unit passes/16 optional skips;330 browsers10.5m,zero browser retries/skips.
 - [Main Pages37859956828](https://github.com/AahPlexX/inmotools/actions/runs/37859956828): success.
 - Actual live8/8 manual export cycles,32 geometry checks,zero page errors; preserves authored YAML csl/references, names preview count scope in zero/singular cases, and avoids false absence status for the native-markup key. Distinct preserved artifacts pandoc-copy-live-candidate.json/log and pandoc-copy-live-extra.json/log; local receipts were not overwritten. Reproduce using the external acceptance script candidate/extra modes against the live URL with fourth argument live-candidate/live-extra.
-- Code is limited to wording/comment changes within the owned tool folder; no shared runtime or tests were changed. Original full37856784792 remains reserved for the core R94 source, with current state in task9a5c. No duplicate full dispatch for this separate wording-only change.
+- Code is limited to wording/comment changes within the owned tool folder; no shared runtime or tests were changed. Original full37856784792 later succeeded for the core R94 source, with completed evidence in task9a5c. No duplicate full dispatch for this separate wording-only change.
