@@ -4,14 +4,16 @@ import { stripFrontmatter } from './frontmatter-engine';
 import type { ParsedDocument } from './markdown-types';
 
 type Range = { start: number; end: number };
+type ProseRange = Range & { emphasisEnds: ReadonlySet<number> };
 const literals = new Set(['code', 'inlineCode', 'math', 'inlineMath', 'html', 'definition', 'image', 'imageReference', 'link', 'linkReference', 'subscript', 'superscript']);
 
 /** Only authored, native prose is eligible; decoded/generated text is never source. */
-export function mapCitationProse(source: string, replace: (text: string) => string, parsed?: ParsedDocument): string {
+export function mapCitationProse(source: string, replace: (text: string, range: Readonly<ProseRange>) => string, parsed?: ParsedDocument): string {
   if (!source.includes('@')) return source;
   const document = parsed ?? parseMarkdown(source);
   const bodyOffset = document.frontmatter.format === null ? 0 : source.length - stripFrontmatter(source).length;
   const ranges: Range[] = [];
+  const emphasisEnds = new Set<number>();
   const collect = (root: Nodes, base: number, captions: boolean) => {
     const stack: Nodes[] = [root];
     while (stack.length) {
@@ -34,6 +36,7 @@ export function mapCitationProse(source: string, replace: (text: string) => stri
         }
       } else if ('children' in node) {
         if (['emphasis', 'strong', 'delete'].includes(node.type) && start !== undefined && end !== undefined) {
+          if (node.type !== 'delete') emphasisEnds.add(base + end);
           const first = node.children[0]?.position?.start.offset;
           const last = node.children.at(-1)?.position?.end.offset;
           if (first !== undefined && last !== undefined) {
@@ -55,7 +58,7 @@ export function mapCitationProse(source: string, replace: (text: string) => stri
   let result = ''; let cursor = 0;
   for (const { start, end } of contiguous) {
     if (start < cursor || end > source.length || start >= end) continue;
-    result += source.slice(cursor, start) + replace(source.slice(start, end));
+    result += source.slice(cursor, start) + replace(source.slice(start, end), { start, end, emphasisEnds });
     cursor = end;
   }
   return result + source.slice(cursor);
