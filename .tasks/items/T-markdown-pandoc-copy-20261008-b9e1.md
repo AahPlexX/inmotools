@@ -3,7 +3,7 @@ task: T-markdown-pandoc-copy-20261008-b9e1
 tool: markdown-workbench
 doc: task
 kind: fix
-state: active
+state: done
 branch: fix/markdown-workbench
 created: 2026-10-08
 updated: 2026-10-08
@@ -17,7 +17,7 @@ Associated citation QoL: accurately label the preview-only key count and Pandoc 
 
 ## Resume here
 
-2026-10-08 23:14:44 UTC: active, restricted to wording/comments after R94 integration and 10/10 live acceptance. Core full validation remains in progress on immutable ed970297. Current summary calls citekeys.length referenced even though those are bracketed preview keys; the passing R94 author-only fixture embeds one source but leaves the preview count zero. Specify the count scope explicitly. With keys crossing native markup, current status first says no cited source was found, then explains that keys were not auto-embedded; use neutral wording when extraction is unsupported. Current status also says default style unless --csl, while the official released Pandoc manual supports csl and citation-style metadata. Its nearby engine comment has the same inaccurate omission. Correct these small wording issues without expanding the preview grammar or changing exports. The wording candidate is implemented and locally accepted below; integration and live acceptance remain pending.
+2026-10-08 23:34:25 UTC: done. Wording source7f16c6090679f0c6d4959c057c4f786bf62c7fd0 is integrated/deployed on main0051a4d05632d1fc212c9a2b5bdcb4c75f3b5a3c. Owned integration37858786373, Pages37859956828 and eight actual live desktop/touch export cycles passed. The preview-key label, unsupported-source status and metadata style hint are corrected; source bytes and export entries remain unchanged. Core full37856784792 is still pending on ed970297 and is tracked separately in active task9a5c; it does not validate these later strings.
 
 ## Acceptance
 
@@ -37,3 +37,12 @@ Baseline three production cycles on immutable ed970297 artifact4221 confirm the 
 The first external manual harness failed before launching a browser because its direct playwright import path was unavailable. The error log is preserved as pandoc-copy-setup-error.log; corrected to the verified installed @playwright/test module without installing/changing dependencies. This was a harness setup failure, not an application failure.
 
 Code diff against immutable ed970297 is limited to three MarkdownWorkspace UI wording changes and a pandoc-export-engine comment. Extractor, returned export data, tests, CSS and dependencies are unchanged. Core full run37856784792 continues on ed970297; no duplicate full dispatch for copy alone. Publish this candidate and obtain its separate owned integration, main Pages and actual live copy acceptance before closing this task.
+
+
+## Completion receipts
+
+- Published through GitHub MCP as7f16c6090679f0c6d4959c057c4f786bf62c7fd0; fetched tree equals locally accepted source. Main0051a4d has identical tree.
+- [Owned integration37858786373](https://github.com/AahPlexX/inmotools/actions/runs/37858786373), job113589294735:4055 unit passes/16 optional skips;330 browsers10.5m,zero browser retries/skips.
+- [Main Pages37859956828](https://github.com/AahPlexX/inmotools/actions/runs/37859956828): success.
+- Actual live8/8 manual export cycles,32 geometry checks,zero page errors; preserves authored YAML csl/references, names preview count scope in zero/singular cases, and avoids false absence status for the native-markup key. Distinct preserved artifacts pandoc-copy-live-candidate.json/log and pandoc-copy-live-extra.json/log; local receipts were not overwritten. Reproduce using the external acceptance script candidate/extra modes against the live URL with fourth argument live-candidate/live-extra.
+- Code is limited to wording/comment changes within the owned tool folder; no shared runtime or tests were changed. Original full37856784792 remains reserved for the core R94 source, with current state in task9a5c. No duplicate full dispatch for this separate wording-only change.
