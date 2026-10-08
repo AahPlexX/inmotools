@@ -17,7 +17,7 @@ Find the source of three page errors that failed the pageerror assertion once in
 
 ## Resume here
 
-Not started. The assertion now prints the page error messages, so the next occurrence names itself. Reproduce with: pnpm exec playwright test tests/e2e/markdown-pandoc-export.spec.ts tests/e2e/markdown-text-export.spec.ts --project=mobile-chromium --workers=1 --repeat-each=20 on a freshly built preview.
+2026-10-08 20:37:41 UTC: original three-pageerror failure remains unexplained. Current published citation/keyboard runtime d9ac316: retries-disabled 20-repeat mobile run of Pandoc/TXT export specs finished 79 passes / one failure (308.6s). None of the 20 first Pandoc cases reproduced its pageerror assertion. The separate failure was repeat 15 of the second Pandoc case, before editing/export: Markdown source textbox was not found within its existing 5-second startup assertion. Do not conflate this with the original three pageerrors or claim a product repair. The written log/JSON preserve the exact failure; the trace/screenshot were overwritten when the following R15 run reused its output directory, so startup DOM/network evidence is unavailable. Future execution runs now use separate output directories. Keep original assertions and diagnostic pageerror messages; reproduce on a fresh production preview, preserving each failure's trace before running another check.
 
 ## Evidence and reproduction
 
@@ -26,3 +26,5 @@ Not started. The assertion now prints the page error messages, so the next occur
 ## Log
 
 - 2026-10-08: recorded with the assertion improved to print messages. No product change.
+
+- 2026-10-08: current runtime 20-repeat mobile run: 79/80 passed, zero retries/skips; first Pandoc pageerror case passed all 20 repeats. One distinct startup editor-visibility timeout; no established cause or runtime fix. Failure artifacts were overwritten by a later run; log/JSON remain and future output directories are isolated.

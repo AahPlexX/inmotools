@@ -187,6 +187,7 @@ MDW-R72 detail: the Table builder dialog gains "Table from CSV" and "Table as CS
 | MDW-R91 | HTML and EPUB exports share one export-asset contract (`path`, `mediaType`, `data`) (formerly F10) | `markdown-types.ts` declares no second `ExportAsset`; images bundle into both formats |
 | MDW-R92 | Lazy Mermaid chunks are cached for offline use | After a visit, Mermaid renders offline |
 | MDW-R93 | Compound citations retain plain prefixes, suffixes, locators and author suppression as document-order CSL clusters; unsupported syntax stays visible | All four bundled styles, repeated keys with distinct locators, braced keys, mixed unresolved keys, annotation-only edits, native literal/metadata exclusions and original/rendered exports retain semantic information; portrait/landscape warnings wrap |
+| MDW-R94 | Pandoc Markdown embeds cited bibliography records for supported author-in-text @key syntax as well as bracketed markers | Actual downloaded YAML references include a loaded source cited as @key [p. 14], preserving source bytes; mixed citation order/deduplication, unknown/escaped/email/literal/metadata cases remain correct |
 
 ## Definition of done
 
