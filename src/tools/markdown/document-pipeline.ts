@@ -1,5 +1,6 @@
 import { substituteFormulaValues } from './table-formula-engine';
 import { substituteInTextCitations } from './citation-engine';
+import type { CitationMarkerText } from './citation-marker';
 
 // The single source of truth for "what the document actually says" once the
 // tool's source-level transformations have been applied: evaluated table
@@ -18,15 +19,17 @@ import { substituteInTextCitations } from './citation-engine';
 export const applyPreparedCitations = (
   formulaPreparedSource: string,
   inTextCitations?: ReadonlyMap<string, string>,
+  markerText?: CitationMarkerText,
 ): string =>
-  inTextCitations && inTextCitations.size > 0
-    ? substituteInTextCitations(formulaPreparedSource, inTextCitations)
+  markerText !== undefined || (inTextCitations && inTextCitations.size > 0)
+    ? substituteInTextCitations(formulaPreparedSource, inTextCitations ?? new Map(), markerText)
     : formulaPreparedSource;
 
 export const prepareDocument = (
   source: string,
   inTextCitations?: ReadonlyMap<string, string>,
-): string => applyPreparedCitations(substituteFormulaValues(source), inTextCitations);
+  markerText?: CitationMarkerText,
+): string => applyPreparedCitations(substituteFormulaValues(source), inTextCitations, markerText);
 
 // Derives a safe filename stem from a document name. Falls back to
 // "document" so an untitled or punctuation-only name still yields a usable

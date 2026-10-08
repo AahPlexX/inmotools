@@ -33,14 +33,27 @@ export function mapCitationProse(source: string, replace: (text: string) => stri
           collect(createMarkdownParser().parse(inner) as Root, base + start + opening[0].length, false);
         }
       } else if ('children' in node) {
+        if (['emphasis', 'strong', 'delete'].includes(node.type) && start !== undefined && end !== undefined) {
+          const first = node.children[0]?.position?.start.offset;
+          const last = node.children.at(-1)?.position?.end.offset;
+          if (first !== undefined && last !== undefined) {
+            ranges.push({ start: base + start, end: base + first }, { start: base + last, end: base + end });
+          }
+        }
         for (let i = node.children.length - 1; i >= 0; i--) stack.push(node.children[i] as Nodes);
       }
     }
   };
   collect(document.tree as Root, bodyOffset, true);
   ranges.sort((a, b) => a.start - b.start || a.end - b.end);
+  const contiguous: Range[] = [];
+  for (const range of ranges) {
+    const previous = contiguous.at(-1);
+    if (previous?.end === range.start) previous.end = range.end;
+    else contiguous.push({ ...range });
+  }
   let result = ''; let cursor = 0;
-  for (const { start, end } of ranges) {
+  for (const { start, end } of contiguous) {
     if (start < cursor || end > source.length || start >= end) continue;
     result += source.slice(cursor, start) + replace(source.slice(start, end));
     cursor = end;

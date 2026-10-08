@@ -17,9 +17,7 @@ Confirmed associated Pandoc/citation gap for MDW-R82 and MDW-R47: formatted comp
 
 ## Resume here
 
-2026-10-08 20:14 UTC: resumed on current main 6a27d901658f27fbbf90d79f0e73ad7a1b4232d3 after R86 completed the frozen 92-item Markdown inventory. Its Pandoc export preserves authored annotations, but citation-engine.ts still replaces entire annotated markers with key-only formatting. Repair this associated semantic-loss bug before advancing to PDF-R02. Specify MDW-R93 for document-order compound clusters, plain prefixes/suffixes, common locators, suppress-author, braced keys and a lossless unsupported-syntax fallback with a visible notice. Source/downloads and native code/metadata boundaries must survive. Locator/prefix edits must invalidate asynchronous formatting, even when keys are unchanged. No new dependency.
-
-Shared scope reason: owned Markdown unit/browser regression tests outside the tool folder and current ordered-inventory/task/index records need updates to prove annotation preservation and remove stale pending R55/R56/R57/R81-R86 notes. Run the full browser suite under GOVERNANCE.md as well as focused checks. R15 typewriter and mobile export pageerror tasks remain unresolved; do not close them from successful retries.
+2026-10-08 20:29:23 UTC: frozen Markdown R55-R86 work is retained on main 64c6c5c. Associated MDW-R93 compound-citation and MDW-R87 keyboard-focus repairs passed final local acceptance: 534 Markdown/recovery units (one optional real-Pandoc test skipped), 31 cluster cases included; TypeScript/production build; 8/8 desktop/touch browser cases (125.9s), zero retries/skips, including unrestricted axe and R15 orientation checks. The earlier combined References/Pandoc/TXT run passed 28/28 (185.0s). This checkpoint is ready for GitHub MCP integration; obtain the exact official source/run, main tree, Pages and live receipts, then run the required full browser suite before closing tasks d713 and 628f. R15 centering cause and one-off mobile export pageerror remain unestablished; successful checks do not close them. Next frozen tool is pdf-sanitizer, PDF-R02. No released/full-pass claim yet.
 
 ## Reproduction
 
@@ -36,4 +34,8 @@ Current substituteInTextCitations extracts only keys, joins their independently 
 - 2026-10-07 14:38:21 UTC: Actual current and unchanged R38 browser baselines both show annotation loss. Finding recorded for the ordered Pandoc/associated tool repair; no runtime change and no fixed claim.
 - 2026-10-07: claimed `fix/markdown-workbench`.
 
-- 2026-10-08 20:14 UTC: current Pandoc manual and developer-primary citeproc running/CSL-JSON documentation fetched live (HTTP 200). The documentation header reports older 1.1.73; verify fields/results against the installed 2.4.63 implementation and exact bundled styles. No runtime edit yet.
+- 2026-10-08 20:04:41 UTC: current Pandoc manual and developer-primary citeproc running/CSL-JSON documentation fetched live (HTTP 200). The documentation header reports older 1.1.73; verify fields/results against the installed 2.4.63 implementation and exact bundled styles. No runtime edit yet.
+
+- 2026-10-08: latest-main production baseline reproduced on desktop/touch. Local source-aware cluster formatter, conservative syntax parser, async annotation invalidation, per-occurrence outputs and wrapping unsupported-syntax notice implemented. Initial test/harness failures and corrected style expectations are retained in VERIFICATION.md. Final checks/publication pending.
+
+- 2026-10-08: tool-check initially rejected a quoted describe-group title as a verified-test citation; replaced it with concrete existing it titles. No runtime or assertion change.

@@ -6,7 +6,7 @@ kind: fix
 state: active
 branch: fix/markdown-workbench
 created: 2026-10-07
-updated: 2026-10-07
+updated: 2026-10-08
 ---
 
 # Investigate intermittent typewriter caret centering
@@ -17,7 +17,7 @@ Associated bug investigation from the ordered tool audit: preserve MDW-R15 first
 
 ## Resume here
 
-2026-10-07 16:10:49 UTC: Keep active: cause remains unestablished. Fresh metadata full 37643618281 on 6b1f5f1 passed 1715 browsers/171 skips (43.8m), zero retry markers/flaky summaries or original 2571.9765625px marker; no failing geometry. R15 desktop/mobile passed. Main aba873b retains runtime d1edf246 with test-only diagnostics, no scrolling/tolerance/timeout changes. Earlier full 37568220227 and 37571121544 each had the identical offset then retry pass. Diagnostic full 37576166482 and later R51 full 37637141396 also passed without reproducing it. Capture and explain an original fresh failure before attributing cause or repair; non-reproduction is not a fix. Continue ordered R55 from current tracker while retaining this concern.
+2026-10-08: cause remains unestablished; no centering runtime, tolerance or timeout repair is claimed. Current main 64c6c5c includes the completed R55-R86 work and the original test diagnostics. Completed R55 full integration 37656063666 on 54ddea527 passed R15 without a centering failure or diagnostic marker (the sole retry was a separate Crystal symmetry-break test). Current associated work is citation task d713, followed by the pending R15/mobile-export reproductions; next frozen tool is PDF-R02. Run the original retries-disabled reproduction and inspect fresh full logs for failing geometry before attributing cause or closure. Earlier pending R55 instructions below are superseded.
 
 ## Log
 

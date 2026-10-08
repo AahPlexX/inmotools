@@ -6,7 +6,7 @@ kind: expand
 state: done
 branch: expand/markdown-workbench
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # Standard spec and tracker
@@ -15,7 +15,7 @@ updated: 2026-10-05
 Owner, 2026-10-05: enumerate every function per tool in its spec, including the owner's notes; repo wins where they differ.
 
 ## Resume here
-Done. Spec `docs/superpowers/specs/2026-10-05-markdown-workbench-design.md` and tracker `src/tools/markdown/TRACKER.md` list 92 requirements (MDW-R01–MDW-R92). Next work is the tracker's Open work list.
+Done: the original 2026-10-05 enumeration established MDW-R01–MDW-R92. The current spec and tracker include subsequently added associated requirements such as MDW-R93; use the tracker Resume here and Open work list for current status.
 
 ## Log
 - 2026-10-05: claimed `expand/markdown-workbench`.

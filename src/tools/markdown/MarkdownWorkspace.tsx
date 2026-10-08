@@ -28,6 +28,7 @@ import { describeLineDiff, summarizeLineDiff } from './diff-engine';
 const OPENED_FILE_BASELINE = 'opened-file';
 const MarkdownDiffView = lazy(() => import('./MarkdownDiffView'));
 import { collectMathDiagnostics } from './math-engine';
+import { extractCitationMarkers } from './citation-marker';
 import { applyPreparedCitations, prepareDocument, toFilenameStem } from './document-pipeline';
 import { appendReferencesMarkdown } from './bibliography-engine';
 import { commitHistory, createHistory, redoHistory, replaceHistoryPresent, undoHistory } from './state-engine';
@@ -42,7 +43,6 @@ import {
   type DraftStore,
 } from './autosave-engine';
 import {
-  extractCitekeys,
   parseBibtex,
   parseCslJson,
   type FormattedCitations,
@@ -449,11 +449,14 @@ export default function MarkdownWorkspace() {
   const citationLibrary = citationParse.library;
   const citationProblem = citationParse.problem;
 
-  const citekeys = useMemo(() => extractCitekeys(source, parsed), [source, parsed]);
+  const formulaPreparedSource = formulaEvaluation.source === source ? formulaEvaluation.evaluated : source;
+  const citationMarkers = useMemo(() => extractCitationMarkers(formulaPreparedSource, formulaPreparedSource === source ? parsed : undefined), [formulaPreparedSource, source, parsed]);
+  const markerSignature = JSON.stringify(citationMarkers.map(marker => marker.raw));
+  const citekeys = useMemo(() => [...new Set(citationMarkers.flatMap(marker => marker.keys))], [citationMarkers]);
   const citekeySignature = citekeys.join('\u0000');
   const citationRequestKey = useMemo(
-    () => JSON.stringify([bibliographyFormat, bibliographyText, citationStyle, citekeySignature]),
-    [bibliographyFormat, bibliographyText, citationStyle, citekeySignature],
+    () => JSON.stringify([bibliographyFormat, bibliographyText, citationStyle, citekeySignature, markerSignature]),
+    [bibliographyFormat, bibliographyText, citationStyle, citekeySignature, markerSignature],
   );
   // A formatting result is valid only for the exact bibliography/style/key
   // inputs that produced it. This makes stale async results unusable during
@@ -476,7 +479,7 @@ export default function MarkdownWorkspace() {
     setCitationFailureKey(null);
     let cancelled = false;
     const requestKey = citationRequestKey;
-    formatCitations(citationLibrary, citekeys, citationStyle)
+    formatCitations(citationLibrary, citekeys, citationStyle, formulaPreparedSource)
       .then((result) => {
         if (!cancelled) setCitationSnapshot({ key: requestKey, result });
       })
@@ -516,10 +519,8 @@ export default function MarkdownWorkspace() {
     formulaRunnerRef.current = null;
   }, []);
 
-  const formulaPreparedSource =
-    formulaEvaluation.source === source ? formulaEvaluation.evaluated : source;
   const preparedSource = useMemo(
-    () => applyPreparedCitations(formulaPreparedSource, citationResult?.inText),
+    () => applyPreparedCitations(formulaPreparedSource, citationResult?.inText, citationResult?.markerText),
     [formulaPreparedSource, citationResult],
   );
   const generatedReferences = citationResult?.bibliographyMarkdown ?? '';
@@ -877,7 +878,7 @@ export default function MarkdownWorkspace() {
   }, []);
 
   const prepareExportSource = useCallback(
-    () => prepareDocument(source, citationResult?.inText),
+    () => prepareDocument(source, citationResult?.inText, citationResult?.markerText),
     [source, citationResult],
   );
 
@@ -1508,12 +1509,15 @@ export default function MarkdownWorkspace() {
           value={bibliographyText}
           onChange={(event) => setBibliographyText(event.target.value)}
         />
-        <p className="markdown-workbench-hint">Reference a source with <code>[@citekey]</code>. Resolved markers are formatted in preview and rendered exports; unresolved markers remain visible. Original Markdown keeps the markers.</p>
+        <p className="markdown-workbench-hint">Reference a source with <code>[@citekey]</code>. Resolved markers are formatted in preview and rendered exports; unresolved markers remain visible. Plain prefixes, suffixes and page/chapter locators are retained. Complex citation syntax stays as written. Original Markdown keeps the markers.</p>
         {citationProblem ? <p className="markdown-workbench-citation-warning" role="alert">{citationProblem}</p> : null}
         {citationResult ? (
           <div className="markdown-workbench-citation-preview">
             {citationResult.unresolved.length > 0 ? (
               <p className="markdown-workbench-citation-warning">Unresolved citation key{citationResult.unresolved.length === 1 ? '' : 's'}: {citationResult.unresolved.join(', ')}</p>
+            ) : null}
+            {citationResult.unsupported?.length ? (
+              <p className="markdown-workbench-citation-warning" role="status">Complex citation syntax kept as written: {citationResult.unsupported.join('; ')}. Use plain annotations here, or choose Pandoc Markdown to process the original syntax with Pandoc.</p>
             ) : null}
             {citationResult.bibliographyHtml.length > 0 ? (
               <div className="markdown-workbench-bibliography-output" dangerouslySetInnerHTML={{ __html: citationResult.bibliographyHtml.join('') }} />
