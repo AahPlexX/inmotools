@@ -465,6 +465,8 @@ const viewports = [
   { name: '1024 tablet landscape', width: 1024, height: 768 },
   { name: '1280 compact desktop', width: 1280, height: 720 },
   { name: '1440 desktop', width: 1440, height: 900 },
+  { name: '1920 full HD desktop', width: 1920, height: 1080 },
+  { name: '2560 wide desktop', width: 2560, height: 1440 },
 ];
 
 for (const viewport of viewports) {
@@ -510,3 +512,20 @@ for (const viewport of viewports) {
     expect(blocking.map((item) => `${item.id}: ${item.help}`)).toEqual([]);
   });
 }
+
+test('MDW-R86 the split view puts the panes side by side from 861 px and stacks them at 859 px', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await expect(page.locator('.markdown-workbench-view-split')).toBeVisible();
+  const panes = () => page.evaluate(() => {
+    const editor = document.querySelector('.markdown-workbench-view-split .markdown-workbench-editor-pane')!.getBoundingClientRect();
+    const preview = document.querySelector('.markdown-workbench-view-split .markdown-workbench-preview-pane')!.getBoundingClientRect();
+    return { editorTop: editor.top, editorBottom: editor.bottom, editorRight: editor.right, previewTop: preview.top, previewLeft: preview.left };
+  });
+  await page.setViewportSize({ width: 861, height: 900 });
+  const wide = await panes();
+  expect(Math.abs(wide.previewTop - wide.editorTop), 'side by side at 861 px').toBeLessThan(2);
+  expect(wide.previewLeft).toBeGreaterThanOrEqual(wide.editorRight - 1);
+  await page.setViewportSize({ width: 859, height: 900 });
+  const narrow = await panes();
+  expect(narrow.previewTop, 'stacked at 859 px').toBeGreaterThanOrEqual(narrow.editorBottom - 1);
+});
