@@ -10,6 +10,7 @@ Local editor for writing, previewing, and exporting Markdown. Documents, drafts,
 - Click a task checkbox in the preview to toggle that line; document task progress shows completed/total and includes nested tasks.
 - Resolved prose citations generate References in preview and rendered exports; code/metadata literals and uncited library entries are excluded. Original Markdown remains unchanged.
 - Prose counts, reading/speaking estimates, Gunning Fog and English Flesch–Kincaid/Coleman–Liau grade estimates; code, math and metadata are excluded.
+- Keep several documents open in tabs (New tab, Open in new tab); each tab is saved as a local draft when you leave it.
 - Open `.md`, `.markdown`, `.txt`, or local HTML. Paste or drop an image to embed it as a data URI (5 MB cap).
 - Syntax tree panel: browse the parsed tree with the keyboard; choosing a node highlights its source range.
 - Compare changes panel: diff the current text against the opened file or a saved draft.

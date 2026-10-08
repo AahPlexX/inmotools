@@ -16,7 +16,7 @@ Work through the reviewed requirement inventory in its recorded order, implement
 
 ## Resume here
 
-Cursor: MDW-R69 done (draft snapshots: keep and restore earlier versions); R68 done. Last R68 commit 99dcde32. R69 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next MDW-R70.
+Cursor: MDW-R70 done (document tabs); R69 done. Last R69 commit dda8d15e. R70 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next MDW-R71.
 
 ## Log
 - 2026-10-06: scope outside the tool folder is limited to owned Markdown unit/browser acceptance tests and generated documentation indexes. New tests are necessary to verify the existing and added requirements; full browser checks are running against the built `770d69e` checkpoint. Combined acceptance passed 10/10 (32.1s), build passed; release/regression pending. Dated sources and portable commands are in `src/tools/markdown/VERIFICATION.md`.

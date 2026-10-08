@@ -131,6 +131,8 @@ MDW-R57 detail: the Compare changes panel (collapsed by default) compares the cu
 
 MDW-R69 detail: each saved draft keeps earlier versions in IndexedDB (store `snapshots`, database version 2). Every manual save (button or Ctrl/Cmd+S) adds a version; automatic saves add one at most every 60 seconds; identical text is not stored twice in a row; the newest 20 versions per draft are kept. The "Local drafts and storage" panel lists the current draft's versions newest first with time and first line. Restore puts that text in the editor; the text it replaces is kept as a version first. Deleting a draft deletes its versions; New and Open start with none.
 
+MDW-R70 detail: a tab bar appears once more than one document is open. "New tab" starts a blank document and "Open in new tab" opens a file, each leaving the current document open; "Open document" and "New" still replace the document in the current tab. Switching keeps each tab's text, undo steps, name and draft link. A tab's document is saved as a local draft before it is left, so closing a tab or reloading keeps the draft in the draft list; open tabs themselves are not restored after a reload. Choosing a draft that is already open in a tab switches to that tab. At most 10 tabs; the tab strip wraps and long names are shortened. Tabs are keyboard operable (Arrow keys, Home, End).
+
 ### Files and storage
 
 | ID | Requirement | Acceptance test |
