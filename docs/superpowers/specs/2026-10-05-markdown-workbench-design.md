@@ -209,7 +209,7 @@ The tool is complete when every requirement is `verified` or `prohibited`, and t
 
 - MDW-R83 conservative default (2026-10-08; owner may override): under the dark site theme a pressed toolbar button keeps the accent fill and takes the page colour as its text instead of white, because the dark accent is pale and white text on it measured 2.38:1; the light theme is unchanged. The scope of the contrast check is the tool's default state plus each view mode with every panel open, at the site theme chosen in the header.
 
-- Reading view themes (MDW-R85): relation to Focus writing and Dark workspace is not settled. Owner may override.
+- Reading view themes (MDW-R85) conservative default (2026-10-08; owner may override): a "Reading theme" select with Default, Sepia and High contrast changes the preview only; the editor, exports and print are unchanged. A chosen Sepia or High contrast theme wins over Dark workspace in the preview; Focus writing is unaffected. The choice is remembered with the editor preferences. Contrast is checked on a rich document for every theme under both site themes.
 
 ## Change log
 
