@@ -407,6 +407,10 @@ export default function MarkdownWorkspace() {
     if (source === persistedTextRef.current && documentName === persistedDocumentNameRef.current) return;
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     autosaveTimerRef.current = setTimeout(() => {
+      autosaveTimerRef.current = null;
+      // A manual save, restore or draft deletion since this timer was set can leave nothing to save;
+      // saving again would re-create a draft the user has just deleted.
+      if (sourceRef.current === persistedTextRef.current && documentNameRef.current === persistedDocumentNameRef.current) return;
       void persistDraft(source, effectiveTitle);
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => {
