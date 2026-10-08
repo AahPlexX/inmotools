@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-Cursor: MDW-R69 done (draft snapshots: keep and restore earlier versions); R68 done. Last R68 commit 99dcde32. R69 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next MDW-R70.
+Cursor: MDW-R72 done (CSV and Markdown table conversion); R71 done. Last R71 commit cb03d426. R72 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next MDW-R81.
 
 ## Frozen inventory order
 

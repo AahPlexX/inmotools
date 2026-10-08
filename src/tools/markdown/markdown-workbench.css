@@ -496,3 +496,12 @@
 .markdown-workbench-diff-view .cm-editor { max-width: 100%; }
 .markdown-workbench-snapshot-label { flex: 1; min-width: 0; font-size: 12px; overflow-wrap: anywhere; align-self: center; }
 .markdown-workbench-subheading { margin: 14px 0 0; font-size: 13px; }
+
+.markdown-workbench-tabs { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 100%; margin: 8px 0 0; }
+.markdown-workbench-tab { display: inline-flex; min-width: 0; max-width: 100%; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--surface); }
+.markdown-workbench-tab[data-active="true"] { border-color: var(--accent, currentColor); font-weight: 600; }
+.markdown-workbench-tab button { min-height: 36px; border: 0; border-radius: 0; background: transparent; color: var(--ink); }
+.markdown-workbench-tab [role="tab"] { min-width: 0; max-width: 180px; padding: 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.markdown-workbench-tab-close { min-width: 36px; padding: 0 8px; }
+.markdown-workbench-draft-actions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; margin-top: 8px; }
+.markdown-table-builder-form textarea { width: 100%; min-width: 0; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); font: 16px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; resize: vertical; }

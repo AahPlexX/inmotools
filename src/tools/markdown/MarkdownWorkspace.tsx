@@ -64,6 +64,18 @@ import {
   type SaveKind,
   type SnapshotStore,
 } from './snapshot-engine';
+import {
+  canAddTab,
+  MAX_TABS,
+  newTabId,
+  relabelTab,
+  tabAfterClose,
+  tabDisplayLabel,
+  tabIdForDraft,
+  withoutTab,
+  type StashedTab,
+  type TabEntry,
+} from './tab-engine';
 import type { CitationStyleId, DraftRecord, ProjectHistory, SnapshotRecord } from './markdown-types';
 import katexExportCss from 'katex/dist/katex.css?inline';
 import 'katex/dist/katex.css';
@@ -216,7 +228,24 @@ export default function MarkdownWorkspace() {
     usageBytes: null,
     quotaBytes: null,
   });
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [lastSavedAt, setLastSavedAtState] = useState<number | null>(null);
+  const lastSavedAtRef = useRef<number | null>(null);
+  const setLastSavedAt = useCallback((value: number | null) => {
+    lastSavedAtRef.current = value;
+    setLastSavedAtState(value);
+  }, []);
+  const historyRef = useRef(history);
+  historyRef.current = history;
+  const openedFileRef = useRef(openedFile);
+  openedFileRef.current = openedFile;
+  const [initialTabId] = useState(newTabId);
+  const [tabs, setTabs] = useState<TabEntry[]>(() => [{ id: initialTabId, label: '' }]);
+  const [activeTabId, setActiveTabId] = useState(initialTabId);
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  const activeTabIdRef = useRef(initialTabId);
+  const stashedTabsRef = useRef(new Map<string, StashedTab>());
+  const openInNewTabRef = useRef(false);
 
   const draftStoreRef = useRef<DraftStore | null>(null);
   const draftIdRef = useRef<string | null>(null);
@@ -230,6 +259,7 @@ export default function MarkdownWorkspace() {
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const bibInputRef = useRef<HTMLInputElement | null>(null);
+  const zipInputRef = useRef<HTMLInputElement | null>(null);
   const persistedTextRef = useRef<string>(DEFAULT_SOURCE);
   const persistedDocumentNameRef = useRef('');
   const previewPendingRef = useRef(false);
@@ -284,7 +314,7 @@ export default function MarkdownWorkspace() {
       .then(refreshStorageEstimate)
       .then(() => true)
       .catch(() => { setStatus('Local autosave failed; your work is still in the editor.'); return false; });
-  }, [refreshStorageEstimate]);
+  }, [refreshStorageEstimate, setLastSavedAt]);
 
   useEffect(() => {
     setIsDirty(
@@ -588,7 +618,143 @@ export default function MarkdownWorkspace() {
     scrollPreviewToLine(line, true);
   }, [scrollPreviewToLine]);
 
-  const loadMarkdownFile = useCallback(async (file: File) => {
+  const showSnapshotsOf = useCallback((draftId: string | null) => {
+    setSnapshots([]);
+    const snapshotStore = snapshotStoreRef.current;
+    if (!draftId || !snapshotStore) return;
+    void snapshotStore.list()
+      .then((all) => { if (draftIdRef.current === draftId) setSnapshots(snapshotsForDraft(all, draftId)); })
+      .catch(() => undefined);
+  }, []);
+
+  // Saves the active document if it changed, then keeps its whole state so the tab can be shown again.
+  // Returns false (and says why) when the document could not be saved or changed while saving.
+  const leaveActiveTab = useCallback(async (request: number): Promise<boolean> => {
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    const previous = sourceRef.current;
+    const previousName = documentNameRef.current;
+    if (previous !== persistedTextRef.current || previousName !== persistedDocumentNameRef.current) {
+      if (!await persistDraft(previous, effectiveTitleRef.current)) {
+        setStatus('Could not save the current document, so the tab was not changed. Download Markdown before trying again.');
+        return false;
+      }
+    }
+    if (request !== fileReadRef.current) return false;
+    if (sourceRef.current !== previous || documentNameRef.current !== previousName) {
+      setStatus('Document changed while saving. Try again when ready.');
+      return false;
+    }
+    stashedTabsRef.current.set(activeTabIdRef.current, {
+      documentName: documentNameRef.current,
+      history: historyRef.current,
+      draftId: draftIdRef.current,
+      persistedText: persistedTextRef.current,
+      persistedName: persistedDocumentNameRef.current,
+      openedFile: openedFileRef.current,
+      lastSavedAt: lastSavedAtRef.current,
+    });
+    return true;
+  }, [persistDraft]);
+
+  // Adds an empty tab entry and makes it the active one; the caller then fills in its document.
+  const beginTab = useCallback(() => {
+    const id = newTabId();
+    setTabs((current) => [...current, { id, label: '' }]);
+    activeTabIdRef.current = id;
+    setActiveTabId(id);
+    draftIdRef.current = null;
+    setSnapshots([]);
+    setPreviewDocumentKey((key) => key + 1);
+  }, []);
+
+  const installTab = useCallback((tab: StashedTab) => {
+    lastEditorChangeAtRef.current = 0;
+    draftIdRef.current = tab.draftId;
+    persistedTextRef.current = tab.persistedText;
+    persistedDocumentNameRef.current = tab.persistedName;
+    setPreviewDocumentKey((key) => key + 1);
+    setHistory(tab.history);
+    setDocumentName(tab.documentName);
+    setOpenedFile(tab.openedFile);
+    setDiffBaselineId(tab.openedFile ? OPENED_FILE_BASELINE : '');
+    setLastSavedAt(tab.lastSavedAt);
+    setIsDirty(tab.history.present !== tab.persistedText || tab.documentName !== tab.persistedName);
+    showSnapshotsOf(tab.draftId);
+  }, [setLastSavedAt, showSnapshotsOf]);
+
+  const switchTab = useCallback(async (id: string) => {
+    if (id === activeTabIdRef.current) return;
+    const target = stashedTabsRef.current.get(id);
+    if (!target) return;
+    const request = ++fileReadRef.current;
+    if (!await leaveActiveTab(request)) return;
+    stashedTabsRef.current.delete(id);
+    activeTabIdRef.current = id;
+    setActiveTabId(id);
+    installTab(target);
+    setStatus('Switched document.');
+  }, [leaveActiveTab, installTab]);
+
+  const newTab = useCallback(async () => {
+    if (!canAddTab(tabsRef.current)) {
+      setStatus(`At most ${MAX_TABS} documents can be open. Close a tab first.`);
+      return;
+    }
+    const request = ++fileReadRef.current;
+    if (!await leaveActiveTab(request)) return;
+    beginTab();
+    installTab({
+      documentName: '',
+      history: createHistory(DEFAULT_SOURCE),
+      draftId: null,
+      persistedText: DEFAULT_SOURCE,
+      persistedName: '',
+      openedFile: null,
+      lastSavedAt: null,
+    });
+    setStatus('Opened a new document in a new tab.');
+  }, [leaveActiveTab, beginTab, installTab]);
+
+  const closeTab = useCallback(async (id: string) => {
+    const current = tabsRef.current;
+    if (current.length <= 1) return;
+    if (id !== activeTabIdRef.current) {
+      stashedTabsRef.current.delete(id);
+      setTabs((entries) => withoutTab(entries, id));
+      setStatus('Closed the tab. Its saved draft is still listed under Local drafts and storage.');
+      return;
+    }
+    const nextId = tabAfterClose(current, id);
+    const next = nextId ? stashedTabsRef.current.get(nextId) : undefined;
+    if (!nextId || !next) return;
+    const request = ++fileReadRef.current;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    const previous = sourceRef.current;
+    const previousName = documentNameRef.current;
+    if (previous !== persistedTextRef.current || previousName !== persistedDocumentNameRef.current) {
+      if (!await persistDraft(previous, effectiveTitleRef.current)) {
+        setStatus('Could not save the current document, so the tab stays open. Download Markdown before closing it.');
+        return;
+      }
+    }
+    if (request !== fileReadRef.current) return;
+    if (sourceRef.current !== previous || documentNameRef.current !== previousName) {
+      setStatus('Document changed while saving. Close the tab again when ready.');
+      return;
+    }
+    stashedTabsRef.current.delete(nextId);
+    setTabs((entries) => withoutTab(entries, id));
+    activeTabIdRef.current = nextId;
+    setActiveTabId(nextId);
+    installTab(next);
+    setStatus('Closed the tab. Its saved draft is still listed under Local drafts and storage.');
+  }, [persistDraft, installTab]);
+
+  useEffect(() => {
+    setTabs((entries) => relabelTab(entries, activeTabId, effectiveTitle));
+  }, [activeTabId, effectiveTitle]);
+
+  const loadMarkdownFile = useCallback(async (file: File, inNewTab = false) => {
     const kind = localDocumentKind(file);
     if (!kind) {
       setStatus(`"${file.name}" is not a supported document. Choose Markdown, plain text, or HTML (.md, .markdown, .txt, .html, .htm).`);
@@ -610,22 +776,32 @@ export default function MarkdownWorkspace() {
         return;
       }
 
-      const currentDocumentIsDirty =
-        original !== persistedTextRef.current
-        || originalDocumentName !== persistedDocumentNameRef.current;
-      if (currentDocumentIsDirty) {
-        if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-        if (!await persistDraft(original, effectiveTitleRef.current)) {
-          setStatus('Could not save the current document, so the selected file was not opened. Download Markdown before trying again.');
+      if (inNewTab) {
+        if (!canAddTab(tabsRef.current)) {
+          setStatus(`At most ${MAX_TABS} documents can be open. Close a tab first.`);
           return;
         }
+        if (!await leaveActiveTab(request)) return;
         if (request !== fileReadRef.current) return;
-        if (
-          sourceRef.current !== original
-          || documentNameRef.current !== originalDocumentName
-        ) {
-          setStatus('File opening cancelled because the document changed while it was being saved. Open the file again when ready.');
-          return;
+        beginTab();
+      } else {
+        const currentDocumentIsDirty =
+          original !== persistedTextRef.current
+          || originalDocumentName !== persistedDocumentNameRef.current;
+        if (currentDocumentIsDirty) {
+          if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+          if (!await persistDraft(original, effectiveTitleRef.current)) {
+            setStatus('Could not save the current document, so the selected file was not opened. Download Markdown before trying again.');
+            return;
+          }
+          if (request !== fileReadRef.current) return;
+          if (
+            sourceRef.current !== original
+            || documentNameRef.current !== originalDocumentName
+          ) {
+            setStatus('File opening cancelled because the document changed while it was being saved. Open the file again when ready.');
+            return;
+          }
         }
       }
 
@@ -635,7 +811,12 @@ export default function MarkdownWorkspace() {
       setSnapshots([]);
       persistedTextRef.current = text;
       persistedDocumentNameRef.current = nextDocumentName;
-      commitSource(text);
+      if (inNewTab) {
+        lastEditorChangeAtRef.current = 0;
+        setHistory(createHistory(text));
+      } else {
+        commitSource(text);
+      }
       setDocumentName(nextDocumentName);
       setOpenedFile({ name: file.name, text });
       setDiffBaselineId(OPENED_FILE_BASELINE);
@@ -647,11 +828,13 @@ export default function MarkdownWorkspace() {
     } catch {
       setStatus('Could not read that file in this browser.');
     }
-  }, [commitSource, persistDraft]);
+  }, [commitSource, persistDraft, leaveActiveTab, beginTab, setLastSavedAt]);
 
   const onFileInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) void loadMarkdownFile(file);
+    const inNewTab = openInNewTabRef.current;
+    openInNewTabRef.current = false;
+    if (file) void loadMarkdownFile(file, inNewTab);
     event.target.value = '';
   }, [loadMarkdownFile]);
 
@@ -843,6 +1026,11 @@ export default function MarkdownWorkspace() {
   };
 
   const loadDraft = async (draft: DraftRecord) => {
+    const openTabId = tabIdForDraft(stashedTabsRef.current, draft.id);
+    if (openTabId) {
+      void switchTab(openTabId);
+      return;
+    }
     const request = ++fileReadRef.current;
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     const previous = sourceRef.current;
@@ -885,6 +1073,9 @@ export default function MarkdownWorkspace() {
     void deleteDraft(store, draft.id)
       .then(() => {
         if (draftIdRef.current === draft.id) { draftIdRef.current = null; setSnapshots([]); }
+        for (const [id, tab] of stashedTabsRef.current) {
+          if (tab.draftId === draft.id) stashedTabsRef.current.set(id, { ...tab, draftId: null });
+        }
         const snapshotStore = snapshotStoreRef.current;
         return (snapshotStore ? removeDraftSnapshots(snapshotStore, draft.id) : Promise.resolve())
           .then(() => listDrafts(store));
@@ -893,6 +1084,63 @@ export default function MarkdownWorkspace() {
       .then(refreshStorageEstimate)
       .then(() => setStatus('Deleted that local draft.'))
       .catch(() => setStatus('Could not delete that local draft.'));
+  };
+
+  const exportAllDrafts = async () => {
+    const store = draftStoreRef.current;
+    if (!store) {
+      setStatus('Local draft storage is unavailable in this browser.');
+      return;
+    }
+    try {
+      if (!await persistCurrentIfDirty(sourceRef.current, effectiveTitleRef.current, documentNameRef.current)) {
+        setStatus('Could not save the current document, so the drafts were not exported.');
+        return;
+      }
+      const all = await listDrafts(store);
+      if (all.length === 0) {
+        setStatus('There are no local drafts to export yet.');
+        return;
+      }
+      const { buildDraftsZip, DRAFTS_ZIP_FILENAME } = await import('./draft-zip-engine');
+      downloadBytes(buildDraftsZip(all), DRAFTS_ZIP_FILENAME, 'application/zip');
+      setStatus(`Exported ${all.length} draft${all.length === 1 ? '' : 's'} as ${DRAFTS_ZIP_FILENAME}.`);
+    } catch {
+      setStatus('Exporting the drafts failed.');
+    }
+  };
+
+  const importDraftsZip = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    const store = draftStoreRef.current;
+    if (!file) return;
+    if (!store) {
+      setStatus('Local draft storage is unavailable in this browser.');
+      return;
+    }
+    try {
+      const { DraftZipError, planDraftImport, readDocumentsFromZip } = await import('./draft-zip-engine');
+      let documents;
+      try {
+        documents = readDocumentsFromZip(new Uint8Array(await file.arrayBuffer()));
+      } catch (error) {
+        setStatus(error instanceof DraftZipError ? error.message : 'Could not read that file in this browser.');
+        return;
+      }
+      if (documents.length === 0) {
+        setStatus('That ZIP has no .md, .markdown or .txt documents to import.');
+        return;
+      }
+      const { created, skipped } = planDraftImport(await listDrafts(store), documents, Date.now());
+      for (const draft of created) await saveDraft(store, draft);
+      setDrafts(await listDrafts(store));
+      refreshStorageEstimate();
+      const already = skipped > 0 ? ` ${skipped} already saved with the same text.` : '';
+      setStatus(`Imported ${created.length} draft${created.length === 1 ? '' : 's'} from ${file.name}.${already}`);
+    } catch {
+      setStatus('Importing the drafts failed. Nothing more was added.');
+    }
   };
 
   const restoreSnapshot = (snapshot: SnapshotRecord) => {
@@ -949,8 +1197,10 @@ export default function MarkdownWorkspace() {
         <div className="markdown-workbench-toolbar-section" role="group" aria-label="Document">
           <span className="markdown-workbench-toolbar-label">Document</span>
           <div className="markdown-workbench-toolbar-group">
-            <button type="button" onClick={() => fileInputRef.current?.click()} title="Open a Markdown, text, or HTML file from this device. Nothing is uploaded.">Open document</button>
+            <button type="button" onClick={() => { openInNewTabRef.current = false; fileInputRef.current?.click(); }} title="Open a Markdown, text, or HTML file from this device. Nothing is uploaded.">Open document</button>
+            <button type="button" onClick={() => { openInNewTabRef.current = true; fileInputRef.current?.click(); }} disabled={tabs.length >= MAX_TABS} title="Open a file in a new tab and keep the current document open.">Open in new tab</button>
             <button type="button" onClick={startNewDraft} title="Save the current document if it changed, then start a blank one.">New</button>
+            <button type="button" onClick={() => void newTab()} disabled={tabs.length >= MAX_TABS} title="Keep this document open and start a blank one in a new tab.">New tab</button>
             <button type="button" onClick={saveDraftNow} title="Save a local draft in this browser. Shortcut: Ctrl/Cmd+S." aria-keyshortcuts="Control+S Meta+S">Save draft</button>
             <input ref={fileInputRef} className="markdown-workbench-file-input" type="file" accept=".md,.markdown,.txt,.html,.htm,text/markdown,text/plain,text/html,application/xhtml+xml" onChange={onFileInputChange} aria-label="Open a local Markdown, text, or HTML file" />
           </div>
@@ -984,6 +1234,41 @@ export default function MarkdownWorkspace() {
         </div>
       </div>
 
+      {tabs.length > 1 ? (
+        <div className="markdown-workbench-tabs" role="tablist" aria-label="Open documents">
+          {tabs.map((tab, index) => {
+            const active = tab.id === activeTabId;
+            const label = tabDisplayLabel(active ? effectiveTitle : tab.label);
+            const move = (target: TabEntry | undefined) => {
+              if (!target) return;
+              document.getElementById(`markdown-tab-${target.id}`)?.focus();
+              void switchTab(target.id);
+            };
+            return (
+              <div key={tab.id} className="markdown-workbench-tab" role="presentation" data-active={active}>
+                <button
+                  type="button"
+                  role="tab"
+                  id={`markdown-tab-${tab.id}`}
+                  aria-selected={active}
+                  aria-controls="markdown-workbench-tabpanel"
+                  tabIndex={active ? 0 : -1}
+                  title={label}
+                  onClick={() => void switchTab(tab.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'ArrowRight') { event.preventDefault(); move(tabs[(index + 1) % tabs.length]); }
+                    else if (event.key === 'ArrowLeft') { event.preventDefault(); move(tabs[(index - 1 + tabs.length) % tabs.length]); }
+                    else if (event.key === 'Home') { event.preventDefault(); move(tabs[0]); }
+                    else if (event.key === 'End') { event.preventDefault(); move(tabs[tabs.length - 1]); }
+                  }}
+                >{label}</button>
+                <button type="button" className="markdown-workbench-tab-close" aria-label={`Close tab ${label}`} title="Close this tab. Its saved draft stays in Local drafts." onClick={() => void closeTab(tab.id)}>×</button>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
       <div className="markdown-workbench-namebar">
         <label className="markdown-workbench-name-field">
           Document name
@@ -996,7 +1281,10 @@ export default function MarkdownWorkspace() {
         </div>
       </div>
 
-      <div className={`markdown-workbench-body markdown-workbench-view-${view}`}>
+      <div
+        className={`markdown-workbench-body markdown-workbench-view-${view}`}
+        {...(tabs.length > 1 ? { id: 'markdown-workbench-tabpanel', role: 'tabpanel', 'aria-labelledby': `markdown-tab-${activeTabId}` } : {})}
+      >
         <div className="markdown-workbench-editor-pane" onDrop={onEditorDrop} onDragOver={onEditorDragOver}>
           <MarkdownEditor
             onFormatChange={commitSource}
@@ -1221,6 +1509,11 @@ export default function MarkdownWorkspace() {
             ))}
           </ul>
         ) : <p className="markdown-workbench-hint">No local drafts saved yet.</p>}
+        <div className="markdown-workbench-draft-actions">
+          <button type="button" onClick={() => void exportAllDrafts()} title="Download every local draft as one ZIP with a .md file per draft.">Export all drafts (ZIP)</button>
+          <button type="button" onClick={() => zipInputRef.current?.click()} title="Add the .md, .markdown and .txt files in a ZIP as local drafts. Drafts already saved with the same name and text are skipped.">Import drafts (ZIP)</button>
+          <input ref={zipInputRef} className="markdown-workbench-file-input" type="file" accept=".zip,application/zip,application/x-zip-compressed" onChange={(event) => void importDraftsZip(event)} aria-label="Import drafts from a ZIP file" />
+        </div>
         <h3 className="markdown-workbench-subheading">Versions of this draft ({snapshots.length})</h3>
         {snapshots.length > 0 ? (
           <ul className="markdown-workbench-draft-list" data-testid="markdown-snapshot-list">

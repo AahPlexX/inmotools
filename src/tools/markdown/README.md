@@ -7,9 +7,12 @@ Local editor for writing, previewing, and exporting Markdown. Documents, drafts,
 - Source, split, and preview. In split view, scrolling either side moves the other.
 - Formatting toolbar, cancellable local auto-format, syntax suggestions, find and replace, Vim keys, spellcheck, optional typewriter scrolling, and a syntax guide.
 - Tables with local formulas and a dimension picker, math, Mermaid and Graphviz diagrams, GitHub alerts, subscripts/superscripts, abbreviation definitions with a glossary, definition lists, native disclosure sections, emoji shortcodes, and citations (APA, IEEE, Chicago, MLA).
+- Table builder also converts pasted CSV to a pipe table and copies the table at the cursor as CSV.
 - Click a task checkbox in the preview to toggle that line; document task progress shows completed/total and includes nested tasks.
 - Resolved prose citations generate References in preview and rendered exports; code/metadata literals and uncited library entries are excluded. Original Markdown remains unchanged.
 - Prose counts, reading/speaking estimates, Gunning Fog and English Flesch–Kincaid/Coleman–Liau grade estimates; code, math and metadata are excluded.
+- Keep several documents open in tabs (New tab, Open in new tab); each tab is saved as a local draft when you leave it.
+- Export every local draft as one ZIP of `.md` files and import such a ZIP back.
 - Open `.md`, `.markdown`, `.txt`, or local HTML. Paste or drop an image to embed it as a data URI (5 MB cap).
 - Syntax tree panel: browse the parsed tree with the keyboard; choosing a node highlights its source range.
 - Compare changes panel: diff the current text against the opened file or a saved draft.
