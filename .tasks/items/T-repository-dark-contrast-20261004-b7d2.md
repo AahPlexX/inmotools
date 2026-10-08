@@ -19,3 +19,4 @@ Not started. Per tool on `fix/<slug>`: fix the workspace colours for `[data-them
 ## Log
 - 2026-10-04: recorded.
 - 2026-10-08: markdown-workbench route fixed on fix/markdown-workbench (one element: a pressed toolbar button, 2.38:1; fix in the tool stylesheet). E2E_THEME=dark playwright test tests/e2e/accessibility.spec.ts -g markdown-workbench: 2 passed locally. Nine routes remain; the shared default is unchanged.
+- 2026-10-08: markdown-workbench fix integrated on main (44a31c6f, run 37811383318).
