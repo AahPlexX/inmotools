@@ -920,8 +920,9 @@ export default function MarkdownWorkspace() {
       : embedded > 0
         ? `${embedded} cited source${embedded === 1 ? '' : 's'} embedded as YAML references.`
         : 'No cited source was found in your bibliography, so none was embedded.';
-    const absent = missing > 0 ? ` ${missing} cited key${missing === 1 ? ' is' : 's are'} not in your bibliography: ${result.unresolvedKeys.join(', ')}.` : '';
-    setStatus(`Exported ${filenameStem}.pandoc.md for Pandoc with table formulas evaluated and citations left as [@key]. ${bibliography}${absent} Pandoc uses its default citation style unless you pass --csl.`);
+    const absent = !result.keptExistingReferences && missing > 0 ? ` ${missing} cited key${missing === 1 ? ' is' : 's are'} not in your bibliography: ${result.unresolvedKeys.join(', ')}.` : '';
+    const unsupported = !result.keptExistingReferences && result.unsupportedCitationSyntax ? ' Some citation keys cross markup and were not auto-embedded. Pass a bibliography file to Pandoc.' : '';
+    setStatus(`Exported ${filenameStem}.pandoc.md for Pandoc with table formulas evaluated and citation markers kept as written. ${bibliography}${absent}${unsupported} Pandoc uses its default citation style unless you pass --csl.`);
     noteExport('Exported your document locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
   };
 
@@ -1510,6 +1511,7 @@ export default function MarkdownWorkspace() {
           onChange={(event) => setBibliographyText(event.target.value)}
         />
         <p className="markdown-workbench-hint">Reference a source with <code>[@citekey]</code>. Resolved markers are formatted in preview and rendered exports; unresolved markers remain visible. Plain prefixes, suffixes and page/chapter locators are retained. Complex citation syntax stays as written. Original Markdown keeps the markers.</p>
+        <p className="markdown-workbench-hint">Pandoc Markdown also includes imported sources cited as <code>@citekey [p. 14]</code>. Author-in-text markers stay as written in preview. Your document’s own references are kept. For <code>nocite</code> wildcards, provide references in the document or pass a bibliography file to Pandoc.</p>
         {citationProblem ? <p className="markdown-workbench-citation-warning" role="alert">{citationProblem}</p> : null}
         {citationResult ? (
           <div className="markdown-workbench-citation-preview">
