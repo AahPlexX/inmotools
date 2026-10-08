@@ -110,6 +110,9 @@ const CITATION_STYLES: { id: CitationStyleId; label: string }[] = [
 
 const PREFS_KEY = 'inmotools.markdown-workbench.prefs';
 
+// MDW-R85: how the rendered preview is coloured; it never changes the editor, exports or print.
+type ReadingTheme = "default" | "sepia" | "contrast";
+
 type EditorPrefs = {
   view: ViewMode;
   lineWrapping: boolean;
@@ -119,6 +122,7 @@ type EditorPrefs = {
   syntaxSuggestions: boolean;
   darkMode: boolean;
   typewriterMode: boolean;
+  readingTheme: ReadingTheme;
 };
 
 const loadEditorPrefs = (): Partial<EditorPrefs> => {
@@ -133,6 +137,7 @@ const loadEditorPrefs = (): Partial<EditorPrefs> => {
     if (typeof values.fontSize === 'number' && Number.isInteger(values.fontSize) && values.fontSize >= 11 && values.fontSize <= 20) {
       prefs.fontSize = values.fontSize;
     }
+    if (values.readingTheme === 'default' || values.readingTheme === 'sepia' || values.readingTheme === 'contrast') prefs.readingTheme = values.readingTheme;
     for (const key of ['lineWrapping', 'vimMode', 'spellcheck', 'syntaxSuggestions', 'darkMode', 'typewriterMode'] as const) {
       if (typeof values[key] === 'boolean') prefs[key] = values[key];
     }
@@ -191,6 +196,7 @@ export default function MarkdownWorkspace() {
   const [syntaxSuggestions, setSyntaxSuggestions] = useState(() => loadEditorPrefs().syntaxSuggestions ?? true);
   const [darkMode, setDarkMode] = useState(() => loadEditorPrefs().darkMode ?? false);
   const [typewriterMode, setTypewriterMode] = useState(() => loadEditorPrefs().typewriterMode ?? false);
+  const [readingTheme, setReadingTheme] = useState<ReadingTheme>(() => loadEditorPrefs().readingTheme ?? "default");
   const [focusMode, setFocusMode] = useState(false);
   const syncLockRef = useRef<'source' | 'preview' | null>(null);
   const ignorePreviewUntilRef = useRef(0);
@@ -199,13 +205,13 @@ export default function MarkdownWorkspace() {
   const lastCursorLineRef = useRef(0);
 
   useEffect(() => {
-    const prefs: EditorPrefs = { view, lineWrapping, fontSize, vimMode, spellcheck, syntaxSuggestions, darkMode, typewriterMode };
+    const prefs: EditorPrefs = { view, lineWrapping, fontSize, vimMode, spellcheck, syntaxSuggestions, darkMode, typewriterMode, readingTheme };
     try {
       window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
     } catch {
       // Private mode can reject storage. The session still works without remembered settings.
     }
-  }, [view, lineWrapping, fontSize, vimMode, spellcheck, syntaxSuggestions, darkMode, typewriterMode]);
+  }, [view, lineWrapping, fontSize, vimMode, spellcheck, syntaxSuggestions, darkMode, typewriterMode, readingTheme]);
 
   const [outlineFilter, setOutlineFilter] = useState('');
   const [diffOpen, setDiffOpen] = useState(false);
@@ -1208,7 +1214,7 @@ export default function MarkdownWorkspace() {
     : 'Storage usage is unavailable in this browser.';
 
   return (
-    <div className={`markdown-workbench${darkMode ? ' markdown-workbench-theme-dark' : ''}${focusMode ? ' markdown-workbench-focus' : ''}`} data-testid="markdown-workbench">
+    <div className={`markdown-workbench${darkMode ? ' markdown-workbench-theme-dark' : ''}${focusMode ? ' markdown-workbench-focus' : ''}`} data-testid="markdown-workbench" data-reading-theme={readingTheme}>
       <div className="markdown-workbench-toolbar" role="toolbar" aria-label="Markdown Workbench controls">
         <div className="markdown-workbench-toolbar-section" role="group" aria-label="View and history">
           <span className="markdown-workbench-toolbar-label">View &amp; history</span>
@@ -1243,6 +1249,7 @@ export default function MarkdownWorkspace() {
             <label className="markdown-workbench-check"><input type="checkbox" checked={typewriterMode} onChange={(event) => setTypewriterMode(event.target.checked)} />Typewriter mode</label>
             <label className="markdown-workbench-check"><input type="checkbox" checked={syntaxSuggestions} onChange={(event) => setSyntaxSuggestions(event.target.checked)} />Syntax suggestions</label>
             <label className="markdown-workbench-check"><input type="checkbox" checked={darkMode} onChange={(event) => setDarkMode(event.target.checked)} />Dark workspace</label>
+            <label className="markdown-workbench-font-size" title="Colour the rendered preview only: Sepia for a warm page, High contrast for white on black. Exports and print are not changed.">Reading theme<select aria-label="Reading theme" value={readingTheme} onChange={(event) => setReadingTheme(event.target.value as ReadingTheme)}><option value="default">Default</option><option value="sepia">Sepia</option><option value="contrast">High contrast</option></select></label>
             <label className="markdown-workbench-font-size">Font size<input aria-label="Font size" type="range" min={11} max={20} value={fontSize} onChange={(event) => setFontSize(Number(event.target.value))} /><output data-testid="markdown-font-size-value">{fontSize} px</output></label>
             <MarkdownSyntaxHelp />
           </div>

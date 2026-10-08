@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-Cursor: MDW-R83 done and integrated on main (source 36ea2f7f, integrated as 44a31c6f; official integration run 37811383318 succeeded with 364 unit files passed (2 skipped) and 300 browser passes in 7.2m, no failed or retried tests in the log). Local evidence for R83: new spec markdown-theme 6 passed (the dark contrast test failed on both projects before the fix), repository dark scan for this route 2 passed. Four MDW-R29 clipboard tests fail only on this Windows host (clipboard returns CRLF), identically on untouched main. No full-site or Pages claim beyond that run. Next MDW-R85 (reading view themes for the preview), then R86 (layout 320 to 2560 px; 1920 and 2560 have no test).
+Cursor: MDW-R85 implemented on fix/markdown-workbench, not yet integrated (R83 was integrated as 44a31c6f, run 37811383318). Local evidence for R85: new spec markdown-reading-theme 4 passed on desktop and mobile (the contrast test found 11 findings before the fixes), markdown-theme 7 passed on mobile, 208 other Markdown and accessibility browser tests passed; the only failures are four MDW-R29 clipboard tests on this Windows host (clipboard returns CRLF), identical on untouched main. Next MDW-R86 (layout 320 to 2560 px; 1920 and 2560 have no test).
 
 ## Frozen inventory order
 

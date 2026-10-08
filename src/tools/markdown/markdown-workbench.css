@@ -509,3 +509,49 @@
 /* MDW-R83: under the dark site theme the accent is pale (#7aa7ff), so a pressed toolbar button takes the page colour
    as its text. The shared rule sets white text, which measured 2.38:1 on that accent; the page colour is about 7.9:1. */
 :root[data-theme="dark"] .markdown-workbench-toolbar button[aria-pressed="true"] { color: var(--paper); }
+
+/* MDW-R85: reading themes colour the rendered preview only. They override the tool variables on the preview, so the
+   editor, the exports and print (excluded below) are unchanged, and they win over the separate Dark workspace switch. */
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="sepia"] .markdown-workbench-preview {
+  color-scheme: light;
+  --surface: #f4ecd8; --surface-strong: #eadfc4; --ink: #3b2f1e; --muted: #5d4b33;
+  --line: #cdbb98; --line-strong: #8a7550; --signal: #8a4b08; --signal-strong: #5f3200; --signal-soft: #eadcb8;
+  --table-head: #eadfc4; --warning: #7a4800; --danger: #a31515; --good: #14633a; --focus: #1b3f9a;
+  background: #f4ecd8; color: #3b2f1e;
+}
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="sepia"] .markdown-workbench-preview pre code .tok-comment { color: #5a4a35; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="sepia"] .markdown-workbench-preview pre code .tok-keyword { color: #1b3f9a; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="sepia"] .markdown-workbench-preview pre code :is(.tok-string, .tok-string2, .tok-literal) { color: #1c6b42; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="sepia"] .markdown-workbench-preview pre code :is(.tok-number, .tok-atom, .tok-bool) { color: #8f4a12; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="sepia"] .markdown-workbench-preview pre code :is(.tok-typeName, .tok-className, .tok-namespace) { color: #5b3aa0; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="sepia"] .markdown-workbench-preview pre code :is(.tok-propertyName, .tok-labelName, .tok-heading, .tok-link, .tok-url) { color: #1b3f9a; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="sepia"] .markdown-workbench-preview pre code :is(.tok-meta, .tok-punctuation, .tok-operator) { color: #5d4b33; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="sepia"] .markdown-workbench-preview pre code .tok-invalid { color: #a31515; }
+
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="contrast"] .markdown-workbench-preview {
+  color-scheme: dark;
+  --surface: #000000; --surface-strong: #1a1a1a; --ink: #ffffff; --muted: #e6e6e6;
+  --line: #ffffff; --line-strong: #ffffff; --signal: #ffff00; --signal-strong: #ffff66; --signal-soft: #1a1a00;
+  --good: #66ff99; --warning: #ffcc00; --danger: #ff9999; --table-head: #1a1a1a; --focus: #ffffff;
+  background: #000000; color: #ffffff;
+}
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="contrast"] .markdown-workbench-preview .markdown-workbench-diagram { padding: 10px; border-radius: var(--radius-sm); background: #fff; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="contrast"] .markdown-workbench-preview pre code .tok-comment { color: #e6e6e6; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="contrast"] .markdown-workbench-preview pre code .tok-keyword { color: #9fc2ff; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="contrast"] .markdown-workbench-preview pre code :is(.tok-string, .tok-string2, .tok-literal) { color: #8dffc0; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="contrast"] .markdown-workbench-preview pre code :is(.tok-number, .tok-atom, .tok-bool) { color: #ffd180; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="contrast"] .markdown-workbench-preview pre code :is(.tok-typeName, .tok-className, .tok-namespace) { color: #e0c0ff; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="contrast"] .markdown-workbench-preview pre code :is(.tok-propertyName, .tok-labelName, .tok-heading, .tok-link, .tok-url) { color: #9be0ff; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="contrast"] .markdown-workbench-preview pre code :is(.tok-meta, .tok-punctuation, .tok-operator) { color: #ffffff; }
+body:not(.markdown-workbench-printing) .markdown-workbench[data-reading-theme="contrast"] .markdown-workbench-preview pre code .tok-invalid { color: #ff9e9e; }
+
+/* Under the dark site theme the default preview keeps its dark surface, so syntax colours use the dark palette the
+   Dark workspace already uses (the light palette measured 2.0 to 3.2:1 on that surface). */
+:root[data-theme="dark"] .markdown-workbench[data-reading-theme="default"]:not(.markdown-workbench-theme-dark) .markdown-workbench-preview pre code .tok-comment { color: #b4bec9; }
+:root[data-theme="dark"] .markdown-workbench[data-reading-theme="default"]:not(.markdown-workbench-theme-dark) .markdown-workbench-preview pre code .tok-keyword { color: #9fb8ff; }
+:root[data-theme="dark"] .markdown-workbench[data-reading-theme="default"]:not(.markdown-workbench-theme-dark) .markdown-workbench-preview pre code :is(.tok-string, .tok-string2, .tok-literal) { color: #7ad9a5; }
+:root[data-theme="dark"] .markdown-workbench[data-reading-theme="default"]:not(.markdown-workbench-theme-dark) .markdown-workbench-preview pre code :is(.tok-number, .tok-atom, .tok-bool) { color: #f2b36c; }
+:root[data-theme="dark"] .markdown-workbench[data-reading-theme="default"]:not(.markdown-workbench-theme-dark) .markdown-workbench-preview pre code :is(.tok-typeName, .tok-className, .tok-namespace) { color: #d2adff; }
+:root[data-theme="dark"] .markdown-workbench[data-reading-theme="default"]:not(.markdown-workbench-theme-dark) .markdown-workbench-preview pre code :is(.tok-propertyName, .tok-labelName, .tok-heading, .tok-link, .tok-url) { color: #8cc8ff; }
+:root[data-theme="dark"] .markdown-workbench[data-reading-theme="default"]:not(.markdown-workbench-theme-dark) .markdown-workbench-preview pre code :is(.tok-meta, .tok-punctuation, .tok-operator) { color: #c7d0d9; }
+:root[data-theme="dark"] .markdown-workbench[data-reading-theme="default"]:not(.markdown-workbench-theme-dark) .markdown-workbench-preview pre code .tok-invalid { color: #ff8a80; }
