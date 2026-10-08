@@ -13,7 +13,7 @@ updated: 2026-10-08
 
 ## Resume here
 
-Cursor: MDW-R83 done locally (dark site theme colour contrast), on top of R82 and the R71 autosave fix integrated on main (e86726be, run 37806390763). R83 local checks before integration: new e2e spec markdown-theme (6 passed; baseline before the fix: the dark contrast test failed on both projects with one element, a pressed toolbar button at 2.38:1), the repository dark scan for this route (2 passed), the default-theme scan (2 passed), and the Markdown UX, inventory and theme specs (108 passed). Four MDW-R29 code-copy tests fail on this Windows host identically on untouched main cd84084d because the system clipboard returns CRLF, so they are not caused by R83. Not yet pushed or integrated. Next MDW-R85 (reading view themes for the preview), then R86 (layout from 320 to 2560 px) and the R86 coverage for 1920 and 2560.
+Cursor: MDW-R83 done and integrated on main (source 36ea2f7f, integrated as 44a31c6f; official integration run 37811383318 succeeded with 364 unit files passed (2 skipped) and 300 browser passes in 7.2m, no failed or retried tests in the log). Local evidence for R83: new spec markdown-theme 6 passed (the dark contrast test failed on both projects before the fix), repository dark scan for this route 2 passed. Four MDW-R29 clipboard tests fail only on this Windows host (clipboard returns CRLF), identically on untouched main. No full-site or Pages claim beyond that run. Next MDW-R85 (reading view themes for the preview), then R86 (layout 320 to 2560 px; 1920 and 2560 have no test).
 
 ## Documents
 
