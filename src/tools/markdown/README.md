@@ -14,7 +14,7 @@ Local editor for writing, previewing, and exporting Markdown. Documents, drafts,
 - Syntax tree panel: browse the parsed tree with the keyboard; choosing a node highlights its source range.
 - Compare changes panel: diff the current text against the opened file or a saved draft.
 - Export Markdown, rendered Markdown, standalone HTML, print/PDF, DOCX, structural EPUB, or a syntax-tree JSON file.
-- Drafts live in IndexedDB. Editor settings live in `localStorage` under `inmotools.markdown-workbench.prefs`.
+- Drafts live in IndexedDB, with up to 20 earlier versions per draft that can be restored. Editor settings live in `localStorage` under `inmotools.markdown-workbench.prefs`.
 
 ## Handoff
 

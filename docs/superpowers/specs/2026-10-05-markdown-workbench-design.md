@@ -129,6 +129,8 @@ MDW-R56 detail: the Syntax tree panel (collapsed by default) shows the document'
 
 MDW-R57 detail: the Compare changes panel (collapsed by default) compares the current text with a baseline chosen from a list: the file opened this session (selected automatically when a file is opened) or any saved local draft. The unified read-only view marks added or changed lines and shows removed lines as struck blocks, with unchanged runs collapsed; a summary states the number of changes and lines. Line-ending style is ignored. The view is built only while the panel is open.
 
+MDW-R69 detail: each saved draft keeps earlier versions in IndexedDB (store `snapshots`, database version 2). Every manual save (button or Ctrl/Cmd+S) adds a version; automatic saves add one at most every 60 seconds; identical text is not stored twice in a row; the newest 20 versions per draft are kept. The "Local drafts and storage" panel lists the current draft's versions newest first with time and first line. Restore puts that text in the editor; the text it replaces is kept as a version first. Deleting a draft deletes its versions; New and Open start with none.
+
 ### Files and storage
 
 | ID | Requirement | Acceptance test |

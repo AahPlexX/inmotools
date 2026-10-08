@@ -13,7 +13,7 @@ updated: 2026-10-07
 
 ## Resume here
 
-Cursor: MDW-R68 done (unsaved-changes unload warning tested; no behaviour change); R57 done. Last R57 commit 559ed9df. R68 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next MDW-R69 (snapshots).
+Cursor: MDW-R69 done (draft snapshots: keep and restore earlier versions); R68 done. Last R68 commit 99dcde32. R69 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next MDW-R70.
 
 ## Documents
 
@@ -100,7 +100,7 @@ Cursor: MDW-R68 done (unsaved-changes unload warning tested; no behaviour change
 | MDW-R66 | verified | e2e "manual save reports IndexedDB failure but a clean document can still start New" | |
 | MDW-R67 | verified | unit "reports usage and quota when the browser storage API is available", "returns null fields, rather than throwing, when the storage API is unavailable" | |
 | MDW-R68 | verified | e2e "MDW-R68 leaving with unsaved changes asks for confirmation and a clean document does not", "MDW-R68 closing the page with unsaved changes raises the browser confirmation dialog" | `beforeunload` is cancelled only while the text or name differs from the last saved draft. |
-| MDW-R69 | missing | — | Each draft keeps its latest text only |
+| MDW-R69 | verified | e2e "MDW-R69 the first saved version can be restored after a second save", "MDW-R69 versions survive a reload, belong to their draft and a restore keeps the replaced text"; unit "keeps the first version when a second manual save follows", "keeps only the newest versions per draft and leaves other drafts alone" | Versions in IndexedDB store `snapshots`: every manual save, automatic saves at most once a minute, no identical consecutive text, newest 20 per draft. Restore keeps the replaced text as a version. |
 | MDW-R70 | missing | — | Drafts are switched one at a time |
 | MDW-R71 | missing | — | |
 | MDW-R72 | missing | — | |
@@ -130,7 +130,7 @@ Cursor: MDW-R68 done (unsaved-changes unload warning tested; no behaviour change
 1. Editing: unresolved typewriter centering concern in [task 17bf](../../../.tasks/items/T-markdown-typewriter-centering-20261007-17bf.md); retain its original diagnostic capture and expectation.
 2. Citations: compound annotation loss in [task d713](../../../.tasks/items/T-markdown-citation-locators-20261007-d713.md), repair with MDW-R82.
 3. Navigation and metrics: MDW-R55, MDW-R56, MDW-R57; confirmed associated count/syllable defects are in [next R55 task](../../../.tasks/items/T-markdown-readability-20261007-12d4.md).
-4. Files and storage: MDW-R69, MDW-R70, MDW-R71, MDW-R72.
+4. Files and storage: MDW-R70, MDW-R71, MDW-R72.
 5. Export: MDW-R81, MDW-R82.
 6. Non-functional: MDW-R83, MDW-R85, MDW-R86.
 

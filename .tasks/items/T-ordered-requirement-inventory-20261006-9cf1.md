@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-Cursor: MDW-R68 done (unsaved-changes unload warning tested; no behaviour change); R57 done. Last R57 commit 559ed9df. R68 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next MDW-R69 (snapshots).
+Cursor: MDW-R69 done (draft snapshots: keep and restore earlier versions); R68 done. Last R68 commit 99dcde32. R69 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next MDW-R70.
 
 ## Frozen inventory order
 

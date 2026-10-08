@@ -56,7 +56,15 @@ import {
 } from './export-engine';
 import { bundleHtmlImages, inlineStylesheetAssets } from './export-assets';
 import { createTableFormulaRunner, TableFormulaRunCancelled, type TableFormulaRunner } from './table-formula-runner';
-import type { CitationStyleId, DraftRecord, ProjectHistory } from './markdown-types';
+import {
+  createIndexedDbSnapshotStore,
+  recordSnapshot,
+  removeDraftSnapshots,
+  snapshotsForDraft,
+  type SaveKind,
+  type SnapshotStore,
+} from './snapshot-engine';
+import type { CitationStyleId, DraftRecord, ProjectHistory, SnapshotRecord } from './markdown-types';
 import katexExportCss from 'katex/dist/katex.css?inline';
 import 'katex/dist/katex.css';
 import './markdown-workbench.css';
@@ -134,6 +142,12 @@ const parseToMdast = (source: string, references = ''): MdastRoot =>
 const formatBytes = (bytes: number): string =>
   bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
+const snapshotPreview = (text: string): string => {
+  const line = text.split('\n').find((candidate) => candidate.trim()) ?? '(empty)';
+  const trimmed = line.trim();
+  return trimmed.length > 48 ? `${trimmed.slice(0, 47)}…` : trimmed;
+};
+
 export default function MarkdownWorkspace() {
   useEffect(() => {
     const workspaceRoute = window.location.hash;
@@ -206,6 +220,8 @@ export default function MarkdownWorkspace() {
 
   const draftStoreRef = useRef<DraftStore | null>(null);
   const draftIdRef = useRef<string | null>(null);
+  const snapshotStoreRef = useRef<SnapshotStore | null>(null);
+  const [snapshots, setSnapshots] = useState<SnapshotRecord[]>([]);
   const editorViewScrollRef = useRef<{ offsetTop: number; sourceLine: number }[]>([]);
   // The latest line the preview was asked to follow. A request that lands while the preview is
   // re-rendering (no anchors yet) is re-applied once the anchors are measured, so it is not lost.
@@ -223,6 +239,7 @@ export default function MarkdownWorkspace() {
   useEffect(() => {
     if (typeof indexedDB === 'undefined') return;
     draftStoreRef.current = createIndexedDbDraftStore();
+    snapshotStoreRef.current = createIndexedDbSnapshotStore();
     listDrafts(draftStoreRef.current).then(setDrafts).catch(() => setDrafts([]));
     estimateStorageUsage().then(setStorageUsage);
   }, []);
@@ -231,7 +248,7 @@ export default function MarkdownWorkspace() {
     estimateStorageUsage().then(setStorageUsage).catch(() => undefined);
   }, []);
 
-  const persistDraft = useCallback((text: string, name: string) => {
+  const persistDraft = useCallback((text: string, name: string, kind: SaveKind = 'auto') => {
     const store = draftStoreRef.current;
     if (!store) return Promise.resolve(false);
     const now = Date.now();
@@ -254,6 +271,12 @@ export default function MarkdownWorkspace() {
             || documentNameRef.current !== documentNameSnapshot,
           );
           setLastSavedAt(now);
+        }
+        const snapshotStore = snapshotStoreRef.current;
+        if (snapshotStore) {
+          void recordSnapshot(snapshotStore, draft.id, name, text, kind, now)
+            .then((next) => { if (draftIdRef.current === draft.id) setSnapshots(next); })
+            .catch(() => undefined);
         }
         return listDrafts(store);
       })
@@ -609,6 +632,7 @@ export default function MarkdownWorkspace() {
       const nextDocumentName = file.name.replace(DOCUMENT_FILE_EXTENSION, '');
       setPreviewDocumentKey(key => key + 1);
       draftIdRef.current = null;
+      setSnapshots([]);
       persistedTextRef.current = text;
       persistedDocumentNameRef.current = nextDocumentName;
       commitSource(text);
@@ -784,7 +808,7 @@ export default function MarkdownWorkspace() {
       setStatus('Local draft storage is unavailable in this browser.');
       return;
     }
-    void persistDraft(source, effectiveTitleRef.current).then((saved) => { if (saved) setStatus('Saved a local draft.'); });
+    void persistDraft(source, effectiveTitleRef.current, 'manual').then((saved) => { if (saved) setStatus('Saved a local draft.'); });
   }, [persistDraft, source]);
 
   const startNewDraft = async () => {
@@ -805,6 +829,7 @@ export default function MarkdownWorkspace() {
       return;
     }
     draftIdRef.current = null;
+    setSnapshots([]);
     persistedTextRef.current = DEFAULT_SOURCE;
     setPreviewDocumentKey(key => key + 1);
     persistedDocumentNameRef.current = '';
@@ -837,6 +862,13 @@ export default function MarkdownWorkspace() {
     const restoredDocumentName = draft.name === 'Autosave' ? '' : draft.name;
     setPreviewDocumentKey(key => key + 1);
     draftIdRef.current = draft.id;
+    setSnapshots([]);
+    const snapshotStore = snapshotStoreRef.current;
+    if (snapshotStore) {
+      void snapshotStore.list()
+        .then((all) => { if (draftIdRef.current === draft.id) setSnapshots(snapshotsForDraft(all, draft.id)); })
+        .catch(() => undefined);
+    }
     persistedTextRef.current = draft.text;
     persistedDocumentNameRef.current = restoredDocumentName;
     commitSource(draft.text);
@@ -852,13 +884,36 @@ export default function MarkdownWorkspace() {
     if (!store) return;
     void deleteDraft(store, draft.id)
       .then(() => {
-        if (draftIdRef.current === draft.id) draftIdRef.current = null;
-        return listDrafts(store);
+        if (draftIdRef.current === draft.id) { draftIdRef.current = null; setSnapshots([]); }
+        const snapshotStore = snapshotStoreRef.current;
+        return (snapshotStore ? removeDraftSnapshots(snapshotStore, draft.id) : Promise.resolve())
+          .then(() => listDrafts(store));
       })
       .then(setDrafts)
       .then(refreshStorageEstimate)
       .then(() => setStatus('Deleted that local draft.'))
       .catch(() => setStatus('Could not delete that local draft.'));
+  };
+
+  const restoreSnapshot = (snapshot: SnapshotRecord) => {
+    const draftId = draftIdRef.current;
+    if (!draftId || snapshot.draftId !== draftId) return;
+    const current = sourceRef.current;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    const snapshotStore = snapshotStoreRef.current;
+    const keepCurrent = snapshotStore
+      ? recordSnapshot(snapshotStore, draftId, effectiveTitleRef.current, current, 'manual', Date.now()).catch(() => null)
+      : Promise.resolve(null);
+    void keepCurrent.then((next) => {
+      if (draftIdRef.current !== draftId) return;
+      if (next) setSnapshots(next);
+      if (sourceRef.current !== current) {
+        setStatus('Document changed while preparing the restore. Choose the version again when ready.');
+        return;
+      }
+      commitSource(snapshot.text);
+      setStatus(`Restored the version from ${new Date(snapshot.createdAt).toLocaleString()}. The text before the restore is kept as a version.`);
+    });
   };
 
   useEffect(() => {
@@ -1166,6 +1221,18 @@ export default function MarkdownWorkspace() {
             ))}
           </ul>
         ) : <p className="markdown-workbench-hint">No local drafts saved yet.</p>}
+        <h3 className="markdown-workbench-subheading">Versions of this draft ({snapshots.length})</h3>
+        {snapshots.length > 0 ? (
+          <ul className="markdown-workbench-draft-list" data-testid="markdown-snapshot-list">
+            {snapshots.map((snapshot) => (
+              <li key={snapshot.id}>
+                <span className="markdown-workbench-snapshot-label">{new Date(snapshot.createdAt).toLocaleString()} — {snapshotPreview(snapshot.text)}</span>
+                <button type="button" onClick={() => restoreSnapshot(snapshot)} aria-label={`Restore version from ${new Date(snapshot.createdAt).toLocaleString()}`}>Restore</button>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="markdown-workbench-hint">No versions yet. Save the draft to keep one.</p>}
+        <p className="markdown-workbench-hint">Each manual save keeps a version; automatic saves keep one at most every minute. The newest 20 versions per draft are kept.</p>
         <p className="markdown-workbench-hint">Drafts are stored in this browser only (IndexedDB) and are never uploaded. Ctrl/Cmd+S saves one immediately.</p>
       </details>
     </div>
