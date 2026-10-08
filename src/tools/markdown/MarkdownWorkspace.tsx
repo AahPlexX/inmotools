@@ -55,6 +55,7 @@ import {
   renderDocxToBytes,
 } from './export-engine';
 import { stripFrontmatter } from './frontmatter-engine';
+import { buildPandocMarkdown } from './pandoc-export-engine';
 import { buildPlainText } from './text-export-engine';
 import { bundleHtmlImages, inlineStylesheetAssets } from './export-assets';
 import { createTableFormulaRunner, TableFormulaRunCancelled, type TableFormulaRunner } from './table-formula-runner';
@@ -406,6 +407,10 @@ export default function MarkdownWorkspace() {
     if (source === persistedTextRef.current && documentName === persistedDocumentNameRef.current) return;
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     autosaveTimerRef.current = setTimeout(() => {
+      autosaveTimerRef.current = null;
+      // A manual save, restore or draft deletion since this timer was set can leave nothing to save;
+      // saving again would re-create a draft the user has just deleted.
+      if (sourceRef.current === persistedTextRef.current && documentNameRef.current === persistedDocumentNameRef.current) return;
       void persistDraft(source, effectiveTitle);
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => {
@@ -898,6 +903,21 @@ export default function MarkdownWorkspace() {
     noteExport('Exported your document locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
   };
 
+  const exportPandoc = () => {
+    const result = buildPandocMarkdown(source, citationLibrary);
+    downloadText(result.text, `${filenameStem}.pandoc.md`);
+    const embedded = result.embeddedKeys.length;
+    const missing = result.unresolvedKeys.length;
+    const bibliography = result.keptExistingReferences
+      ? 'Your own references block was kept as written.'
+      : embedded > 0
+        ? `${embedded} cited source${embedded === 1 ? '' : 's'} embedded as YAML references.`
+        : 'No cited source was found in your bibliography, so none was embedded.';
+    const absent = missing > 0 ? ` ${missing} cited key${missing === 1 ? ' is' : 's are'} not in your bibliography: ${result.unresolvedKeys.join(', ')}.` : '';
+    setStatus(`Exported ${filenameStem}.pandoc.md for Pandoc with table formulas evaluated and citations left as [@key]. ${bibliography}${absent} Pandoc uses its default citation style unless you pass --csl.`);
+    noteExport('Exported your document locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
+  };
+
   const exportHtml = async () => {
     setStatus('Preparing standalone HTML and bundling its assets…');
     await waitForPreviewSettled();
@@ -1233,7 +1253,8 @@ export default function MarkdownWorkspace() {
           <div className="markdown-workbench-toolbar-group markdown-workbench-export-group">
             <button type="button" onClick={exportMarkdown} title="Download the source you typed, with formulas and citation markers left as written.">Markdown</button>
             <button type="button" disabled={citationExportBlocked} onClick={exportRenderedMarkdown} title="Download Markdown with formulas evaluated, citations formatted and References included. Available when citation formatting finishes.">Rendered Markdown</button>
-            <button type="button" disabled={citationExportBlocked} onClick={exportText} title="Download the text without any Markdown marks. Lists keep their bullets and numbers, links keep their address in brackets, and tables use tabs. Available when citation formatting finishes.">Plain text</button>
+            <button type="button" onClick={exportPandoc} title="Download Markdown for Pandoc: table formulas become values, citations stay as [@key], and the cited sources are embedded as YAML references so pandoc --citeproc finds them. Pass --csl to pick a style.">Pandoc Markdown</button>
+            <button type="button" disabled={citationExportBlocked} onClick={exportText}title="Download the text without any Markdown marks. Lists keep their bullets and numbers, links keep their address in brackets, and tables use tabs. Available when citation formatting finishes.">Plain text</button>
             <button type="button" disabled={citationExportBlocked} onClick={() => void exportHtml()}title="Download one HTML file with the rendered document, diagrams, and images bundled in. Available when citation formatting finishes.">Standalone HTML</button>
             <button type="button" disabled={citationExportBlocked} onClick={printDocument} title="Print the rendered preview, or save it as PDF from the print dialog. Switch out of Source view first. Available when citation formatting finishes.">Print / PDF</button>
             <button type="button" disabled={citationExportBlocked} onClick={() => void exportDocx()} title="Download a Word file. Math stays as plain text. Available when citation formatting finishes.">DOCX</button>

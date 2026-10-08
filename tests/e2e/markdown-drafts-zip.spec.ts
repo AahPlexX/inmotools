@@ -13,6 +13,22 @@ const saveNamedDraft = async (page: Page, name: string, text: string) => {
   await expect(page.getByTestId('markdown-save-state')).toContainText(/^Saved/, { timeout: 15_000 });
 };
 
+test('MDW-R71 deleting the open document\'s draft is not undone by an autosave that was already pending', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await saveNamedDraft(page, 'Solo', '# Solo body');
+  await page.getByText('Local drafts and storage', { exact: false }).click();
+  const list = page.getByTestId('markdown-draft-list');
+  await expect(list.locator('li')).toHaveCount(1);
+  await list.getByRole('button', { name: /^Delete draft/ }).click();
+  await expect(page.getByText('No local drafts saved yet.')).toBeVisible();
+
+  // The editing and renaming above scheduled an autosave (1.2 s debounce) before the manual save.
+  // That timer must not save the already-saved document again as a new draft.
+  await page.waitForTimeout(2000);
+  await expect(page.getByText('No local drafts saved yet.')).toBeVisible();
+  await expect(list.locator('li')).toHaveCount(0);
+});
+
 test('MDW-R71 three drafts export to a ZIP with three .md files and import back', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
