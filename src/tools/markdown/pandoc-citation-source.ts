@@ -1,5 +1,5 @@
 import type { Nodes, Root } from 'mdast';
-import { isEscaped, mapCitationProse } from './citation-source';
+import { hasNativeCitationSpace, isEscaped, mapCitationProse } from './citation-source';
 import { stripFrontmatter } from './frontmatter-engine';
 import { parseMarkdown } from './parse-engine';
 
@@ -70,7 +70,7 @@ export function extractPandocCitationKeys(source: string): { keys: string[]; uns
     const closes = new Map<number, number>(); const opens: number[] = [];
     const whitespace = new Uint32Array(segment.length + 1);
     for (let i = 0; i < segment.length; i++) {
-      whitespace[i + 1] = whitespace[i] + Number(/\s/u.test(segment[i]));
+      whitespace[i + 1] = whitespace[i] + Number(hasNativeCitationSpace(segment[i]));
       if (segment[i] === '{') opens.push(i);
       else if (segment[i] === '}' && opens.length) closes.set(opens.pop()!, i);
     }

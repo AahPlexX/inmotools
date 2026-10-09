@@ -7,6 +7,11 @@ type Range = { start: number; end: number };
 type ProseRange = Range & { emphasisEnds: ReadonlySet<number> };
 const literals = new Set(['code', 'inlineCode', 'math', 'inlineMath', 'html', 'definition', 'image', 'imageReference', 'link', 'linkReference', 'subscript', 'superscript']);
 
+/** Native braced-key spaces; NEL, LS, PS and BOM are valid key characters. */
+export function hasNativeCitationSpace(text: string): boolean {
+  return /[\t-\r\p{Zs}]/u.test(text);
+}
+
 /** Only authored, native prose is eligible; decoded/generated text is never source. */
 export function mapCitationProse(source: string, replace: (text: string, range: Readonly<ProseRange>) => string, parsed?: ParsedDocument): string {
   if (!source.includes('@')) return source;

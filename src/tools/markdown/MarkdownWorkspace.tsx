@@ -1513,6 +1513,7 @@ export default function MarkdownWorkspace() {
           onChange={(event) => setBibliographyText(event.target.value)}
         />
         <p className="markdown-workbench-hint">Reference a source with <code>[@citekey]</code>. Resolved markers are formatted in preview and rendered exports; unresolved markers remain visible. Plain prefixes, suffixes and page/chapter locators are retained. Complex citation syntax stays as written. Original Markdown keeps the markers.</p>
+        <p className="markdown-workbench-hint">Use the exact ID from your bibliography. Keys cannot contain spaces or tabs; use a hyphen or underscore instead. Wrap punctuation-heavy IDs in braces, such as <code>[@{'{'}chapter.1.{'}'}]</code>.</p>
         <p className="markdown-workbench-hint">Pandoc Markdown also includes imported sources cited as <code>@citekey [p. 14]</code>. Author-in-text markers stay as written in preview. Your document’s own references are kept. For <code>nocite</code> wildcards, provide references in the document or pass a bibliography file to Pandoc.</p>
         {citationProblem ? <p className="markdown-workbench-citation-warning" role="alert">{citationProblem}</p> : null}
         {citationResult ? (
