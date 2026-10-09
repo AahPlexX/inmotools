@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-markdown-workbench-design.md
 tracker: src/tools/markdown/TRACKER.md
-updated: 2026-10-07
+updated: 2026-10-09
 ---
 
 # Markdown Workbench — spec
@@ -189,6 +189,7 @@ MDW-R72 detail: the Table builder dialog gains "Table from CSV" and "Table as CS
 | MDW-R93 | Compound citations retain plain prefixes, suffixes, locators and author suppression as document-order CSL clusters; unsupported syntax stays visible | All four bundled styles, repeated keys with distinct locators, braced keys, mixed unresolved keys, annotation-only edits, native literal/metadata exclusions and original/rendered exports retain semantic information; portrait/landscape warnings wrap |
 | MDW-R94 | Pandoc Markdown embeds cited bibliography records for supported author-in-text @key syntax as well as bracketed markers | Actual downloaded YAML references include a loaded source cited as @key [p. 14], preserving source bytes; mixed citation order/deduplication, unknown/escaped/email/literal/metadata cases remain correct; citation count labels identify preview scope, unsupported auto-embedding status does not imply absent library entries, and the Pandoc style hint names supported metadata selection |
 | MDW-R95 | Preview citation recognition respects native word/formatting boundaries and preserves authored prefix hyphens rather than misreading them as suppression | Email-like [name@alpha], numeric/Unicode words and blocked period/formatting boundaries stay literal without a false reference/count; real bracketed prefixes, suppression and supported locators remain correct, original/Pandoc source stays authored and actual rendered exports agree |
+| MDW-R96 | Braced citation keys use the native space predicate consistently in preview and Pandoc references, with a clear key-syntax hint | Ordinary spaces, tabs and Unicode space separators remain literal without false references/counts; supported valid non-space Unicode and punctuation keys resolve and embed matching Pandoc records; actual rendered/original/Pandoc downloads, edits/Undo and narrow viewport wrapping remain correct |
 
 ## Definition of done
 
@@ -283,3 +284,5 @@ HTML task import retains the checked state of a leading checkbox input directly 
 - 2026-10-07 17:01:21 UTC: Final R55 hyphen/generated-caption repairs passed all 443 Markdown/recovery units (15.49s), TypeScript/clean build and 12/12 combined production browsers (59.8s), desktop/touch, no retries/skips. Counter normalizes U+002D/U+2010/U+2011 compounds without editing source; generated Details from empty/removed markup is excluded while authored Details counts. Independent exact legacy R54 assertions are retained. Current repaired source is ready for GitHub MCP publication; older 13a456e/7c4a94a receipts do not validate these repairs. Publish candidate then one immediate source-record checkpoint and allow final full integration to finish without further record-only pushes. Verify exact official full receipt/main tree/Pages/live acceptance before R55 completion or R56 advancement. Cursor R55, 79/92 incomplete; R15/citation/Crystal concerns remain open.
 
 - 2026-10-07 17:02:50 UTC: Final R55 runtime/test checkpoint 64e17739586fac7c92a38ea94ef436fc11312d2b is published through GitHub MCP and fetched tree equals locally validated 406af5f. It includes both grades, native boundary/count/syllable fixes, exact legacy R54 assertions, Unicode hyphen equivalence and actual generated-caption decisions. Local 443 units (15.49s), TypeScript/clean production build and 12/12 combined browsers (59.8s), zero retries/skips, passed. Fresh full integration 37655869959 is pending on exact source. This immediate documentation-only checkpoint supersedes that initial request; obtain the latest integration head/official full receipt without further record-only pushes. Runtime/tests must remain identical to 64e1773. Earlier R55 full requests apply to older source and cannot establish final repair acceptance. Main still 2410e7a; no final R55 main/Pages/full-success claim. After full success compare main tree, verify Pages and live cases, then finish R55/advance R56. Frozen cursor R55; tool incomplete 79/92. R15/citation/Crystal concerns remain open.
+
+- 2026-10-09: added MDW-R96 before implementation after confirmed braced-space false citations and omitted valid Unicode Pandoc references. Official reader probes and primary predicate are recorded in taska36e; R95 remains a separate candidate/gate.
