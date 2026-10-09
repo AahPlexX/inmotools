@@ -20,6 +20,11 @@ export interface PdfRenderedPage {
   outputScale: number;
 }
 
+export interface PdfDocumentOpenOptions {
+  signal?: AbortSignal;
+  onPassword?: (updatePassword: (password: string) => void, reason: number) => void;
+}
+
 function configurePdfWorker(): void {
   if (!GlobalWorkerOptions.workerPort) GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 }
@@ -37,15 +42,32 @@ export class PdfJsDocumentSession {
     private readonly document: PDFDocumentProxy,
   ) {}
 
-  static async open(bytes: Uint8Array): Promise<PdfJsDocumentSession> {
+  static async open(bytes: Uint8Array, options: PdfDocumentOpenOptions = {}): Promise<PdfJsDocumentSession> {
+    const { signal, onPassword } = options;
+    const aborted = () => new DOMException('PDF opening was cancelled.', 'AbortError');
+    if (signal?.aborted) throw aborted();
     configurePdfWorker();
     const loadingTask = getDocument({ data: bytes.slice() });
+    let destruction: Promise<void> | undefined;
+    const dispose = () => destruction ??= loadingTask.destroy().catch(() => undefined);
+    const cancel = () => { void dispose(); };
+    signal?.addEventListener('abort', cancel, { once: true });
+    if (onPassword) loadingTask.onPassword = (updatePassword: (password: string) => void, reason: number) => {
+      if (!signal?.aborted) onPassword(updatePassword, reason);
+    };
     try {
       const document = await loadingTask.promise;
+      if (signal?.aborted) {
+        await dispose();
+        throw aborted();
+      }
       return new PdfJsDocumentSession(loadingTask, document);
     } catch (error) {
-      await loadingTask.destroy();
+      await dispose();
+      if (signal?.aborted) throw aborted();
       throw error;
+    } finally {
+      signal?.removeEventListener('abort', cancel);
     }
   }
 

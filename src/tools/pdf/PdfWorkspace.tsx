@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadBytes } from '../../lib/download';
 import {
   extractPdfAttachments,
@@ -21,6 +21,8 @@ import PdfSourceFormInventory from './PdfSourceFormInventory';
 import PdfOverlayPanel from './PdfOverlayPanel';
 import PdfExportSummaryPanel from './PdfExportSummaryPanel';
 import PdfCanvas from './PdfCanvas';
+import PdfPasswordDialog, { type PdfPasswordRequest } from './PdfPasswordDialog';
+import type { PdfJsDocumentSession } from './pdfjs-browser';
 import {
   attachmentDefinitionsFromStages,
   attachmentStageError,
@@ -47,6 +49,8 @@ type PdfItem = {
   pages: string;
   rotate: 0 | 90 | 180 | 270;
 };
+
+type ProtectedPdfItem = { id: string; file: File; session: PdfJsDocumentSession };
 
 type MetadataDraft = {
   title: string;
@@ -213,6 +217,19 @@ function geometryValidationError(outputPlan: OutputPlanRow[], edits: GeometryEdi
 
 export default function PdfWorkspace() {
   const [items, setItems] = useState<PdfItem[]>([]);
+  const [protectedItems, setProtectedItems] = useState<ProtectedPdfItem[]>([]);
+  const [passwordRequest, setPasswordRequest] = useState<PdfPasswordRequest | null>(null);
+  const [intakeIssues, setIntakeIssues] = useState<string[]>([]);
+  const intakeRef = useRef<AbortController | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const passwordFocusReturnRef = useRef(false);
+  const protectedSessionsRef = useRef(new Map<string, PdfJsDocumentSession>());
+  useEffect(() => () => {
+    intakeRef.current?.abort();
+    intakeRef.current = null;
+    for (const session of protectedSessionsRef.current.values()) void session.destroy().catch(() => undefined);
+    protectedSessionsRef.current.clear();
+  }, []);
   const [flatten, setFlatten] = useState(true);
   const [metadata, setMetadata] = useState<MetadataDraft>(EMPTY_METADATA);
   const [outputFilename, setOutputFilename] = useState('');
@@ -230,11 +247,23 @@ export default function PdfWorkspace() {
   const [overlayDraft, setOverlayDraft] = useState<PdfOverlayDraft>(EMPTY_OVERLAY_DRAFT);
   const [status, setStatus] = useState('Choose PDFs to merge, extract, reorder, rotate, flatten, or prepare for export.');
   const [busy, setBusy] = useState(false);
+  function restorePasswordFocus() {
+    if (!passwordFocusReturnRef.current || busy || passwordRequest || document.querySelector('.pdf-password-dialog[open]')) return;
+    const input = fileInputRef.current;
+    if (!input || input.disabled) return;
+    passwordFocusReturnRef.current = false;
+    if (document.activeElement === document.body || document.activeElement?.closest('.pdf-password-dialog')) input.focus();
+  }
+  useEffect(() => { restorePasswordFocus(); }, [busy, passwordRequest]);
   const [viewerSourceId, setViewerSourceId] = useState('');
   const [viewerPage, setViewerPage] = useState(1);
   const [viewerZoomPercent, setViewerZoomPercent] = useState(100);
-  const viewerItem = items.find((item) => item.id === viewerSourceId) ?? items[0];
-  const viewerPageCount = viewerItem?.inspection.pageCount ?? 0;
+  const viewerSources = [
+    ...items.map((item) => ({ id: item.id, file: item.file, pageCount: item.inspection.pageCount, session: undefined as PdfJsDocumentSession | undefined })),
+    ...protectedItems.map((item) => ({ ...item, pageCount: item.session.pageCount })),
+  ];
+  const viewerItem = viewerSources.find((item) => item.id === viewerSourceId) ?? viewerSources[0];
+  const viewerPageCount = viewerItem?.pageCount ?? 0;
   const resolvedViewerPage = viewerPageCount ? Math.min(Math.max(viewerPage, 1), viewerPageCount) : 1;
 
   const pageStates = useMemo(() => items.map((item) => {
@@ -354,27 +383,110 @@ export default function PdfWorkspace() {
 
   async function load(list: FileList | null) {
     if (!list?.length) return;
+    const files = Array.from(list);
+    intakeRef.current?.abort();
+    const controller = new AbortController();
+    intakeRef.current = controller;
+    setPasswordRequest(null);
+    setIntakeIssues([]);
     setBusy(true);
+    let added = 0;
+    let readOnly = 0;
+    const issues: string[] = [];
     try {
-      const next: PdfItem[] = [];
-      for (const file of Array.from(list)) {
+      for (const file of files) {
+        if (controller.signal.aborted) break;
         try {
           const bytes = new Uint8Array(await file.arrayBuffer());
-          const inspection = await inspectPdf(bytes);
-          next.push({ id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`, file, inspection, pages: '', rotate: 0 });
+          if (controller.signal.aborted) break;
+          const id = crypto.randomUUID();
+          try {
+            const inspection = await inspectPdf(bytes);
+            if (controller.signal.aborted) break;
+            setItems((current) => [...current, { id, file, inspection, pages: '', rotate: 0 }]);
+            added += 1;
+          } catch (error) {
+            if (!(error instanceof Error) || !/encrypt/i.test(error.message)) throw error;
+            const child = new AbortController();
+            const cancel = () => child.abort();
+            controller.signal.addEventListener('abort', cancel, { once: true });
+            try {
+              const { PdfJsDocumentSession } = await import('./pdfjs-browser');
+              if (controller.signal.aborted) child.abort();
+              const session = await PdfJsDocumentSession.open(bytes, {
+                signal: child.signal,
+                onPassword: (updatePassword, reason) => {
+                  if (controller.signal.aborted) return;
+                  passwordFocusReturnRef.current = true;
+                  let answered = false;
+                  setPasswordRequest({
+                    fileName: file.name,
+                    incorrect: reason === 2,
+                    submit: (password) => {
+                      if (answered || child.signal.aborted || controller.signal.aborted) return;
+                      answered = true;
+                      setPasswordRequest(null);
+                      updatePassword(password);
+                    },
+                    cancel: () => {
+                      if (answered) return;
+                      answered = true;
+                      setPasswordRequest(null);
+                      child.abort();
+                    },
+                  });
+                },
+              });
+              if (controller.signal.aborted) { await session.destroy(); break; }
+              protectedSessionsRef.current.set(id, session);
+              setProtectedItems((current) => [...current, { id, file, session }]);
+              setViewerSourceId(id);
+              setViewerPage(1);
+              readOnly += 1;
+            } catch (error) {
+              if (child.signal.aborted && !controller.signal.aborted) throw new Error('Opening cancelled.');
+              throw error;
+            } finally {
+              controller.signal.removeEventListener('abort', cancel);
+              if (intakeRef.current === controller) setPasswordRequest(null);
+            }
+          }
         } catch (error) {
-          const message = error instanceof Error ? error.message : 'unknown error';
-          if (/encrypt/i.test(message)) throw new Error(`${file.name} is encrypted. This workstation cannot safely modify it with the current engine; decrypt it in an authorized PDF application first.`);
-          throw new Error(`${file.name}: ${message}`);
+          if (controller.signal.aborted) break;
+          issues.push(`${file.name}: ${error instanceof Error ? error.message : 'Could not read this PDF.'}`);
+          setIntakeIssues([...issues]);
         }
       }
-      setItems((current) => [...current, ...next]);
-      setStatus(`Added ${next.length} PDF${next.length === 1 ? '' : 's'} locally. Review page selections, forms, attachments, overlays, page geometry, document properties, and export settings before processing.`);
-    } catch (error) {
-      setStatus(`Could not read PDF: ${error instanceof Error ? error.message : 'unknown error'}`);
+      if (!controller.signal.aborted) setStatus(`Added ${added} editable PDF${added === 1 ? '' : 's'} and ${readOnly} read-only PDF${readOnly === 1 ? '' : 's'} locally.${issues.length ? ` ${issues.length} file${issues.length === 1 ? ' was' : 's were'} not opened; see the file notices.` : ''}`);
     } finally {
-      setBusy(false);
+      if (intakeRef.current === controller) {
+        intakeRef.current = null;
+        setPasswordRequest(null);
+        setBusy(false);
+      }
     }
+  }
+
+  function removeProtected(id: string) {
+    const session = protectedSessionsRef.current.get(id);
+    protectedSessionsRef.current.delete(id);
+    if (session) void session.destroy().catch(() => undefined);
+    setProtectedItems((current) => current.filter((item) => item.id !== id));
+  }
+
+  function clearSources() {
+    intakeRef.current?.abort();
+    intakeRef.current = null;
+    setPasswordRequest(null);
+    setBusy(false);
+    for (const session of protectedSessionsRef.current.values()) void session.destroy().catch(() => undefined);
+    protectedSessionsRef.current.clear();
+    setProtectedItems([]);
+    setIntakeIssues([]);
+    setViewerSourceId('');
+    setViewerPage(1);
+    setItems([]); setMetadata(EMPTY_METADATA); setOutputFilename(''); setBlankPages([]); setGeometryEdits({}); setGeometryPageKey(''); setStagedAttachments([]); setStagedFormFields([]); setOverlayDraft(EMPTY_OVERLAY_DRAFT);
+    setStatus('Queue cleared. Choose PDFs to begin again.');
   }
 
   function move(index: number, delta: number) {
@@ -574,7 +686,17 @@ export default function PdfWorkspace() {
   return <>
     <div className="workspace-header"><div><h2>PDF Workstation</h2><p>Prepare deterministic local PDF outputs: page order, selection, blank pages, page boxes, embedded files, editable forms, Bates/overlays, metadata, and export naming.</p></div></div>
     <div className="workspace-body">
-      <div className="field"><label htmlFor="pdf-files">Add PDF files</label><input id="pdf-files" type="file" accept="application/pdf,.pdf" multiple onChange={(event) => consumeFileInput(event.target, () => load(event.target.files))} /><small>New selections append to the current queue instead of replacing it.</small></div>
+      <div className="field"><label htmlFor="pdf-files">Add PDF files</label><input ref={fileInputRef} id="pdf-files" type="file" accept="application/pdf,.pdf" multiple disabled={busy} onChange={(event) => consumeFileInput(event.target, () => load(event.target.files))} /><small>New selections append. Protected PDFs open separately for read-only viewing; readable files are kept if another file fails or is cancelled.</small></div>
+      {intakeIssues.length ? <ul className="notice" data-testid="pdf-intake-issues" aria-label="File opening notices" style={{ overflowWrap: 'anywhere' }}>{intakeIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul> : null}
+      {protectedItems.map((item) => <section className="notice" data-testid="pdf-protected-item" key={item.id} style={{ marginTop: 14, overflowWrap: 'anywhere' }}>
+        <strong>{item.file.name}</strong>
+        <p className="help-text">{item.session.pageCount} pages · {bytesLabel(item.file.size)} · Read-only. This encrypted PDF cannot be modified or included in output by this workstation.</p>
+        <p className="help-text">Remove this read-only source when finished to release its viewer memory.</p>
+        <div className="button-row">
+          <button className="action-button secondary" type="button" onClick={() => { setViewerSourceId(item.id); setViewerPage(1); }}>View read-only</button>
+          <button className="action-button secondary" type="button" aria-label={`Remove read-only ${item.file.name}`} onClick={() => removeProtected(item.id)}>Remove read-only</button>
+        </div>
+      </section>)}
 
       {items.map((item, index) => {
         const pageState = pageStates[index];
@@ -624,9 +746,9 @@ export default function PdfWorkspace() {
 
       {viewerItem ? <section className="notice" style={{ marginTop: 18 }} aria-labelledby="pdf-viewer-title">
         <h3 id="pdf-viewer-title" style={{ margin: 0 }}>Document viewer</h3>
-        <p className="help-text">PDF.js renders the active source page locally with a bundled worker. Canvas pixels are only the visual layer; document operations continue to use PDF coordinates and deterministic source bytes.</p>
+        <p className="help-text">View, select and search document text locally. Protected sources are read-only and are excluded from output.</p>
         <div className="workspace-grid three" style={{ marginTop: 14 }}>
-          <div className="field"><label htmlFor="pdf-viewer-source">Preview source</label><select id="pdf-viewer-source" value={viewerItem.id} onChange={(event) => { setViewerSourceId(event.target.value); setViewerPage(1); }}>{items.map((item) => <option key={item.id} value={item.id}>{item.file.name}</option>)}</select></div>
+          <div className="field"><label htmlFor="pdf-viewer-source">Preview source</label><select id="pdf-viewer-source" aria-describedby="pdf-viewer-source-name" value={viewerItem.id} onChange={(event) => { setViewerSourceId(event.target.value); setViewerPage(1); }}>{viewerSources.map((item) => <option key={item.id} value={item.id}>{item.file.name}{item.session ? ' (read-only)' : ''}</option>)}</select><small id="pdf-viewer-source-name" style={{ overflowWrap: 'anywhere' }}>Selected source: {viewerItem.file.name}{viewerItem.session ? ' · Read-only' : ''}</small></div>
           <div className="field"><label htmlFor="pdf-viewer-page">Preview page</label><input id="pdf-viewer-page" type="number" min="1" max={viewerPageCount} step="1" value={resolvedViewerPage} onChange={(event) => { const next = Number(event.target.value); setViewerPage(Number.isFinite(next) ? Math.min(Math.max(Math.trunc(next), 1), viewerPageCount) : 1); }} /></div>
           <div className="field"><label htmlFor="pdf-viewer-zoom">Preview zoom</label><input id="pdf-viewer-zoom" type="number" min="25" max="500" step="25" value={viewerZoomPercent} onChange={(event) => { const next = Number(event.target.value); setViewerZoomPercent(Number.isFinite(next) ? Math.min(Math.max(next, 25), 500) : 100); }} /><small>25%–500%; canvas backing pixels are independently capped for display-memory safety.</small></div>
         </div>
@@ -634,7 +756,7 @@ export default function PdfWorkspace() {
           <button className="action-button secondary" type="button" aria-label="Previous preview page" disabled={resolvedViewerPage <= 1} onClick={() => setViewerPage((page) => Math.max(1, page - 1))}>Previous page</button>
           <button className="action-button secondary" type="button" aria-label="Next preview page" disabled={resolvedViewerPage >= viewerPageCount} onClick={() => setViewerPage((page) => Math.min(viewerPageCount, page + 1))}>Next page</button>
         </div>
-        <PdfCanvas file={viewerItem.file} pageNumber={resolvedViewerPage} zoom={viewerZoomPercent / 100} onPageRequest={setViewerPage} />
+        <PdfCanvas file={viewerItem.file} pageNumber={resolvedViewerPage} zoom={viewerZoomPercent / 100} onPageRequest={setViewerPage} providedSession={viewerItem.session} />
       </section> : null}
 
       {items.length ? <section className="notice" style={{ marginTop: 18 }} aria-labelledby="pdf-properties-title">
@@ -733,9 +855,10 @@ export default function PdfWorkspace() {
             : `Processing is blocked because ${formFieldTotal} source form field${formFieldTotal === 1 ? '' : 's'} would not remain editable after cross-document page copying. Enable flattening to preserve their current appearances without silently discarding source form structure.`}</p>
       </div> : null}
 
-      <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked || Boolean(blankPlanError) || Boolean(geometryError) || Boolean(attachmentError) || Boolean(formAuthoringError) || Boolean(overlayError)} onClick={() => void process()}>Process and download</button><button className="action-button secondary" type="button" disabled={!items.length || busy} onClick={() => { setItems([]); setMetadata(EMPTY_METADATA); setOutputFilename(''); setBlankPages([]); setGeometryEdits({}); setGeometryPageKey(''); setStagedAttachments([]); setStagedFormFields([]); setOverlayDraft(EMPTY_OVERLAY_DRAFT); setStatus('Queue cleared. Choose PDFs to begin again.'); }}>Clear queue</button></div>
+      <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked || Boolean(blankPlanError) || Boolean(geometryError) || Boolean(attachmentError) || Boolean(formAuthoringError) || Boolean(overlayError)} onClick={() => void process()}>Process and download</button><button className="action-button secondary" type="button" disabled={(busy && !intakeRef.current) || (!items.length && !protectedItems.length && !busy)} onClick={clearSources}>Clear queue</button></div>
       <div className="status-line" role="status">{busy ? 'Processing PDF bytes locally…' : status}</div>
       <div className="notice"><strong>Current sanitization boundary</strong><p className="help-text">Output is rebuilt into a new PDF, so source document-level Info/catalog metadata and embedded files are not intentionally carried forward. Replacement metadata, output attachments, newly authored editable fields, and export overlays are opt-in. Selected page content and page-level annotations are preserved; this stage is not yet the workstation's planned malware analysis, secure redaction, or active-content sanitization system.</p></div>
     </div>
+    <PdfPasswordDialog request={passwordRequest} onClosed={restorePasswordFocus} />
   </>;
 }
