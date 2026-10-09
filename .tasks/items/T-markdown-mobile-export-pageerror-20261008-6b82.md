@@ -6,7 +6,7 @@ kind: fix
 state: backlog
 branch: fix/markdown-workbench
 created: 2026-10-08
-updated: 2026-10-08
+updated: 2026-10-09
 ---
 
 # Investigate a one-off page error on mobile during the Pandoc export browser test
@@ -16,6 +16,9 @@ updated: 2026-10-08
 Find the source of three page errors that failed the pageerror assertion once in a combined mobile run, without hiding them. Found while implementing MDW-R82.
 
 ## Resume here
+
+2026-10-09 14:29 UTC: backlog; original three pageerrors and earlier local startup timeout still lack established causes. R94 full37856784792 on ed970297 passed1799 browsers/171 skips without retry: non-reproduction only. Current R95 runtime6875774/main15bdec65 separately produced a live post-deploy startup timeout with preserved network trace: new entry index-Dm5-ig-7.js returnedHTTP404 after Pages37943298127 deploy completed14:21:58. The exact URL returnedHTTP200 at14:25:16, byte-matched the immutable artifact at14:26, and live6/6 passed after availability changed. Distinct live transition evidence, not a cause/fix for this task's original local failures. Unique external r95-deployed-live-browser.json/log/results preserve the new startup trace; r95-postdeploy-asset-probe.json and r95-candidate-availability-proof.json preserve the later availability/source proof. Keep all original assertions; no failure-hiding or repeated unchanged stress run is justified.
+
 
 2026-10-08 21:29:32 UTC: additional official full validation 37840159373 on d9ac316 succeeded: 4039 units/15 skips and 1788 browser passes/171 skips/one unrelated Photo image.decode retry. Original Markdown centering and export cases passed both profiles without retry. This is non-reproduction, not a root-cause fix; retain this task and its original expectation/artifact limitations. Latest deployed runtime/test tree matches main 57293d5.
 
@@ -30,3 +33,5 @@ Find the source of three page errors that failed the pageerror assertion once in
 - 2026-10-08: recorded with the assertion improved to print messages. No product change.
 
 - 2026-10-08: current runtime 20-repeat mobile run: 79/80 passed, zero retries/skips; first Pandoc pageerror case passed all 20 repeats. One distinct startup editor-visibility timeout; no established cause or runtime fix. Failure artifacts were overwritten by a later run; log/JSON remain and future output directories are isolated.
+
+- 2026-10-09: recorded separate live deployment-entry404→200 observation and available-release6/6 success without attributing it to the original pageerror or local-startup failures. No product repair; backlog retained.
