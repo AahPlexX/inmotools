@@ -10,6 +10,7 @@ type Props = {
   zoom: number;
   onDocumentReady?: (pageCount: number) => void;
   onPageRequest?: (pageNumber: number) => void;
+  providedSession?: PdfJsDocumentSession;
 };
 
 type PdfDocumentTextMatch = PdfTextMatch & {
@@ -18,7 +19,7 @@ type PdfDocumentTextMatch = PdfTextMatch & {
 
 const MAX_DOCUMENT_SEARCH_RESULTS = 200;
 
-export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady, onPageRequest }: Props) {
+export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady, onPageRequest, providedSession }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
   const sessionRef = useRef<PdfJsDocumentSession | null>(null);
@@ -32,10 +33,10 @@ export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady, onP
 
   useEffect(() => {
     let disposed = false;
+    const controller = new AbortController();
+    let activeSession: PdfJsDocumentSession | null = null;
     searchRequestRef.current += 1;
-    const previous = sessionRef.current;
     sessionRef.current = null;
-    if (previous) void previous.destroy();
     setRendered(null);
     setMatches([]);
     setSearchStatus('Enter text to search this document.');
@@ -43,15 +44,18 @@ export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady, onP
 
     void (async () => {
       try {
-        const [{ PdfJsDocumentSession }, bytes] = await Promise.all([
-          import('./pdfjs-browser'),
-          file.arrayBuffer(),
-        ]);
-        const session = await PdfJsDocumentSession.open(new Uint8Array(bytes));
+        let session = providedSession;
+        if (!session) {
+          const [{ PdfJsDocumentSession }, bytes] = await Promise.all([
+            import('./pdfjs-browser'), file.arrayBuffer(),
+          ]);
+          session = await PdfJsDocumentSession.open(new Uint8Array(bytes), { signal: controller.signal });
+        }
         if (disposed) {
-          await session.destroy();
+          if (!providedSession) await session.destroy();
           return;
         }
+        activeSession = session;
         sessionRef.current = session;
         onDocumentReady?.(session.pageCount);
         setSessionVersion((value) => value + 1);
@@ -62,12 +66,12 @@ export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady, onP
 
     return () => {
       disposed = true;
+      controller.abort();
       searchRequestRef.current += 1;
-      const session = sessionRef.current;
-      sessionRef.current = null;
-      if (session) void session.destroy();
+      if (sessionRef.current === activeSession) sessionRef.current = null;
+      if (activeSession && !providedSession) void activeSession.destroy().catch(() => undefined);
     };
-  }, [file, onDocumentReady]);
+  }, [file, onDocumentReady, providedSession]);
 
   useEffect(() => {
     const session = sessionRef.current;
