@@ -3,10 +3,10 @@ task: T-markdown-preview-boundary-20261008-c4d2
 tool: markdown-workbench
 doc: task
 kind: fix
-state: next
+state: active
 branch: fix/markdown-workbench
 created: 2026-10-08
-updated: 2026-10-08
+updated: 2026-10-09
 ---
 
 # Preserve literal word and email boundaries in citation preview
@@ -17,7 +17,7 @@ Correct a confirmed native citation false positive in preview and review rendere
 
 ## Resume here
 
-2026-10-08 23:54:53 UTC: next, requirement MDW-R95 missing. R94 full37856784792 succeeded and task9a5c is done; this separately confirmed preview repair follows. Actual live main ee258df (runtime7f16c60) with source Contact [name@alpha] today. and loaded alpha CSL JSON yields preview Contact (name Alpha, 2026) today., an Alpha References entry, and Citations (1 preview key). Actual Pandoc download correctly remains Contact [name@alpha] today. The verified official Pandoc3.12.1 reader returns no Cite nodes for the same source. No repair or acceptance claimed. Do not silently consider this fixed by R94 or the count-label correction.
+2026-10-09 13:58 UTC: active R95, still missing. Current clean base main23e304e7cc1affe867d9fc7503bc6c1f76ec3729 contains final R94 records f5cefad; integration37862265819 and Pages37862426450 succeeded. R94 runtime/tests7f16c60 unchanged and all accepted gates remain valid. task:start from the primary checkout resumed the existing owned worktree; this specifically queued task was activated manually to avoid selecting the unrelated older backlog. GitHub MCP refreshed official latest Pandoc3.12.1 (published2026-10-08T01:48:41Z) today; immutable release reader sources returned HTTP200.32 fresh reader probes confirm literal Unicode/email/period/closing-emphasis boundaries, authored hyphens versus suppression and failure of whole semicolon clusters when one item lacks an eligible key. No R95 implementation or acceptance yet. Next: baseline-failing regressions, smallest marker parser repair, local/owned/full/main/live acceptance on the final candidate, then close this task. Keep R93 complex syntax preservation and R94 export-only grammar independent.
 
 ## Baseline evidence
 
@@ -35,3 +35,8 @@ Next frozen tool remains PDF-R02 after associated Markdown work. R15 task17bf an
 Observed2026-10-08 23:46:53 UTC:16 reader cases saved external pandoc-author-research/preview-boundary-reader-probes.json. Word/number/Unicode word, ordinary terminal period and closing emphasis before @ produce no Cite nodes. Escaped period permits NormalCitation; the existing complex-annotation preservation contract may keep that source raw without silently extending supported preview syntax. [name-@alpha] is NormalCitation with prefix name-, while [name -@alpha] and [-@alpha] suppress the author. [word.-@alpha] keeps word.- as a normal prefix. Comma and underscore permit normal citation. [name@alpha; @beta] yields beta AuthorInText, whereas [name@alpha @beta] yields beta NormalCitation with the literal email-like prefix. Check complete-cluster eligibility; do not invent a genuine bracketed citation from a bare author marker inside a failed bracket cluster. Preserve the explicit author-in-text preview limitation.
 
 MDW-R95 is specified before implementation; tracker missing and task next. R94's completed full receipt cannot validate a future parser change. Retain all accepted valid-cluster regressions and add meaningful baseline-failing cases before editing.
+
+## Log
+
+- 2026-10-09: activated c4d2 on the existing fix/markdown-workbench checkout after task:start. Shared meaningful unit/browser regressions are necessary to validate source-aware recognition across preview and actual prepared exports; this is the reason for tests outside the tool folder and a fresh full browser gate. No dependency, workflow or other-tool change is planned.
+- 2026-10-09: external preview-boundary-reader-probes-20261009.json records32 fresh official released-reader cases and current immutable-source HTTP200/hash/date receipts. Failed semicolon clusters yield bare author citations in native Pandoc, which the preview contract deliberately keeps authored; do not fabricate bracketed citations from their later keys.

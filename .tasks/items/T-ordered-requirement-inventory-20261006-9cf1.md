@@ -5,7 +5,7 @@ kind: fix
 state: active
 branch: fix/markdown-workbench
 created: 2026-10-06
-updated: 2026-10-08
+updated: 2026-10-09
 ---
 
 # Ordered requirement implementation
@@ -14,6 +14,8 @@ updated: 2026-10-08
 Complete the reviewed inventory in the frozen order below, including associated bugs. Maintain current per-tool requirements, verification evidence and resumable progress. Preserve existing verified behavior and the static browser-only architecture. Record exact source revisions, reproducible checks, known limitations and the next action at every checkpoint.
 
 ## Resume here
+
+2026-10-09 13:58 UTC: active R95/taskc4d2, still missing. Clean base main23e304e7cc1affe867d9fc7503bc6c1f76ec3729 includes final R94 records f5cefad; integration37862265819 and Pages37862426450 succeeded, runtime/tests7f16c60 unchanged. GitHub MCP refreshed latest official Pandoc3.12.1 today and immutable release sources returned HTTP200.32 fresh released-reader probes confirm the preview false positive and distinguish authored hyphens, true suppression, native formatting boundaries and failed semicolon clusters. Next: failing regressions and the bounded marker parser repair, then candidate local/owned/full/main/live gates. No R95 fix or acceptance claimed. R94/R93 accepted evidence remains valid; do not repeat unchanged gates. Frozen next tool PDF-R02; R15/task17bf and startup/task6b82 causes remain unresolved.
 
 2026-10-08 23:54:53 UTC: R94 is verified and task9a5c done. Required full [37856784792](https://github.com/AahPlexX/inmotools/actions/runs/37856784792), validate job113582773567, succeeded on immutable core ed970297: 4055 unit passes/16 optional skips; 1799 browser passes/171 skips (52.7m), zero retries. All ten R94 browser cases passed; no centering diagnostic was logged. Core local552 units with real Pandoc, TypeScript/build,20 production, owned330 and live10 remain accepted. Deployed wording runtime7f16c60 has only three text changes and an engine comment beyond core; its separate owned37858786373 (4055/16 units,330 browsers,no retries/skips), Pages37859956828 and8 live export cycles/32 geometry checks passed; taskb9e1 done. Latest fetched record main5d2446d and Pages37861295012 succeeded with unchanged runtime/tests. Next associated requirement R95 is missing, taskc4d2 next: live email-like bracket falsely formats Alpha in preview although native Pandoc has no Cite and repaired Pandoc export is literal. Sixteen released-reader probes distinguish word/period/formatting boundaries and authored hyphens from suppression; no preview fix claimed. Tasks17bf/6b82 remain unresolved; current full success is non-reproduction, not a cause/fix. Next frozen tool PDF-R02 after associated Markdown repairs. Do not repeat completed unchanged gates for these final records.
 
