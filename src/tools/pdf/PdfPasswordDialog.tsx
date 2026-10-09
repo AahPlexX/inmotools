@@ -12,16 +12,31 @@ export default function PdfPasswordDialog({ request, onClosed }: { request: PdfP
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  // Moving a pointer target between pointer-down and click can cancel activation.
+  const pointerFocusRef = useRef(false);
+
+  function revealFocusedControl(control: HTMLElement | null) {
+    if (!control) return;
+    // Focus can arrive while React is committing a new password request.
+    queueMicrotask(() => {
+      const dialog = dialogRef.current;
+      if (dialog?.open && control.isConnected && dialog.contains(control) && document.activeElement === control) {
+        control.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+    });
+  }
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
 
   useEffect(() => {
     setPassword('');
     setShow(false);
+    pointerFocusRef.current = false;
     const dialog = dialogRef.current;
     if (request) {
       if (!dialog?.open) dialog?.showModal();
       inputRef.current?.focus();
+      revealFocusedControl(inputRef.current);
     } else if (dialog?.open) dialog.close();
   }, [request]);
 
@@ -36,8 +51,15 @@ export default function PdfPasswordDialog({ request, onClosed }: { request: PdfP
     aria-labelledby="pdf-password-title"
     aria-describedby="pdf-password-file pdf-password-description"
     onClose={onClosed}
+    onPointerDownCapture={() => { pointerFocusRef.current = true; }}
+    onPointerCancelCapture={() => { pointerFocusRef.current = false; }}
+    onClickCapture={() => { pointerFocusRef.current = false; }}
+    onFocus={(event) => {
+      if (!pointerFocusRef.current && event.target.matches('input, button')) revealFocusedControl(event.target);
+    }}
     onCancel={(event) => { event.preventDefault(); setPassword(''); request?.cancel(); }}
     onKeyDown={(event) => {
+      pointerFocusRef.current = false;
       if (event.key !== 'Tab') return;
       if (event.shiftKey && document.activeElement === inputRef.current) {
         event.preventDefault(); cancelRef.current?.focus();
