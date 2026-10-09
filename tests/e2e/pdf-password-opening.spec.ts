@@ -265,3 +265,48 @@ test('PDF-R02 password and read-only controls remain accessible in dark, light a
   }
   expect(errors).toEqual([]);
 });
+
+test('PDF-R02 keeps focused password controls and outlines within reduced-height viewports', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
+  const name = `${'owned-long-protected-name-'.repeat(16)}.pdf`;
+  for (const viewport of [{ width: 320, height: 220 }, { width: 844, height: 240 }]) {
+    await page.setViewportSize(viewport);
+    await page.getByLabel('Add PDF files').setInputFiles({ ...specimen('owned-aes256.pdf'), name });
+    const dialog = page.getByRole('dialog', { name: 'Open protected PDF' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('#pdf-password-file')).toHaveText(name);
+    const input = page.getByLabel('PDF password', { exact: true });
+    const cancel = page.getByRole('button', { name: 'Cancel opening', exact: true });
+    const assertVisibleFocus = async (control: typeof input) => {
+      await expect(control).toBeFocused();
+      const box = (await control.boundingBox())!;
+      const frame = (await dialog.boundingBox())!;
+      // The site focus outline extends 6px; allow the dialog's 1px border too.
+      expect(box.x - 7).toBeGreaterThanOrEqual(frame.x);
+      expect(box.y - 7).toBeGreaterThanOrEqual(frame.y);
+      expect(box.x + box.width + 7).toBeLessThanOrEqual(frame.x + frame.width);
+      expect(box.y + box.height + 7).toBeLessThanOrEqual(frame.y + frame.height);
+      expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    };
+    await assertVisibleFocus(input);
+    await page.keyboard.press('Shift+Tab'); await assertVisibleFocus(cancel);
+    await page.keyboard.press('Tab'); await assertVisibleFocus(input);
+    await input.fill('discard this transient value');
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+    await expect(page.getByLabel('Add PDF files')).toBeFocused();
+    await page.getByLabel('Add PDF files').setInputFiles({ ...specimen('owned-aes256.pdf'), name });
+    await assertVisibleFocus(input);
+    await dialog.evaluate((element) => {
+      const control = element.querySelector('button[type="button"]')!;
+      const box = control.getBoundingClientRect();
+      const frame = element.getBoundingClientRect();
+      element.scrollTop += box.bottom - frame.bottom + 1;
+    });
+    const edge = (await cancel.boundingBox())!;
+    await page.mouse.click(edge.x + edge.width / 2, edge.y + edge.height - 2);
+    await expect(dialog).not.toBeVisible();
+    await expect(page.getByLabel('Add PDF files')).toBeFocused();
+  }
+  expect(errors).toEqual([]);
+});
