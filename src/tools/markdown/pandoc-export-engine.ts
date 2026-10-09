@@ -1,4 +1,4 @@
-import YAML from 'yaml';
+import YAML, { type ScalarTag } from 'yaml';
 import type { CitationEntry, CitationLibrary } from './markdown-types';
 import { extractPandocCitationKeys } from './pandoc-citation-source';
 import { parseFrontmatter } from './frontmatter-engine';
@@ -29,8 +29,27 @@ export interface PandocExport {
   readonly unsupportedCitationSyntax: boolean;
 }
 
-const referencesBlock = (entries: readonly CitationEntry[]): string =>
-  YAML.stringify({ references: entries }, { lineWidth: 0 }).trimEnd();
+const nativeIdTag: ScalarTag = {
+  tag: 'tag:yaml.org,2002:str',
+  format: 'PANDOC_CITATION_ID',
+  default: true,
+  identify: value => typeof value === 'string',
+  resolve: value => value,
+  stringify: item => JSON.stringify(item.value as string).replace(/[\u0085\u2028\u2029]/g,
+    character => `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`),
+};
+
+const referencesBlock = (entries: readonly CitationEntry[]): string => {
+  const references = entries.map(entry => {
+    if (!/[\u0085\u2028\u2029]/u.test(entry.id)) return entry;
+    // Escape these IDs inside quotes before the native YAML reader can fold
+    // them or treat their characters as physical metadata line boundaries.
+    const id = new YAML.Scalar(entry.id);
+    id.format = nativeIdTag.format;
+    return { ...entry, id };
+  });
+  return YAML.stringify({ references }, { lineWidth: 0, customTags: [nativeIdTag] }).trimEnd();
+};
 
 const YAML_BLOCK = /^(---[ \t]*\r?\n)([\s\S]*?)(\r?\n---[ \t]*(?:\r?\n|$))/;
 

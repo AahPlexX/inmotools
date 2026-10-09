@@ -1,4 +1,4 @@
-import { isEscaped, mapCitationProse } from './citation-source';
+import { hasNativeCitationSpace, isEscaped, mapCitationProse } from './citation-source';
 import type { ParsedDocument } from './markdown-types';
 
 export interface CitationItem {
@@ -47,6 +47,7 @@ function keysIn(raw: string, offset: number, context: ProseContext): KeyMatch[] 
   };
   const keys: KeyMatch[] = [];
   for (const match of raw.matchAll(keyPattern)) {
+    if (match[2] !== undefined && hasNativeCitationSpace(match[2])) continue;
     const at = match.index + match[1].length;
     if (isEscaped(raw, at)) continue;
     // Suppression starts before the hyphen. A blocked or escaped hyphen
