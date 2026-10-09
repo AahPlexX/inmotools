@@ -34,34 +34,54 @@ const range = `${number}(?:\\s*[-–]\\s*${number})?`;
 const locatorValue = `${range}(?:\\s*,\\s*${range})*`;
 const locatorPattern = new RegExp(`^\\s*,?\\s*(?:(${locatorTerms.map(([, pattern]) => pattern).join('|')})\\s+)?(${locatorValue})(?=$|[\\s,.])`, 'i');
 
-function keysIn(raw: string): RegExpExecArray[] {
-  return [...raw.matchAll(keyPattern)].filter(match => !isEscaped(raw, match.index + match[1].length));
+type ProseContext = { start: number; emphasisEnds: ReadonlySet<number> };
+type KeyMatch = { index: number; end: number; id: string; suppressed: boolean };
+
+function keysIn(raw: string, offset: number, context: ProseContext): KeyMatch[] {
+  const blocked = (index: number) => {
+    const last = raw.charCodeAt(index - 1);
+    const preceding = raw.slice(Math.max(0, index - (last >= 0xdc00 && last <= 0xdfff ? 2 : 1)), index);
+    return /[\p{L}\p{N}]/u.test(preceding)
+      || (preceding === '.' && !isEscaped(raw, index - 1))
+      || context.emphasisEnds.has(context.start + offset + index);
+  };
+  const keys: KeyMatch[] = [];
+  for (const match of raw.matchAll(keyPattern)) {
+    const at = match.index + match[1].length;
+    if (isEscaped(raw, at)) continue;
+    // Suppression starts before the hyphen. A blocked or escaped hyphen
+    // remains authored prefix text; the following @ can still be eligible.
+    const suppressed = Boolean(match[1]) && !isEscaped(raw, match.index) && !blocked(match.index);
+    const index = suppressed ? match.index : at;
+    if (blocked(index)) continue;
+    keys.push({ index, end: match.index + match[0].length, id: match[2] ?? match[3], suppressed });
+  }
+  return keys;
 }
 
-function splitItems(raw: string): string[] {
-  const parts: string[] = []; let start = 0; let depth = 0;
+function splitItems(raw: string): { raw: string; offset: number }[] {
+  const parts: { raw: string; offset: number }[] = []; let start = 0; let depth = 0;
   for (let i = 0; i < raw.length; i++) {
     if (isEscaped(raw, i)) continue;
     if (raw[i] === '{') depth++;
     else if (raw[i] === '}') depth--;
-    else if (raw[i] === ';' && depth === 0) { parts.push(raw.slice(start, i)); start = i + 1; }
+    else if (raw[i] === ';' && depth === 0) { parts.push({ raw: raw.slice(start, i), offset: start }); start = i + 1; }
   }
-  parts.push(raw.slice(start));
+  parts.push({ raw: raw.slice(start), offset: start });
   return parts;
 }
 
-function parseItem(raw: string): CitationItem | null {
-  const matches = keysIn(raw);
+function parseItem(raw: string, matches: KeyMatch[]): CitationItem | null {
   if (matches.length !== 1) return null;
   const match = matches[0];
   const prefix = raw.slice(0, match.index).trim();
-  let suffix = raw.slice(match.index + match[0].length);
+  let suffix = raw.slice(match.end);
   // Complex Markdown and forced/ambiguous locators remain authored rather
   // than being partially interpreted and losing information.
   if (/[\\`*_{}[\]<>~^$|@]/.test(prefix + suffix)) return null;
-  const item: CitationItem = { id: match[2] ?? match[3] };
+  const item: CitationItem = { id: match.id };
   if (prefix) item.prefix = prefix + ' ';
-  if (match[1]) item['suppress-author'] = true;
+  if (match.suppressed) item['suppress-author'] = true;
   const locator = locatorPattern.exec(suffix);
   if (locator) {
     item.locator = locator[2];
@@ -74,31 +94,39 @@ function parseItem(raw: string): CitationItem | null {
   return item;
 }
 
-export function markersInProse(segment: string): CitationMarker[] {
-  const markers: CitationMarker[] = [];
+function locatedMarkers(segment: string, context: ProseContext): { offset: number; marker: CitationMarker }[] {
+  const markers: { offset: number; marker: CitationMarker }[] = [];
   for (const match of segment.matchAll(markerPattern)) {
     if (isEscaped(segment, match.index)) continue;
-    const keys = keysIn(match[0]).map(key => key[2] ?? key[3]);
-    if (!keys.length) continue;
-    const items = splitItems(match[0].slice(1, -1)).map(parseItem);
-    markers.push({ raw: match[0], keys, items: items.every(item => item !== null) ? items : null });
+    const parts = splitItems(match[0].slice(1, -1)).map(part => ({
+      ...part, keys: keysIn(part.raw, match.index + 1 + part.offset, context),
+    }));
+    // A failed item invalidates the bracketed cluster. Later bare author
+    // markers in that source remain outside the preview's supported grammar.
+    if (parts.some(part => part.keys.length === 0)) continue;
+    const keys = parts.flatMap(part => part.keys.map(key => key.id));
+    const items = parts.map(part => parseItem(part.raw, part.keys));
+    markers.push({ offset: match.index, marker: { raw: match[0], keys, items: items.every(item => item !== null) ? items : null } });
   }
   return markers;
 }
 
+export function markersInProse(segment: string): CitationMarker[] {
+  return locatedMarkers(segment, { start: 0, emphasisEnds: new Set() }).map(({ marker }) => marker);
+}
+
 export function extractCitationMarkers(source: string, parsed?: ParsedDocument): CitationMarker[] {
   const markers: CitationMarker[] = [];
-  mapCitationProse(source, segment => { markers.push(...markersInProse(segment)); return segment; }, parsed);
+  mapCitationProse(source, (segment, range) => { markers.push(...locatedMarkers(segment, range).map(({ marker }) => marker)); return segment; }, parsed);
   return markers;
 }
 
 export function replaceCitationMarkers(source: string, render: (marker: CitationMarker) => string): string {
-  return mapCitationProse(source, segment => {
-    const markers = markersInProse(segment);
-    let index = 0;
+  return mapCitationProse(source, (segment, range) => {
+    const markers = new Map(locatedMarkers(segment, range).map(({ offset, marker }) => [offset, marker]));
     return segment.replace(markerPattern, (raw: string, offset: number) => {
-      if (isEscaped(segment, offset) || !keysIn(raw).length) return raw;
-      return render(markers[index++]);
+      const marker = markers.get(offset);
+      return marker ? render(marker) : raw;
     });
   });
 }
