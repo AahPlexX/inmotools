@@ -16,6 +16,8 @@ Continue the frozen ordered tool audit at PDF-R02; implement supported local pas
 
 ## Resume here
 
+2026-10-09 22:45 UTC: main `5b41f31cd295245b35f93deb1b07e1dc4455266f` contains the native-engine/portable research records; source1419321 runtime/tests remain unchanged. Full37998863480 is still active; no completed full result yet. Next frozen PDF-R04 task is queued as c061, including the reproduced malformed optional-name-tree/opaque production error; it must wait for R02/R03 acceptance.
+
 2026-10-09 22:41 UTC checkpoint: Additional immutable-source coverage completed at 22:40 UTC: Firefox passed all 16 cases across desktop and compact viewport; WebKit passed all 16 cases across desktop and mobile emulation in 93.2s. All application cases have zero retries/skips/failures. The first 32-case invocation records 16 Firefox passes plus 16 WebKit host-preflight launch failures; do not count those as application failures or as a 32/32 pass. Corrected WebKit evidence is separate. Runtime/tests remain identical to frozen 1419321; only records have advanced to main de3845647bbd9fd3c2c6ceb7edcf9863eadabade. Full 37998863480 remains active.
 
 2026-10-09 22:32 UTC: PDF-R02 and PDF-R03 remain partial; task 7f9e is active. Corrected immutable source `1419321cff565cf19b5520ec9784b5230b54e38f` was published through GitHub MCP. Owned integration [37998860272](https://github.com/AahPlexX/inmotools/actions/runs/37998860272), job 114051717153, completed successfully: 4119 unit tests passed, 18 skipped; build passed in 7.84s; all 48 PDF browser cases passed in 2.0m with no failures, skips or retries. Main `5063dcd885313f954e1d543a0f622d7bdaa10c6a` contains the correction, and the entire PDF runtime/test/fixture scope compares equal to the frozen source.
