@@ -13,41 +13,11 @@ updated: 2026-10-09
 
 ## Resume here
 
-2026-10-09 22:06 UTC: PDF-R02/R03 remain partial, task7f9e active. Final candidate local14/14production cases passed1.5m, desktop/touch, zero retries/skips, on immutable pdf-r02-frozen-dist afterHTTP200 readiness. Covers exact password/retry/error semantics, native first/last Tab/axe, three typed/cancelled same-file cycles and focus return per profile, navigation/pending worker termination/reopen, read-only/source switching/View/reset/search/page/zoom, empty-user modification refusal, mixed malformed/protected/readable actual3page download, full selected filename and four viewport bounds.42PDFunits passed2.98s for unchanged reader/writer logic; final TypeScript and clean build passed15.64s. Previous32legacycases passed in their scopes; no claim they ran on the final focus/accessibility source yet. Freeze and publish current runtime/tests, then one fresh exact-source full and owned integration, main/Pages/qualified-live14 receipts. Do not modify this source or duplicate unchanged gates while its required full runs. Protected inputs never enter editable output; no ignoreEncryption/decrypted export, dependencies/workflows/auth/backend/newstorage. Earlier failures and current primary sources retained in VERIFICATION.md. After final acceptance verifyR02/R03 and advance frozenR04; separate Markdown/Crystal causes remain unresolved.
+2026-10-09 22:21 UTC: PDF-R02 and PDF-R03 remain partial; task 7f9e is active. Main `43eef1b1497e5744944bcfe0f8893fb472bff754` includes initial password-opening source `7fe9ac49606237e0b41b9de76acba4beb32eaa23`. Its dark dialog used undefined `--text` against dark `--surface`: the new measured-contrast regression fails in both profiles at 1.13257:1. The standalone axe scan returned no violations despite that visible defect; do not treat axe alone as contrast proof.
 
-Previous final-candidate checkpoint (history):
+The narrow correction uses the existing `--ink` and `--line` tokens. Types and clean production build passed. After confirmed preview HTTP 200, the strengthened theme regression passed 2/2 in 41.8s, without retries or skips: desktop and touch each exercise Light, Dark and System, require at least 4.5:1 for dialog heading/filename/labels, run unrestricted dialog and owned read-only-control axe, open/render and clear. Earlier 14/14 password-flow cases and 42 PDF unit cases remain accepted only in their stated prior-source scopes. Existing 32 legacy browser cases retain their original receipts.
 
-2026-10-09 22:00 UTC: PDF-R02 partial, focus-repaired14/14production cases passed1.8m, no retries/skips. Three typed/cancelled same-file cycles per profile retain focus; navigation destroys pending workers and reopening succeeds. Native first/last Tab and unrestricted modal axe pass; protected reading/search/page/zoom, AES128/AES256/empty-user/exact-space/Unicode and mixed malformed-file actual download boundaries pass. Visual320portrait/844landscape measured0overlap/0pageoverflow/0pageerrors; full protected filename wraps. Native select visually clips its selected long value, so a full selected-source helper is added, with exact-text viewport regression; View read-only button/reset cycle strengthened. Fresh final helper types/build and targeted source/view acceptance pending; no release/full/main/live claim.42units and prior32legacyPDFcases remain accepted in their stated scopes. Next freeze/publish final candidate after these checks; one required fresh full gate.
-
-Previous repair checkpoint (history):
-
-2026-10-09 21:55 UTC: PDF-R02 partial. Keyboard-repaired production13passed/1failed1.3m: desktop cancellation did not focus Add PDF files. Keyboard wrapping and unrestricted modal axe pass; same cancellation case mobile passed, no underlying cause attribution beyond observed focus behavior. Removed timed requestAnimationFrame focus callback; return now checks committed picker enabled state and native dialog closure, invoked from close event and state effect. React useEffect primaryHTTP200 refreshed today; W3C APG focus-return requirement retained. No test assertion/timeout/retry weakened. Fresh focus-repaired types/build, all14password cases and explicit repeated cancellation are required before candidate release; no full/main/live acceptance yet.
-
-Previous focus checkpoint (history):
-
-2026-10-09 21:51 UTC: PDF-R02 partial. Repaired TypeScript and clean production build passed (26.75s) after owned first/last Tab wrapping; fresh14password cases running on immutable pdf-r02-keyboard-dist afterHTTP200 readiness. Prior finalexplicit partition34passed/2matchingkeyboardfailures3.9m; queue/exportpartition10passed38.4s, no other failures. No test assertions/timeouts/retries weakened. Direct native focus probe shows first Shift+Tab changes activeElement toBODY/document.hasFocusfalse; W3C APG says first/last tabbable elements wrap. Modal axe checks did not run in the failed cases before this repair.42PDFunits remain accepted for unchanged loading/writing logic. Current source not released; next inspect repaired actual password results and visual geometry, freeze/publish, then exact owned/full/main/Pages/live gates.
-
-Previous keyboard checkpoint (history):
-
-2026-10-09 21:49 UTC: PDF-R02 partial; strengthened final browser run exposed a native reverse-Tab boundary failure before axe analysis. Direct focus probe and W3C modal-dialog APG refreshedHTTP200 today corroborate first/last tabbable wrapping. Added owned first/last Tab handling; no test assertion/timeout weakened. Existing final10queue/exportcases and42units/types/build remain prior-source receipts. Fresh repaired TypeScript/build and password keyboard/axe/long-name acceptance required; all final partition results will be read separately. No candidate release/full claim.
-
-Previous acceptance checkpoint (history):
-
-2026-10-09 21:45 UTC: PDF-R02 partial. Final TypeScript/build passed after two wording improvements; first production14/14passed1.2m. Final queue/export partition10/10passed38.4s. A filename regex selected only pdf.spec.ts; remaining pdf-.*.spec.ts files run separately on the same immutable pdf-r02-final-dist, including stronger keyboard/axe/opened-long-name coverage. No case is intentionally omitted or counted twice. Broad42/42PDFunits passed2.98s. New/full/main/live final-source receipts remain pending. Next: inspect remaining production results, then freeze/publish candidate and one fresh required full gate.
-
-Previous production checkpoint (history):
-
-2026-10-09 21:41 UTC: PDF-R02 partial; 42/42 PDF units passed2.98s, corrected TypeScript and clean production build passed. New production14case desktop/touch password/view/search/download/cancellation/responsiveness acceptance is running on immutable pdf-r02-first-dist at4227 afterHTTP200 readiness. Corrected unchanged-runtime baseline4/4failed; initial JSON-loader failure and implicit-any typing error preserved separately and corrected. No new full/main/live implementation receipt yet. Next: inspect actual production results, fix confirmed failures, run existing PDF regressions, freeze candidate and publish through GitHub MCP with one fresh required full gate.
-
-Previous implementation checkpoint (history):
-
-2026-10-09 21:39 UTC: PDF-R02 implementation draft is present: cancellable reader loading, native password retry dialog, separate owned protected sessions, per-file readable-peer preservation and cleanup. Corrected production baseline4/4 failed on unchanged PDF runtime in immutable R96 artifact (source81fc788, PDF identical to mainf33c004), missing password UI; original JSON-import run failed before tests and is setup evidence only. Focused13/13 lifecycle/refusal/renderer units passed1.68s. First TypeScript found untyped callback parameters; corrected explicit signatures are being checked. New production acceptance and broader units/build are pending; R02 remains partial, R03 retains modification refusal. No release or full-validation claim.
-
-Previous specification checkpoint (history):
-
-2026-10-09 21:31 UTC: ordered audit continues at PDF-R02, task7f9e active on fix/pdf-sanitizer, base mainf33c0047bab18f97585f479981b6a23977039bdd. Password-opening/mixed-intake/cancellation contract specified before code; PDF-R02 remains missing. Current intake rejects protected inputs and loses newly selected readable peers from the same batch; existing queue remains. PDF-R03 modification refusal is retained. Official pinned PDF.js API/tests, pdf-lib README and WHATWG dialog fetchedHTTP200 at21:28 UTC; owned real-worker and encrypted fixture preparation is recorded in VERIFICATION.md and ordered parent. No PDF runtime change or acceptance yet. Next: meaningful failing regressions, cancellable loading/password dialog, separate protected read-only viewing, per-file intake; then units/types/build/production/owned/single required full/main/Pages/live receipts. Do not follow the previous default R31 cursor before the frozen inventory's earlier R02–R30 items. Separate Markdown and Crystal unresolved observations retain their own tasks.
-
-Previous default (history; superseded by frozen ordered audit): 167 requirements: 33 verified, 2 implemented, 20 partial, 112 missing. Next action: PDF-R31 (fit modes), PDF-R68 (fill existing fields), then the editing layer (PDF-R38–PDF-R49). No blocker.
+Old owned run `37997434143` and full run `37997433850` on `7fe9ac4` completed cancelled and are superseded. Cancellation happened after main contained the first runtime; that source was not kept off main. Publish the corrected immutable candidate through GitHub MCP, then run one replacement full gate. Do not reuse cancelled full validation or change runtime/tests during the replacement gate. Corrected main, Pages, qualified-live 16-case and completed full receipts are still pending. Complete those before verifying R02/R03 or implementing the next frozen item, PDF-R04. Current primary sources and distinct failed setup/baseline/repair attempts remain in VERIFICATION.md; no new auth, backend, dependency, workflow or password persistence.
 
 ## Documents
 
@@ -65,7 +35,7 @@ Previous default (history; superseded by frozen ordered audit): 167 requirements
 | ID | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | PDF-R01 | verified | e2e "merges multiple source PDFs in the visible queue order" |  |
-| PDF-R02 | partial | unit "does not create a loading task after the caller already cancelled"; e2e "PDF-R02 opens AES256 with password retry and actual reader text, search, pages and zoom" | Implemented candidate;42units/types/build/final14production pass. Owned/full/main/Pages/live pending. |
+| PDF-R02 | partial | unit "does not create a loading task after the caller already cancelled"; e2e "PDF-R02 opens AES256 with password retry and actual reader text, search, pages and zoom" | Initial runtime on main43eef1b; dark correction is ready. Prior42units/14flow cases and corrected2theme cases pass in stated scopes. Corrected owned/full/main/Pages/live acceptance pending. |
 | PDF-R03 | partial | e2e "PDF-R03 keeps empty-user protected documents read-only and produces no protected download" | Existing engine refusal preserved;3realfixture unit cases/newappcase pass. Final exact-source full/main/live gate pending withR02. |
 | PDF-R04 | partial | unit "reports final page geometry for workstation page-box tooling" | Page count, size, form fields, Info metadata, page geometry and attachments are shown; encryption detail, active content and structural warnings are not |
 | PDF-R05 | missing | — |  |
@@ -230,11 +200,11 @@ Previous default (history; superseded by frozen ordered audit): 167 requirements
 | PDF-R164 | partial | e2e "inventories, extracts, and authors embedded file attachments without silently carrying source files forward" | Queue items list form-field, attachment and metadata counts; other badges are missing |
 | PDF-R165 | missing | — |  |
 | PDF-R166 | verified | `tests/e2e/accessibility.spec.ts` "has no serious or critical axe violations at <route>" (route `pdf-sanitizer`) |  |
-| PDF-R167 | partial | — | Panels use the site classes; the viewer frame has a fixed light background (`PdfCanvas.tsx`); no dark contrast test |
+| PDF-R167 | partial | — | Password dialog and read-only controls have Light/Dark/System contrast/accessibility coverage; whole-tool theme acceptance is incomplete, and the viewer frame remains fixed light (`PdfCanvas.tsx`) |
 
 ## Open work
 
-1. PDF-R31, PDF-R33, PDF-R05: viewer fit modes, pan and thumbnails.
+1. Finish corrected-source PDF-R02/R03 acceptance, then PDF-R04 in frozen inventory order. PDF-R31, PDF-R33 and PDF-R05 remain later viewer work.
 2. PDF-R68, PDF-R78, PDF-R79: fill existing fields and form-data interchange.
 3. PDF-R07, PDF-R08, PDF-R145: multi-output splitting with ZIP.
 4. PDF-R38–PDF-R49: editing layer.
@@ -245,7 +215,7 @@ Previous default (history; superseded by frozen ordered audit): 167 requirements
 
 ## Known limitations
 
-- Encrypted PDFs are refused.
+- Protected PDFs can be opened for local read-only viewing; protected inputs remain excluded from editable processing and downloads. Final corrected-source acceptance is pending.
 - Source form fields must be flattened before page copying; editable source fields are not carried into the output.
 - Page-level annotations (and any actions they carry) are kept in the rebuilt output.
 
