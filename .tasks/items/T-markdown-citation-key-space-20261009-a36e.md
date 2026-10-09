@@ -3,7 +3,7 @@ task: T-markdown-citation-key-space-20261009-a36e
 tool: markdown-workbench
 doc: task
 kind: fix
-state: next
+state: active
 branch: fix/markdown-workbench
 created: 2026-10-09
 updated: 2026-10-09
@@ -16,6 +16,10 @@ updated: 2026-10-09
 Repair confirmed false citations for braced keys containing native spaces and missing Pandoc references for valid non-space Unicode keys. Preserve original source, valid ordinary/braced citations, native exclusions and current R93–R95 behavior. Add a useful plain-language key-syntax hint. This follows the separately validated R95 word/suppression repair.
 
 ## Resume here
+
+2026-10-09 15:20 UTC: MDW-R95 verified; taskc4d2 done. Required full [37942247199](https://github.com/AahPlexX/inmotools/actions/runs/37942247199), validate job113859327303, succeeded on immutable runtime/test source68757745fd98ff46ea12ebd8b251e97fb6867285:4080 unit passes/17 optional skips and1805 browser passes/171 skips (54.0m), zero browser retries. Summary emitted15:06:49 UTC; completed receipt observed15:10:06 UTC. Owned336, main15bdec65, Pages37943298127 and qualified live6/6 remain accepted. R15 and Photo white-balance passed both profiles without retry; this is non-reproduction, not an established cause or fix. Current record main8ffe37a was fetched successfully and merged into this checkout after complete-tree equality; the earlier CLI authentication failure is no longer blocking. MDW-R96 remains missing and taska36e is now active, specified before implementation. Next: failing native-space regressions, preview/export predicate repair, key hint and its own fresh immutable-source full gate; R95 receipts cannot validate future R96 code. Frozen next tool PDF-R02 follows associated Markdown repairs. Tasks17bf/6b82 retain their separate unresolved causes; no routing repair or PDF implementation. See VERIFICATION.md and each task for reproducible evidence.
+
+Previous claim (history):
 
 2026-10-09 15:02 UTC: next, MDW-R96 missing and specified before code. R95's single full37942247199 on6875774 is still running; finish its receipt before this sequential implementation. Current remote record main04bdb101 and local523c57 have identical21 root entries through GitHub MCP tree verification; Git command-line fetch authentication is unavailable, but MCP publication works. Actual live runtime6875774 confirms the separate braced-key bug. No R96 code or acceptance yet. Next: source-aware failing regressions, native predicate repair in preview and export-only extraction, source/key hint, local/owned/fresh-full/main/live gates. Future parser changes require their own immutable-source full; do not attribute R95's pending full to this repair. Frozen next tool PDF-R02 after associated Markdown repairs.
 
@@ -36,3 +40,5 @@ Shared meaningful unit/browser regressions outside the tool folder are necessary
 ## Log
 
 - 2026-10-09: recorded confirmed live UI and actual rendered/Pandoc download differences, plus26released-reader cases and primary space predicate. No runtime change or complete claim.
+
+- 2026-10-09 15:20 UTC: task:start resumed the existing worktree and CLI fetch succeeded. Activated after R95 full success/closure, before R96 runtime changes. Shared meaningful regression/full-gate reason remains recorded under Acceptance and scope.
