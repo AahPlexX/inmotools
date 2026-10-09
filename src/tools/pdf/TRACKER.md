@@ -6,14 +6,16 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-pdf-sanitizer-design.md
 tracker: src/tools/pdf/TRACKER.md
-updated: 2026-10-05
+updated: 2026-10-09
 ---
 
 # PDF Sanitizer — tracker
 
 ## Resume here
 
-167 requirements: 33 verified, 2 implemented, 20 partial, 112 missing. Next action: PDF-R31 (fit modes), PDF-R68 (fill existing fields), then the editing layer (PDF-R38–PDF-R49). No blocker.
+2026-10-09 21:31 UTC: ordered audit continues at PDF-R02, task7f9e active on fix/pdf-sanitizer, base mainf33c0047bab18f97585f479981b6a23977039bdd. Password-opening/mixed-intake/cancellation contract specified before code; PDF-R02 remains missing. Current intake rejects protected inputs and loses newly selected readable peers from the same batch; existing queue remains. PDF-R03 modification refusal is retained. Official pinned PDF.js API/tests, pdf-lib README and WHATWG dialog fetchedHTTP200 at21:28 UTC; owned real-worker and encrypted fixture preparation is recorded in VERIFICATION.md and ordered parent. No PDF runtime change or acceptance yet. Next: meaningful failing regressions, cancellable loading/password dialog, separate protected read-only viewing, per-file intake; then units/types/build/production/owned/single required full/main/Pages/live receipts. Do not follow the previous default R31 cursor before the frozen inventory's earlier R02–R30 items. Separate Markdown and Crystal unresolved observations retain their own tasks.
+
+Previous default (history; superseded by frozen ordered audit): 167 requirements: 33 verified, 2 implemented, 20 partial, 112 missing. Next action: PDF-R31 (fit modes), PDF-R68 (fill existing fields), then the editing layer (PDF-R38–PDF-R49). No blocker.
 
 ## Documents
 

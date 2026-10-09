@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-pdf-sanitizer-design.md
 tracker: src/tools/pdf/TRACKER.md
-updated: 2026-10-05
+updated: 2026-10-09
 ---
 
 # PDF Sanitizer — spec
@@ -42,6 +42,12 @@ Out of scope:
 - Workers: the PDF.js worker (`pdfjs-dist/build/pdf.worker.min.mjs`, configured in `pdfjs-browser.ts`) parses and renders pages off the main thread.
 - Browser APIs: Canvas 2D (`getContext('2d')`) displays rendered pages at the device pixel ratio; the File API reads the PDF and attachments; Blob downloads save the exported PDF and summary.
 
+### Password opening contract (specified 2026-10-09)
+
+PDF-R02 uses the pinned PDF.js loading task and password callback. Protected documents belong to a separate read-only viewer list with actual reader page counts; they never masquerade as inspected editable inputs or enter pdf-lib export. PDF-R03 remains enforced, including protected PDFs with an empty user password. Each selected file is handled independently: readable peers and the existing queue survive another file's error or cancelled password request. A failed password keeps the prompt available for retry; input is passed exactly, never trimmed or independently normalized. Password text is transient and cleared after submission/closure, never persisted or logged. The native modal dialog has a labelled password field, show/hide control, submission, Cancel, Escape and focus restoration; long names and controls reflow in narrow portrait/landscape.
+
+Opening tasks must be cancellable before their document promise resolves. Removing/clearing sources or leaving the tool aborts pending loading and destroys owned reader sessions; a later open remains usable. Read-only session ownership is explicit between intake and canvas, so switching previews does not accidentally destroy an owned protected document or demand a second password. Errors are reported per file without discarding successful peers. Password support means only what the pinned reader accepts; no universal Unicode/password/encryption interoperability or decrypted export claim. Owned AES256/AES128, empty-user restriction, space/Unicode and malformed specimens verify the cycle. External meaningful unit/browser fixtures and tests are required; their shared-file scope requires one fresh full regression gate on the frozen implementation source.
+
 ## Requirements
 
 ### Intake, diagnostics and page operations
@@ -49,7 +55,7 @@ Out of scope:
 | ID | Requirement | Acceptance test |
 | --- | --- | --- |
 | PDF-R01 | Open one or more local PDFs with the native file input; new selections append to the queue (formerly 1) | Choose two PDFs, then a third; all three are queued |
-| PDF-R02 | Password prompt that opens supported encrypted PDFs when the user supplies the password (formerly 2) | Open an encrypted PDF; a password prompt appears and the correct password opens it |
+| PDF-R02 | Cancellable password prompt opens supported encrypted PDFs read-only, preserving readable peers from mixed selections (formerly 2) | Wrong then correct password opens a protected PDF with selectable text, search, page navigation and zoom; Cancel/Escape keeps readable peers; exact password spaces are preserved; protected inputs never enter editable output; portrait/landscape dialog controls fit |
 | PDF-R03 | An encrypted PDF is refused with a message instead of being modified | Process an encrypted PDF; the message says it cannot be modified and no file downloads |
 | PDF-R04 | Document diagnostics summary: pages, dimensions, size, forms, metadata, attachments, encryption, active-content indicators and structural warnings (formerly 3) | Queue a PDF; the item lists each diagnostic |
 | PDF-R05 | Lazy thumbnail page rail (formerly 4) | Open a 20-page PDF; thumbnails render as the rail scrolls |
