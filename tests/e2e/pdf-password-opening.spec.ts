@@ -225,3 +225,43 @@ test('PDF-R02 password controls and long file names fit portrait, landscape, tab
   }
   await page.getByRole('button', { name: /Remove read-only long-protected-name/, exact: false }).click();
 });
+
+test('PDF-R02 password and read-only controls remain accessible in dark, light and system themes', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
+  for (const theme of ['Dark', 'Light', 'System']) {
+    if (theme === 'System') await page.emulateMedia({ colorScheme: 'dark' });
+    await page.getByRole('radio', { name: theme, exact: true }).check();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme === 'Light' ? 'light' : 'dark');
+    await page.getByLabel('Add PDF files').setInputFiles(specimen('owned-aes256.pdf'));
+    await expect(page.getByRole('dialog', { name: 'Open protected PDF' })).toBeVisible();
+    const textContrasts = await page.locator('.pdf-password-dialog').evaluate((dialog) => {
+      const luminance = (color: string) => {
+        const channels = color.match(/[\d.]+/g)!.slice(0, 3).map(Number).map((value) => {
+          const channel = value / 255;
+          return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+        });
+        return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+      };
+      const background = luminance(getComputedStyle(dialog).backgroundColor);
+      return [...dialog.querySelectorAll('h2, .pdf-password-file, label')].map((element) => {
+        const foreground = luminance(getComputedStyle(element).color);
+        return { text: element.textContent, ratio: (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05) };
+      });
+    });
+    expect(textContrasts.length).toBeGreaterThanOrEqual(4);
+    for (const result of textContrasts) expect(result.ratio, `${theme}: ${result.text}`).toBeGreaterThanOrEqual(4.5);
+    const dialogAccessibility = await new AxeBuilder({ page }).include('.pdf-password-dialog').analyze();
+    expect(dialogAccessibility.violations).toEqual([]);
+    await unlock(page, 'fixture-user');
+    await rendered(page);
+    const controlsAccessibility = await new AxeBuilder({ page })
+      .include('[data-testid="pdf-protected-item"]')
+      .include('#pdf-viewer-source')
+      .include('#pdf-viewer-source-name')
+      .include('label[for="pdf-viewer-source"]')
+      .analyze();
+    expect(controlsAccessibility.violations).toEqual([]);
+    await page.getByRole('button', { name: 'Clear queue', exact: true }).click();
+  }
+  expect(errors).toEqual([]);
+});
