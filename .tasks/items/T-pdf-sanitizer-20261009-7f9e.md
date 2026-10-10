@@ -16,7 +16,7 @@ Continue the frozen ordered tool audit at PDF-R02; implement supported local pas
 
 ## Resume here
 
-2026-10-10 23:33 UTC: inventory cursor remains PDF-R02/R03;7f9e active and R04c061 next. Failed full38090462219 remains the required gate. Existing [Crystal d7a8](T-crystal-substitution-retry-20261009-d7a8.md) is now active as a narrow gate dependency repair in its own fix/crystal-lattice-studio worktree/claim3dacf00, with spec and canonical [Crystal verification](../../src/tools/crystal/VERIFICATION.md) updated before code. This does not advance the frozen inventory to Crystal or mark PDF items complete. PDF runtime/accepted scope remains unchanged; no unchanged full redispatch. Next complete actual Crystal repair acceptance and one changed-source full gate, then resume PDF acceptance/R04.
+2026-10-10 23:39 UTC: frozen cursorPDF-R02/R03;7f9e active/R04c061 next. Narrow [Crystal d7a8](T-crystal-substitution-retry-20261009-d7a8.md) dependency repair has actual16/16 Chromium/Firefox/WebKit scope passes, no retries/skips, retained original defect assertion/timeout and new red2/2baseline→green route preference regression. Types/build pass. [Crystal verification](../../src/tools/crystal/VERIFICATION.md) carries actual input hashes/recipes/current authoritative receipts. Frozen repair publication, owned integration, one changed-source full and main/Pages/live are next. Prior full38090462219 remains failed; accepted unchanged PDF scopes are reused only within their bounds. No inventory advance or full-release acceptance.
 
 ### Historical checkpoint — before dependency activation
 
@@ -62,3 +62,5 @@ Current mainb6c1ab0 contains records only beyond integrated candidate; all non-M
 - 2026-10-10 23:15 UTC: bounded external original-case comparison5passed/1failed54.964s, default smooth2/3 and root-auto prototype3/3. Matching local failure captured pointerdown/up/click on DIV with correct selected site/Fe input; local trace records24px button and root10067→10079 at dispatch→10328after. Observed local missed activation is preserved; no same-cause runner claim, application repair, repository-test change or scope acceptance. Portable reproduction/details in PDF VERIFICATION.md.
 
 - 2026-10-10 23:33 UTC: activated existing Crystal d7a8 as a narrow dependency repair for the failed PDF gate, preserving the frozen inventory cursor and existing PDF evidence. Separate tool branch/worktree; contract specified before code, no unrelated Crystal feature pass.
+
+- 2026-10-10 23:39 UTC: scoped Crystal dependency repair16/16actual production checks passed; required changed-source release/full gates pending, PDF acceptance remains open.

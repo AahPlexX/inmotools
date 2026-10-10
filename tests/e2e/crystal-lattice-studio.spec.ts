@@ -414,6 +414,43 @@ test('builds vacancy, substitution and interstitial defects with undo', async ({
   await expect(page.getByTestId('crystal-site-count')).toContainText('8 sites');
 });
 
+test('CLS-R030 keeps automatic reveals local and restores route preferences', async ({ page }) => {
+  await page.goto('./#/');
+  const scrollState = () => page.evaluate(() => ({
+    value: document.documentElement.style.getPropertyValue('scroll-behavior'),
+    priority: document.documentElement.style.getPropertyPriority('scroll-behavior'),
+    computed: getComputedStyle(document.documentElement).scrollBehavior,
+  }));
+  const initial = await scrollState();
+  for (const mode of ['default', 'important', 'reduced'] as const) {
+    await page.emulateMedia({ reducedMotion: mode === 'reduced' ? 'reduce' : 'no-preference' });
+    await page.evaluate((important) => {
+      if (important) document.documentElement.style.setProperty('scroll-behavior', 'smooth', 'important');
+      else document.documentElement.style.removeProperty('scroll-behavior');
+    }, mode === 'important');
+    const before = await scrollState();
+    await page.evaluate(() => { location.hash = '/tools/crystal-lattice-studio'; });
+    await expect(page.getByTestId('crystal-workspace')).toBeVisible();
+    await expect.poll(scrollState).toEqual({ value: 'auto', priority: '', computed: 'auto' });
+    await page.evaluate(() => { location.hash = '/'; });
+    await expect(page.getByTestId('crystal-workspace')).toHaveCount(0);
+    await expect.poll(scrollState).toEqual(before);
+  }
+  await page.evaluate(() => { location.hash = '/tools/crystal-lattice-studio'; });
+  await expect(page.getByTestId('crystal-workspace')).toBeVisible();
+  await expect.poll(scrollState).toEqual({ value: 'auto', priority: '', computed: 'auto' });
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('scroll-behavior', 'smooth', 'important');
+    location.hash = '/';
+  });
+  await expect(page.getByTestId('crystal-workspace')).toHaveCount(0);
+  await expect.poll(scrollState).toEqual({ value: 'smooth', priority: 'important', computed: 'smooth' });
+  await page.evaluate(({ value, priority }) => {
+    if (value) document.documentElement.style.setProperty('scroll-behavior', value, priority);
+    else document.documentElement.style.removeProperty('scroll-behavior');
+  }, initial);
+});
+
 test('applies a cubic cell constraint to subsequent edits', async ({ page }) => {
   await page.goto('./#/tools/crystal-lattice-studio');
   await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');

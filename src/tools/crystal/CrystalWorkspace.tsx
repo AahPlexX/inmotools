@@ -1,4 +1,4 @@
-import { type ChangeEvent, useCallback, useMemo, useRef, useState } from 'react';
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { consumeFileInput } from '../../lib/file-input';
 import CrystalAdvancedAnalysisPanel from './CrystalAdvancedAnalysisPanel';
 import CrystalDiffractionPanel from './CrystalDiffractionPanel';
@@ -67,6 +67,19 @@ function fromProjectRepresentation(representation: ProjectRepresentation): Cryst
 }
 
 export default function CrystalWorkspace() {
+  useEffect(() => {
+    const style = window.document.documentElement.style;
+    const previous = style.getPropertyValue('scroll-behavior');
+    const priority = style.getPropertyPriority('scroll-behavior');
+    // Automatic reveals must not move controls during pointer activation.
+    style.setProperty('scroll-behavior', 'auto');
+    return () => {
+      if (style.getPropertyValue('scroll-behavior') !== 'auto' || style.getPropertyPriority('scroll-behavior')) return;
+      if (previous) style.setProperty('scroll-behavior', previous, priority);
+      else style.removeProperty('scroll-behavior');
+    };
+  }, []);
+
   const [starter, setStarter] = useState<StarterStructureId>('nacl');
   const [history, setHistory] = useState(() => createCrystalHistory(createStarterStructure('nacl')));
   const [measurements, setMeasurements] = useState<readonly CrystalMeasurement[]>([]);

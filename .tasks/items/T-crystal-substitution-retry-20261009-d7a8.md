@@ -17,9 +17,9 @@ Investigate the newly observed substitution failure during full regression, reta
 
 ## Resume here
 
-2026-10-10 23:33 UTC: active narrow dependency repair for failed required PDF full38090462219. Main baseline46e952c; GitHub MCP claim3dacf00 on fix/crystal-lattice-studio, own worktree. Frozen inventory cursor remains PDF-R02/R03; R04 queued. [Crystal tracker](../../src/tools/crystal/TRACKER.md#resume-here), [verification](../../src/tools/crystal/VERIFICATION.md) and spec carry current contract and portable evidence. No application code changed yet.
+2026-10-10 23:39 UTC: actual scoped effect and route regression pass16/16 focused production cases without retries/skips/flaky/global errors: Chromium8 in91.595s (320portrait,844landscape,1440desktop,390touch), Firefox/WebKit8 in82.640s (desktop/compact or touch). TypeScript exit0; production build exit0 in15.18s. Original defect test body/assertion/default5000ms is byte-identical to a25535a. New route baseline had failed2/2 on unchanged production artifact. Frozen runtime/tests are ready for publication; owned integration, one changed-source full, main/Pages/qualified-live gates are next. No full-release acceptance or inventory advance.
 
-Scoped instant viewport scrolling with conditional prior-value/priority restoration is specified before code. Reuse the already captured unchanged failure/prototype and same-date authoritative CSSWG/React/CSSOM receipts. Next add meaningful route-preference regression, record its unchanged-artifact baseline, implement only the scoped effect, then freeze and validate actual source/one new full/main/Pages/live. Preserve original case/assertion/timeout, selected-site/element/Undo semantics and source ownership. CI trace still unavailable; local missed pointer is established, same runner cause unconfirmed. Shared test changes prove new scope; parent/PDF task updates preserve cross-tool gate state and are the shared-file reason. No unrelated Crystal feature development or inventory advance.
+PDF-R02/R03 remain partial,7f9e active, R04c061 queued. Canonical narrow dependency evidence and portable recipe are in Crystal VERIFICATION.md. Shared test change proves scope; shared parent/PDF task changes preserve gate status. Other Crystal work remains frozen later.
 
 ### Historical checkpoint — before dependency repair
 
@@ -46,3 +46,7 @@ Completed official job logs retrieved2026-10-09 16:28–29UTC. Original assertio
 - 2026-10-10 23:30 UTC: activated existing d7a8 as a narrow dependency repair for failed required PDF gate38090462219. Frozen inventory cursor remains PDF-R02/R03; separate Crystal branch/worktree, no unrelated feature pass. Current root/CSS/React primary sources and exact accepted baseline/prototype scopes reused.
 
 - 2026-10-10 23:33 UTC: scoped CLS-R030 pointer/route-preference contract specified before code, Crystal canonical tracker/evidence current, primary receipts and prior failure/prototype reused. New route regression/baseline are next. Parent/PDF task records are shared cross-tool gate evidence; no application implementation yet.
+
+- 2026-10-10 23:38 UTC: meaningful route baseline2/2failed on unchanged production artifact; scoped effect implemented, original case retained, actual type/build/browser checks pending.
+
+- 2026-10-10 23:39 UTC: actual frozen repair16/16production checks passed, types/build pass; original test unchanged, new preference regression red2/2→green. Freeze/publication and required release/full gates next.
