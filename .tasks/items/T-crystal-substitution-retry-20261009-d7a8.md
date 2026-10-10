@@ -3,7 +3,7 @@ task: T-crystal-substitution-retry-20261009-d7a8
 tool: crystal-lattice-studio
 doc: task
 kind: fix
-state: backlog
+state: active
 branch: fix/crystal-lattice-studio
 created: 2026-10-09
 updated: 2026-10-10
@@ -16,6 +16,12 @@ updated: 2026-10-10
 Investigate the newly observed substitution failure during full regression, retaining the original assertion and timeout. Preserve the frozen tool order. No Crystal code or test changed for this observation.
 
 ## Resume here
+
+2026-10-10 23:30 UTC: active dependency repair for the failed PDF full gate; frozen inventory cursor remains PDF-R02/R03 and R04 remains queued. Own worktree fix/crystal-lattice-studio starts from main46e952c0453cb30963cfca750bd1e73c846ff01b; GitHub MCP claim publication is next. Preserve existing point-defect behavior, original assertion/timeout, selected-site/element semantics and Undo. No unrelated Crystal feature development or inventory advance.
+
+Reuse the recorded unchanged original-case failure/prototype and same-date CSSWG/React/CSSOM primary evidence. Specify the narrow scoped-scroll contract before code, add meaningful route/preference and reduced-motion regression, implement, then validate actual source and one frozen full gate. Earlier local captured pointer miss is established; unavailable CI trace does not establish that runner's event target. The existing PDF runtime stays unchanged. Current task records must accompany each working step; no PR.
+
+### Historical checkpoint — before dependency repair
 
 2026-10-10 23:15 UTC: backlog in the frozen Crystal position; no Crystal application/repository-test changes. PDF's required full [38090462219](https://github.com/AahPlexX/inmotools/actions/runs/38090462219), job114325656434, sourcea25535ad10b41d865b492f294f98fbffa124c29e concludedfailure23:07:10UTC:1830browserpasses/171skips/1failure54.0m. This same mobile substitution case failed both initial and retry: Na1 element expectedFe/receivedNa through5000ms,13resolutions, test408. Cause remains unestablished. Previous Markdown full37953387063 passed with this case flaky on first attempt/retry pass; the new full is failed and must not be described as merely flaky.
 
@@ -36,3 +42,5 @@ Completed official job logs retrieved2026-10-09 16:28–29UTC. Original assertio
 - 2026-10-10 23:12 UTC: new exact-source full38090462219 failed this assertion on both attempts, unlike previous retry-pass history. Downloaded official job log preserves counts/assertion; runner artifact downloadHTTP403. Unchanged isolated mobile case1/1passed11.350s; six-case external pointer comparison pending. No application/repository-test edit, root-cause or repair claim.
 
 - 2026-10-10 23:15 UTC: bounded external original-case comparison5passed/1failed54.964s, default smooth2/3 and root-auto prototype3/3. Matching local failure captured pointerdown/up/click on DIV with correct selected site/Fe input; local trace records24px button and root10067→10079 at dispatch→10328after. Observed local missed activation is preserved; no same-cause runner claim, application repair, repository-test change or scope acceptance. Portable reproduction/details in PDF VERIFICATION.md.
+
+- 2026-10-10 23:30 UTC: activated existing d7a8 as a narrow dependency repair for failed required PDF gate38090462219. Frozen inventory cursor remains PDF-R02/R03; separate Crystal branch/worktree, no unrelated feature pass. Current root/CSS/React primary sources and exact accepted baseline/prototype scopes reused.
