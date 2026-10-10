@@ -13,11 +13,13 @@ updated: 2026-10-10
 
 ## Resume here
 
-2026-10-10 23:03 UTC: PDF-R02/R03 remain partial, task [7f9e](../../../.tasks/items/T-pdf-sanitizer-20261009-7f9e.md) active. Frozen candidate `a25535ad10b41d865b492f294f98fbffa124c29e` is integrated; current main `d667cc01d18442ffc22504a9972add525830e228` adds records only. Fetch comparison confirms all non-Markdown content still matches the candidate. There are no open PRs.
+2026-10-10 23:15 UTC: PDF-R02/R03 remain partial and [task7f9e](../../../.tasks/items/T-pdf-sanitizer-20261009-7f9e.md) active. Frozen source `a25535ad10b41d865b492f294f98fbffa124c29e` is integrated; current main `b6c1ab0d60dc90a4392a241dcfe1979f2805dac9` adds records only, with all non-Markdown content matching. Records integration `38093751990` succeeded.
 
-Accepted evidence and portable reproductions are in [VERIFICATION.md](VERIFICATION.md): local Chromium20/native40, owned PDF52 and qualified-live20 pass; main Pages and five byte-matched live assets pass. The single full run `38090462219`, job `114325656434`, was still running at23:02:36 UTC. Fetch its current result and final log summary before verifying R02/R03 and closing7f9e; preserve actual failures/retries/skips. Do not duplicate that unchanged gate.
+The required full run [38090462219](https://github.com/AahPlexX/inmotools/actions/runs/38090462219), job114325656434, completed **failure** at23:07:10 UTC:4119 unit passes/18 skips, build7.65s;1830 browser passes/171 skips/1failure54.0m. The sole failure is Crystal's mobile substitution case, initial and retry both expecting Fe but observing Na at the unchanged5000ms assertion. No PDF failure is reported. Current [verification](VERIFICATION.md) preserves the full receipt and the accepted local20Chromium/40native, owned52 and qualified-live20 PDF scopes, Pages and byte-matched assets.
 
-[PDF-R04 task c061](../../../.tasks/items/T-pdf-sanitizer-20261009-c061.md) remains queued. Current primary-source preparation now includes reader metadata/action API distinctions and object-enumeration allocation limits. Activate c061 explicitly after preceding acceptance; task-start worktree reuse returns before queued activation. Runtime/tests remain frozen.
+The full gate is failed; do not mark it green, verify/close R02/R03 or advance R04 on the isolated Crystal pass. [Crystal issue d7a8](../../../.tasks/items/T-crystal-substitution-retry-20261009-d7a8.md) preserves the intermittent failure; its cause remains unestablished. Uploaded runner artifact11685031973 could not be downloaded (HTTP403). Existing mobile case passed1/1 locally on the unchanged immutable artifact; an external six-case passive pointer comparison completed5passes/1failure: default smooth2/3, root-auto prototype3/3. The local failure matched the full assertion; pointerdown/up/click reached a DIV while viewport scrolling moved the computed button target. This is local diagnosis, not a CI-trace cause or application repair. No application/test change or unchanged full rerun.
+
+[R04c061](../../../.tasks/items/T-pdf-sanitizer-20261009-c061.md) remains queued with current pinned primary sources and portable diagnostics baselines. Preserve frozen inventory order and current read-only/refusal boundaries. After the gate is resolved, activate c061 explicitly because task-start worktree reuse returns before queued activation.
 
 ## Documents
 
@@ -35,8 +37,8 @@ Accepted evidence and portable reproductions are in [VERIFICATION.md](VERIFICATI
 | ID | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | PDF-R01 | verified | e2e "merges multiple source PDFs in the visible queue order" |  |
-| PDF-R02 | partial | unit "does not create a loading task after the caller already cancelled"; e2e "PDF-R02 opens AES256 with password retry and actual reader text, search, pages and zoom" | Currenta25535a is on main94abf91; local20Chromium/40native, owned52 and live20 pass. Final full38090462219 receipt remains unread; prior failed scopes retained. |
-| PDF-R03 | partial | e2e "PDF-R03 keeps empty-user protected documents read-only and produces no protected download" | Existing engine refusal preserved;3realfixture unit cases and protected appcase pass in recorded scopes. Final new intake-clear source gates remain co-gated withR02. |
+| PDF-R02 | partial | unit "does not create a loading task after the caller already cancelled"; e2e "PDF-R02 opens AES256 with password retry and actual reader text, search, pages and zoom" | Frozen a25535a is on main; local20Chromium/40native, owned52 and live20 pass. Required full38090462219 failed solely at the reported Crystal mobile substitution assertion; final acceptance stays open. |
+| PDF-R03 | partial | e2e "PDF-R03 keeps empty-user protected documents read-only and produces no protected download" | Existing engine refusal preserved;3realfixture unit cases and protected appcase pass in recorded scopes. Final acceptance remains co-gated with R02; required full has a reported Crystal failure. |
 | PDF-R04 | partial | unit "reports final page geometry for workstation page-box tooling" | Page count, size, form fields, Info metadata, page geometry and attachments are shown; encryption detail, active content and structural warnings are not |
 | PDF-R05 | missing | — |  |
 | PDF-R06 | verified | e2e "merges multiple source PDFs in the visible queue order"; unit "combines local PDFs without changing the source buffers" |  |
