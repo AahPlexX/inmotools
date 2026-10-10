@@ -27,3 +27,5 @@ If the PDF worktree already exists, scripts/task-start.mjs returns from the reus
 
 ## Log
 - 2026-10-09 22:45 UTC: queued from primary source and owned baseline preparation; source remains unchanged while preceding full gate runs.
+
+- 2026-10-10 22:33 UTC: queued preparation only. Refreshed8pinned official source receiptsHTTP200/hash-identical to October9; current live desktop/touch baseline reproduces malformed optional Names rejection with opaque type text, prior source retained and zero pageerrors/action execution. New owned probe confirms getForm creates an AcroForm/one parsed object for no-form source while original byte hash remains unchanged. Source diagnostics must precede mutating getters; whole-array enumeration occurs before traversal limits. Exact receipts, recipes and pinned lines are in VERIFICATION.md. No application code or task activation; final preceding full remains pending.
