@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-2026-10-10 23:03 UTC: cursor PDF-R02/R03 remains partial; task [7f9e](T-pdf-sanitizer-20261009-7f9e.md) active, [R04c061](T-pdf-sanitizer-20261009-c061.md) next. Current [PDF tracker](../../src/tools/pdf/TRACKER.md#resume-here) and [verification](../../src/tools/pdf/VERIFICATION.md) carry candidate/main identity, accepted scoped receipts, historical failures and current primary sources. Full `38090462219` was still running at23:02:36 UTC; retrieve its final summary before advancing. Application/tests remain frozen. No PR.
+2026-10-10 23:15 UTC: frozen cursor PDF-R02/R03 remains partial, [7f9e](T-pdf-sanitizer-20261009-7f9e.md) active and [R04c061](T-pdf-sanitizer-20261009-c061.md) next. Required full38090462219 failed:1830browserpasses/171skips/1failure54.0m, Crystal mobile substitution expectedFe/receivedNa on initial and retry. Current [PDF tracker](../../src/tools/pdf/TRACKER.md#resume-here), [verification](../../src/tools/pdf/VERIFICATION.md) and [Crystal issue d7a8](T-crystal-substitution-retry-20261009-d7a8.md) preserve scoped successes and the failed gate. No full-success, causal-repair or sequence-advance claim. Runtime/tests remain unchanged; no PR.
 
 ## Frozen inventory order
 
