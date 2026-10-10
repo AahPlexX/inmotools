@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-crystal-lattice-studio-design.md
 tracker: src/tools/crystal/TRACKER.md
-updated: 2026-10-05
+updated: 2026-10-10
 ---
 
 # Crystal Lattice Studio — spec
@@ -40,6 +40,14 @@ Out of scope:
 
 - Engines and libraries: `@spglib/moyo-wasm@0.19.0` (Moyo, WebAssembly) performs space-group and symmetry analysis, loaded lazily on first use; `three@0.185.1` renders the structure, with `OrbitControls` and `ConvexGeometry` from its addons; the CIF, PDB, VASP and XYZ import and export, diffraction, reciprocal-space, refinement and fitting engines are first-party TypeScript in `src/tools/crystal/`.
 - Browser APIs: WebAssembly runs the symmetry kernel; WebGL (`THREE.WebGLRenderer`, `preserveDrawingBuffer`) draws the viewport, and the viewport shows the renderer's error message, or "WebGL is unavailable in this browser.", when it cannot start; Canvas 2D composes the PNG export (`canvas.toBlob`); exports download through `src/lib/download`.
+
+### Stable pointer activation contract — specified 2026-10-10
+
+CLS-R030 point-defect actions must remain reliably activatable after selecting a site, creating a vacancy, undoing it and focusing the element input. While this workspace is mounted, default programmatic viewport scrolling is instant so automatic reveals cannot animate the document under a pending pointer action. Manual scrolling remains available. This scope uses the existing browser CSSOM and React effect lifecycle; it does not change the shared stylesheet, dependencies, structure/history engines or another tool's behavior.
+
+Capture the previous root inline scroll-behavior value and priority. Apply auto with empty priority while mounted, then restore the previous declaration on unmount only when the current declaration still equals the applied auto/empty-priority declaration. Preserve a later changed value or priority. Normal and reduced-motion route transitions, pre-existing smooth!important and later changed declarations must retain their non-Crystal preferences. Native pointer/keyboard activation, selected-site/element semantics and undo remain unchanged. The component's model variable named document must not be mistaken for the browser document.
+
+The unchanged original point-defect case remains the behavior regression; add a meaningful route/preference regression before implementation. Existing captured local failure/prototype is baseline evidence, not repaired-application acceptance. Require actual-source desktop/mobile Chromium and native-engine checks, owned integration, one frozen full gate, main/Pages and qualified live checks. This is a dependency repair for the current PDF gate; the frozen requirement inventory cursor does not advance to Crystal.
 
 ## Requirements
 
@@ -304,4 +312,5 @@ None: no function was compared between an ML and a non-ML method.
 
 ## Change log
 
+- 2026-10-10 — Specified CLS-R030 stable pointer activation and local viewport-scroll preference restoration for the reproduced gate-blocking missed click.
 - 2026-10-05 — Created: 171 requirements as built at a582f5dc.
