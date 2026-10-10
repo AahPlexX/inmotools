@@ -138,6 +138,8 @@ test('PDF-R02 keeps readable peers and the existing queue when protected and mal
     for await (const chunk of stream) chunks.push(chunk as Buffer);
     expect((await PDFDocument.load(Buffer.concat(chunks))).getPageCount()).toBe(3);
     await page.getByRole('button', { name: 'Clear queue', exact: true }).click();
+    await expect(page.getByTestId('pdf-item')).toHaveCount(0);
+    await expect(page.getByTestId('pdf-render-canvas')).toHaveCount(0);
   }
   expect(errors).toEqual([]);
 });
@@ -189,6 +191,9 @@ test('PDF-R02 switches protected and editable previews without another prompt an
   await expect(page.getByTestId('pdf-protected-item')).toHaveCount(0);
   await expect(page.getByTestId('pdf-item')).toHaveCount(1);
   await page.getByRole('button', { name: 'Clear queue', exact: true }).click();
+  await expect(page.getByTestId('pdf-item')).toHaveCount(0);
+  await expect(page.getByTestId('pdf-protected-item')).toHaveCount(0);
+  await expect(page.getByTestId('pdf-render-canvas')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => {
     const state = (window as typeof window & { __pdfPasswordWorkers: { started: number; terminated: number } }).__pdfPasswordWorkers;
     return state.started - state.terminated;
@@ -264,6 +269,43 @@ test('PDF-R02 password and read-only controls remain accessible in dark, light a
     await page.getByRole('button', { name: 'Clear queue', exact: true }).click();
   }
   expect(errors).toEqual([]);
+});
+
+test('PDF-R02 keeps document scroll behavior local and restores route preferences', async ({ page }) => {
+  await page.goto('./#/');
+  const scrollState = () => page.evaluate(() => ({
+    value: document.documentElement.style.getPropertyValue('scroll-behavior'),
+    priority: document.documentElement.style.getPropertyPriority('scroll-behavior'),
+    computed: getComputedStyle(document.documentElement).scrollBehavior,
+  }));
+  const initial = await scrollState();
+  for (const mode of ['default', 'important', 'reduced'] as const) {
+    await page.emulateMedia({ reducedMotion: mode === 'reduced' ? 'reduce' : 'no-preference' });
+    await page.evaluate((important) => {
+      if (important) document.documentElement.style.setProperty('scroll-behavior', 'smooth', 'important');
+      else document.documentElement.style.removeProperty('scroll-behavior');
+    }, mode === 'important');
+    const before = await scrollState();
+    await page.evaluate(() => { location.hash = '/tools/pdf-sanitizer'; });
+    await expect(page.getByLabel('Add PDF files')).toBeVisible();
+    await expect.poll(scrollState).toEqual({ value: 'auto', priority: '', computed: 'auto' });
+    await page.evaluate(() => { location.hash = '/'; });
+    await expect(page.getByLabel('Add PDF files')).toHaveCount(0);
+    await expect.poll(scrollState).toEqual(before);
+  }
+  await page.evaluate(() => { location.hash = '/tools/pdf-sanitizer'; });
+  await expect(page.getByLabel('Add PDF files')).toBeVisible();
+  await expect.poll(scrollState).toEqual({ value: 'auto', priority: '', computed: 'auto' });
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('scroll-behavior', 'smooth', 'important');
+    location.hash = '/';
+  });
+  await expect(page.getByLabel('Add PDF files')).toHaveCount(0);
+  await expect.poll(scrollState).toEqual({ value: 'smooth', priority: 'important', computed: 'smooth' });
+  await page.evaluate(({ value, priority }) => {
+    if (value) document.documentElement.style.setProperty('scroll-behavior', value, priority);
+    else document.documentElement.style.removeProperty('scroll-behavior');
+  }, initial);
 });
 
 test('PDF-R02 keeps focused password controls and outlines within reduced-height viewports', async ({ page }) => {

@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-pdf-sanitizer-design.md
 tracker: src/tools/pdf/TRACKER.md
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # PDF Sanitizer — spec
@@ -47,6 +47,10 @@ Out of scope:
 PDF-R02 uses the pinned PDF.js loading task and password callback. Protected documents belong to a separate read-only viewer list with actual reader page counts; they never masquerade as inspected editable inputs or enter pdf-lib export. PDF-R03 remains enforced, including protected PDFs with an empty user password. Each selected file is handled independently: readable peers and the existing queue survive another file's error or cancelled password request. A failed password keeps the prompt available for retry; input is passed exactly, never trimmed or independently normalized. Password text is transient and cleared after submission/closure, never persisted or logged. The native modal dialog has a labelled password field, show/hide control, submission, Cancel, Escape and focus restoration; long names and controls reflow in narrow portrait/landscape.
 
 Password controls and their visible focus outlines must stay inside the scrollable dialog in reduced-height viewports (320×220 and 844×240), including long filenames, initial focus, first/last Tab wrapping and Escape/cancel focus return. Reveal only the still-focused control inside the still-open dialog; a delayed scroll must not affect closed/unmounted dialogs or another focused control. Pointer focus must preserve the clicked target until activation, including a visible lower-edge click; an automatic focus scroll must not move the target away before mouse-up. Browser-native focus scrolling alone can partially clip controls, so actual geometry and cancellation are required.
+
+Clear queue is available beside the file picker, before notices, source lists and the preview, so clearing does not require traversing export/editor controls or a changing preview. It retains the existing intake-abort and export-busy safeguards and clears editable and protected lists. Acceptance checks the empty source lists and absent canvas before asserting worker release; a retained queue must not be misreported as a post-clear leak.
+
+While the PDF workstation is mounted, default programmatic document scrolling is instant so automatic control reveals do not animate the viewport under a pointer action. This is local to this workstation; manual scrolling is unchanged. Capture the previous root inline scroll value and priority, then restore them on unmount only if the current declaration still matches the applied auto value with empty priority. Do not overwrite a later changed value or priority. Normal/reduced-motion route transitions and a pre-existing inline important declaration must preserve the previous non-PDF behavior. No global stylesheet or other tool behavior is changed.
 
 Opening tasks must be cancellable before their document promise resolves. Removing/clearing sources or leaving the tool aborts pending loading and destroys owned reader sessions; a later open remains usable. Read-only session ownership is explicit between intake and canvas, so switching previews does not accidentally destroy an owned protected document or demand a second password. Errors are reported per file without discarding successful peers. Password support means only what the pinned reader accepts; no universal Unicode/password/encryption interoperability or decrypted export claim. Owned AES256/AES128, empty-user restriction, space/Unicode and malformed specimens verify the cycle. External meaningful unit/browser fixtures and tests are required; their shared-file scope requires one fresh full regression gate on the frozen implementation source.
 

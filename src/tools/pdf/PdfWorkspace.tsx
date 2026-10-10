@@ -216,6 +216,18 @@ function geometryValidationError(outputPlan: OutputPlanRow[], edits: GeometryEdi
 }
 
 export default function PdfWorkspace() {
+  useEffect(() => {
+    const style = document.documentElement.style;
+    const previous = style.getPropertyValue('scroll-behavior');
+    const priority = style.getPropertyPriority('scroll-behavior');
+    // Automatic reveals must not move controls during pointer activation.
+    style.setProperty('scroll-behavior', 'auto');
+    return () => {
+      if (style.getPropertyValue('scroll-behavior') !== 'auto' || style.getPropertyPriority('scroll-behavior')) return;
+      if (previous) style.setProperty('scroll-behavior', previous, priority);
+      else style.removeProperty('scroll-behavior');
+    };
+  }, []);
   const [items, setItems] = useState<PdfItem[]>([]);
   const [protectedItems, setProtectedItems] = useState<ProtectedPdfItem[]>([]);
   const [passwordRequest, setPasswordRequest] = useState<PdfPasswordRequest | null>(null);
@@ -687,6 +699,7 @@ export default function PdfWorkspace() {
     <div className="workspace-header"><div><h2>PDF Workstation</h2><p>Prepare deterministic local PDF outputs: page order, selection, blank pages, page boxes, embedded files, editable forms, Bates/overlays, metadata, and export naming.</p></div></div>
     <div className="workspace-body">
       <div className="field"><label htmlFor="pdf-files">Add PDF files</label><input ref={fileInputRef} id="pdf-files" type="file" accept="application/pdf,.pdf" multiple disabled={busy} onChange={(event) => consumeFileInput(event.target, () => load(event.target.files))} /><small>New selections append. Protected PDFs open separately for read-only viewing; readable files are kept if another file fails or is cancelled.</small></div>
+      <div className="button-row" style={{ marginTop: 12 }}><button className="action-button secondary" type="button" disabled={(busy && !intakeRef.current) || (!items.length && !protectedItems.length && !busy)} onClick={clearSources}>Clear queue</button></div>
       {intakeIssues.length ? <ul className="notice" data-testid="pdf-intake-issues" aria-label="File opening notices" style={{ overflowWrap: 'anywhere' }}>{intakeIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul> : null}
       {protectedItems.map((item) => <section className="notice" data-testid="pdf-protected-item" key={item.id} style={{ marginTop: 14, overflowWrap: 'anywhere' }}>
         <strong>{item.file.name}</strong>
@@ -855,7 +868,7 @@ export default function PdfWorkspace() {
             : `Processing is blocked because ${formFieldTotal} source form field${formFieldTotal === 1 ? '' : 's'} would not remain editable after cross-document page copying. Enable flattening to preserve their current appearances without silently discarding source form structure.`}</p>
       </div> : null}
 
-      <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked || Boolean(blankPlanError) || Boolean(geometryError) || Boolean(attachmentError) || Boolean(formAuthoringError) || Boolean(overlayError)} onClick={() => void process()}>Process and download</button><button className="action-button secondary" type="button" disabled={(busy && !intakeRef.current) || (!items.length && !protectedItems.length && !busy)} onClick={clearSources}>Clear queue</button></div>
+      <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked || Boolean(blankPlanError) || Boolean(geometryError) || Boolean(attachmentError) || Boolean(formAuthoringError) || Boolean(overlayError)} onClick={() => void process()}>Process and download</button></div>
       <div className="status-line" role="status">{busy ? 'Processing PDF bytes locally…' : status}</div>
       <div className="notice"><strong>Current sanitization boundary</strong><p className="help-text">Output is rebuilt into a new PDF, so source document-level Info/catalog metadata and embedded files are not intentionally carried forward. Replacement metadata, output attachments, newly authored editable fields, and export overlays are opt-in. Selected page content and page-level annotations are preserved; this stage is not yet the workstation's planned malware analysis, secure redaction, or active-content sanitization system.</p></div>
     </div>
