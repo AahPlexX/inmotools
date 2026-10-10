@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-2026-10-10 23:39 UTC: frozen cursorPDF-R02/R03;7f9e active/R04c061 next. Narrow [Crystal d7a8](T-crystal-substitution-retry-20261009-d7a8.md) dependency repair has actual16/16 Chromium/Firefox/WebKit scope passes, no retries/skips, retained original defect assertion/timeout and new red2/2baseline→green route preference regression. Types/build pass. [Crystal verification](../../src/tools/crystal/VERIFICATION.md) carries actual input hashes/recipes/current authoritative receipts. Frozen repair publication, owned integration, one changed-source full and main/Pages/live are next. Prior full38090462219 remains failed; accepted unchanged PDF scopes are reused only within their bounds. No inventory advance or full-release acceptance.
+2026-10-10 23:48 UTC: frozen cursorPDF-R02/R03;7f9e active/R04c061 next. Narrow [Crystal d7a8](T-crystal-substitution-retry-20261009-d7a8.md) dependency repair sourceb914406 is on maincfb7dd3, complete trees equal; owned38095818585 SUCCESS77browserpasses/5skips,4119unitpasses/18skips, build5.36s; Pages38096031158 SUCCESS; qualified-live8/8pass64.641s without retries/skips/errors. Actual source comparison handles observed generated filenames/preload-list order explicitly; five-file raw byte equality is not claimed. [Crystal verification](../../src/tools/crystal/VERIFICATION.md) preserves exact receipts/limits. Required changed-source full38095819719/job114341370995 remains in progress with records/unit/build stages succeeded and browser outcome pending. Preserve accepted unchanged PDF scopes, leave R02/R03 partial and R04 queued. Next read completed full logs once and record actual result before PDF acceptance/advance; do not duplicate the running full.
 
 ### Historical checkpoint — before dependency activation
 
@@ -235,3 +235,5 @@ Portable PDF fixture reproduction: use pinned pdf-lib1.17.1 to create two pages 
 - 2026-10-10 23:33 UTC: activated existing Crystal d7a8 as a narrow dependency repair for the failed PDF gate, preserving the frozen inventory cursor and existing PDF evidence. Separate tool branch/worktree; contract specified before code, no unrelated Crystal feature pass.
 
 - 2026-10-10 23:39 UTC: scoped Crystal dependency repair16/16actual production checks passed; required changed-source release/full gates pending, PDF acceptance remains open.
+
+- 2026-10-10 23:48 UTC: narrow Crystal repair integrated maincfb7dd3, owned/Pages/live passed; exact changed-source full38095819719 still running. PDF cursor held, accepted scopes reused, no raw five-file-match claim.
