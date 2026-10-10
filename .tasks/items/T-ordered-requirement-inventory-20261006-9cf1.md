@@ -5,7 +5,7 @@ kind: fix
 state: active
 branch: fix/markdown-workbench
 created: 2026-10-06
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # Ordered requirement implementation
@@ -15,11 +15,11 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-2026-10-09 23:23 UTC: isolated Chromium attempt ended without final JSON or exit receipt; its log reaches18/18 invocation only, never accepted18passes. Preview4235 was absent and HTTP000; subsequent native attempt has actual NS_ERROR_CONNECTION_REFUSED, then was stopped. These attempts are local harness failures, not deployed-site evidence. Their exact exit/source-session cause is unknown, and they do not explain the earlier completed intake/cleanup failures. New contained harness owns preview4240 and test process in one shell, qualifiesHTTP200, records UTC readiness and explicit exit status; actual18-case result pending. No product assertion/timeout/retry changed. Distinct pdf-r02-focus-isolated-* and pdf-r02-contained-* evidence retained.
+2026-10-10 21:43 UTC: PDF-R02/R03 remain partial; task7f9e active, R04c061 next. GitHub MCP confirms main fbd8d1f291d497303e280aa26b308c24dcb14662 still contains frozen correction7929d89. Exact-source full [38004341658](https://github.com/AahPlexX/inmotools/actions/runs/38004341658)/job114069557562 completed successfully at00:24:05 UTC: 4119 unit tests passed/18 skipped, 370 unit files passed/2 skipped, build8.23s, 1829 browser cases passed/171 skipped in56.5m. Completed log contains no flaky/retry summary. Owned50 PDF cases, contained Chromium18 and qualified-live18 previously passed on this source; main Pages38004611600 succeeded. Do not redispatch an unchanged full or describe these historical receipts as new runs.
 
-2026-10-09 23:19 UTC: PDF-R02/R03 remain partial; task7f9e active, R04c061 next. Mainb2a6b1e still uses theme-only1419321 runtime. New guarded focus-reveal correction is uncommitted: types/build passed, reduced-height focus and lower-edge pointer activation pass allsixprofiles. Old-source reduced-height baseline fails2/2. Production candidate17/18 and native33/36 gates failed; no acceptance claim. Serial affected-flow diagnostic3/4Chromium failed mobile worker release; native7/8 failed desktopWebKit waiting for download (60s), a different failure from earlier prompt failures. Four instrumented mobile cleanup cycles plus one instrumented original mobile case releaseallworkers withzeroerrors. Causes remain unresolved; diagnostic timing alone does not prove a repair. No assertion/timeout/retry weakened. Unique external artifacts and current primary receipts are in VERIFICATION.md.
+Native acceptance remains unresolved. Original mobileWebKit9-case sequence completed with5 passed/1 failed/3 not run (35.6s); the extra global error only reports the configured stop after one maximum allowed failure; it is not another failed test. At failure the queue retained1 file,1 canvas and1 actual dedicated-worker context, counters5 started/4 terminated. The Clear queue trace moved document scrollTop10487 to10716 between click action and after snapshot (229px); canvas dimensions stayed300×200. This establishes that clearing was not observed, not a post-clear worker leak. Subsequent stable-page smooth/auto comparative probe completed six cycles (three each) at23:45–46 UTC on October9: all native pointer clicks cleared the queue and actual worker contexts, zero page errors, explicit exit0. It does not establish smooth scrolling as the cause. No speculative document-scroll or worker-ownership change is justified by these results.
 
-Superseded full37998863480 completed cancelled23:01:41, never accepted. No replacement full dispatched. Next obtain corrected candidate acceptance, publish through GitHub MCP with owned integration, freeze source and dispatch one replacementfull; qualify actualmain/Pages/live and completed full before verifying R02/R03 or advancing R04. Noauth/backend/dependencies/workflow/password-storage change.
+Next capture the original sequence with passive pointer-target observations and a bounded smooth/auto comparison to distinguish a click missed during changing layout from actual cleanup. Retain the failed native gate35/36 and all earlier distinct failures. Read VERIFICATION.md for portable reproduction, official research and scope. Keep R02/R03 partial and R04c061 next until native acceptance is resolved. No auth/backend/dependency/workflow/password-storage change. Runtime/tests remain frozen7929d89; records-only updates do not invalidate its accepted full.
 
 
 ## Frozen inventory order
