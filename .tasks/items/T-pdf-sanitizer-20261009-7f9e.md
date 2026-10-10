@@ -16,6 +16,10 @@ Continue the frozen ordered tool audit at PDF-R02; implement supported local pas
 
 ## Resume here
 
+2026-10-10 23:51 UTC: PDF canonical tracker/verification refreshed in its own fix/pdf-sanitizer worktree after Crystal records integration38096363472 succeeded on main9f812e9. PDF application/all PDF unit/browser tests remain unchanged from a25535a; accepted PDF scopes are reused, completion remains33/167 verified,22partial/111missing/1implemented. Required replacement full38095819719/job114341370995 remains in progress, sourceb914. R02/R03 partial; R04c061 queued. [PDF tracker](../../src/tools/pdf/TRACKER.md#resume-here) and [verification](../../src/tools/pdf/VERIFICATION.md) carry current dependency/source/gate and next action. This is a records-only step; no extra browser gate or runtime change.
+
+### Dependency acceptance checkpoint — 2026-10-10 23:48 UTC
+
 2026-10-10 23:48 UTC: frozen cursorPDF-R02/R03;7f9e active/R04c061 next. Narrow [Crystal d7a8](T-crystal-substitution-retry-20261009-d7a8.md) dependency repair sourceb914406 is on maincfb7dd3, complete trees equal; owned38095818585 SUCCESS77browserpasses/5skips,4119unitpasses/18skips, build5.36s; Pages38096031158 SUCCESS; qualified-live8/8pass64.641s without retries/skips/errors. Actual source comparison handles observed generated filenames/preload-list order explicitly; five-file raw byte equality is not claimed. [Crystal verification](../../src/tools/crystal/VERIFICATION.md) preserves exact receipts/limits. Required changed-source full38095819719/job114341370995 remains in progress with records/unit/build stages succeeded and browser outcome pending. Preserve accepted unchanged PDF scopes, leave R02/R03 partial and R04 queued. Next read completed full logs once and record actual result before PDF acceptance/advance; do not duplicate the running full.
 
 ### Historical checkpoint — before dependency activation
@@ -66,3 +70,5 @@ Current mainb6c1ab0 contains records only beyond integrated candidate; all non-M
 - 2026-10-10 23:39 UTC: scoped Crystal dependency repair16/16actual production checks passed; required changed-source release/full gates pending, PDF acceptance remains open.
 
 - 2026-10-10 23:48 UTC: narrow Crystal repair integrated maincfb7dd3, owned/Pages/live passed; exact changed-source full38095819719 still running. PDF cursor held, accepted scopes reused, no raw five-file-match claim.
+
+- 2026-10-10 23:51 UTC: own PDF canonical records refreshed after repaired Crystal records reached main9f812e9; unchanged PDF source/tests verified, matching accepted scopes reused, current full running and cursor held.
