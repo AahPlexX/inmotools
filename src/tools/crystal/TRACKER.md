@@ -13,9 +13,9 @@ updated: 2026-10-10
 
 ## Resume here
 
-2026-10-10 23:39 UTC: actual scoped effect and route regression pass16/16 focused production cases without retries/skips/flaky/global errors: Chromium8 in91.595s (320portrait,844landscape,1440desktop,390touch), Firefox/WebKit8 in82.640s (desktop/compact or touch). TypeScript exit0; production build exit0 in15.18s. Original defect test body/assertion/default5000ms is byte-identical to a25535a. New route baseline had failed2/2 on unchanged production artifact. Frozen runtime/tests are ready for publication; owned integration, one changed-source full, main/Pages/qualified-live gates are next. No full-release acceptance or inventory advance.
+2026-10-10 23:48 UTC: frozen repair sourceb914406311360ef3c2f4612f0b8add878842fb5e is integrated on maincfb7dd3cb82005bf46b7173750a6b7777479f523; complete trees equal. [Owned38095818585](https://github.com/AahPlexX/inmotools/actions/runs/38095818585), job114341374604 SUCCESS:4119unitpasses/18skips,370files/2skips, build5.36s,77browserpasses/5skips2.2m, no retry marker. [Pages38096031158](https://github.com/AahPlexX/inmotools/actions/runs/38096031158) SUCCESS on this main. Qualified-live8/8passed64.641s, no retries/skips/flaky/globalerrors/exit0, including320portrait/844landscape and original defect plus preference cycle. Focused local16/16 pass remains exact source acceptance. No open PRs and source branch deletion confirmed.
 
-PDF-R02/R03 remain partial,7f9e active, R04c061 queued. Canonical narrow dependency evidence and portable recipe are in Crystal VERIFICATION.md. Shared test change proves scope; shared parent/PDF task changes preserve gate status. Other Crystal work remains frozen later.
+Required [full38095819719](https://github.com/AahPlexX/inmotools/actions/runs/38095819719), validatejob114341370995, exact sourceb914 remains in progress. Its records/unit/build stages succeeded; browser outcome/counts are pending. Do not redispatch unchanged source or claim full completion. PDF-R02/R03 remain partial,7f9e active; R04c061 stays queued. Next read completed full job logs once, record actual counts/retries/failures, then complete or repair the gate and resume PDF acceptance. Other Crystal work stays in the frozen later inventory position.
 
 ## Documents
 
