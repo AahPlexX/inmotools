@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-2026-10-10 23:33 UTC: inventory cursor remains PDF-R02/R03;7f9e active and R04c061 next. Failed full38090462219 remains the required gate. Existing [Crystal d7a8](T-crystal-substitution-retry-20261009-d7a8.md) is now active as a narrow gate dependency repair in its own fix/crystal-lattice-studio worktree/claim3dacf00, with spec and canonical [Crystal verification](../../src/tools/crystal/VERIFICATION.md) updated before code. This does not advance the frozen inventory to Crystal or mark PDF items complete. PDF runtime/accepted scope remains unchanged; no unchanged full redispatch. Next complete actual Crystal repair acceptance and one changed-source full gate, then resume PDF acceptance/R04.
+2026-10-10 23:39 UTC: frozen cursorPDF-R02/R03;7f9e active/R04c061 next. Narrow [Crystal d7a8](T-crystal-substitution-retry-20261009-d7a8.md) dependency repair has actual16/16 Chromium/Firefox/WebKit scope passes, no retries/skips, retained original defect assertion/timeout and new red2/2baseline→green route preference regression. Types/build pass. [Crystal verification](../../src/tools/crystal/VERIFICATION.md) carries actual input hashes/recipes/current authoritative receipts. Frozen repair publication, owned integration, one changed-source full and main/Pages/live are next. Prior full38090462219 remains failed; accepted unchanged PDF scopes are reused only within their bounds. No inventory advance or full-release acceptance.
 
 ### Historical checkpoint — before dependency activation
 
@@ -233,3 +233,5 @@ Portable PDF fixture reproduction: use pinned pdf-lib1.17.1 to create two pages 
 - 2026-10-09 16:18 UTC: four additional native desktop/touch probes pass immediate loading cancellation followed by real canvas drawing. Immediate destroy rejects Error Loading aborted before any password callback; prompt-phase cancellation previously rejected PasswordExceptioncode1. Subsequent AES256 opening renders both authored pages at320×240/400×260 with1143/1147dark pixels and exact text,0pageerrors. Future loading cancellation must use the request cancellation state rather than classifying all cancellations by exception name alone. External native-render-cancel-probes-20261009.mjs/json/log preserve this standalone reader evidence; no PDF app implementation.
 
 - 2026-10-10 23:33 UTC: activated existing Crystal d7a8 as a narrow dependency repair for the failed PDF gate, preserving the frozen inventory cursor and existing PDF evidence. Separate tool branch/worktree; contract specified before code, no unrelated Crystal feature pass.
+
+- 2026-10-10 23:39 UTC: scoped Crystal dependency repair16/16actual production checks passed; required changed-source release/full gates pending, PDF acceptance remains open.

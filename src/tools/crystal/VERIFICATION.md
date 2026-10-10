@@ -10,7 +10,13 @@ Current state: [TRACKER.md](TRACKER.md). Current task: [d7a8](../../../.tasks/it
 
 ## Current checkpoint
 
-2026-10-10 23:33 UTC: source baseline main46e952c0453cb30963cfca750bd1e73c846ff01b, active claim3dacf00c598559887f757c4e89959426a91d8023. No application implementation. Scoped stable-click/route-preference contract is specified; new meaningful route regression and its prior-artifact baseline are next. Current PDF-R02/R03 gate remains failed; no inventory advance or repair acceptance.
+2026-10-10 23:39 UTC: actual scoped effect and route regression pass16/16 focused production cases without retries/skips/flaky/global errors: Chromium8 in91.595s (320portrait,844landscape,1440desktop,390touch), Firefox/WebKit8 in82.640s (desktop/compact or touch). TypeScript exit0; production build exit0 in15.18s. Original defect test body/assertion/default5000ms is byte-identical to a25535a. New route baseline had failed2/2 on unchanged production artifact. Frozen runtime/tests are ready for publication; owned integration, one changed-source full, main/Pages/qualified-live gates are next. No full-release acceptance or inventory advance.
+
+PDF-R02/R03 remain partial,7f9e active, R04c061 queued. Canonical narrow dependency evidence and portable recipe are in Crystal VERIFICATION.md. Shared test change proves scope; shared parent/PDF task changes preserve gate status. Other Crystal work remains frozen later.
+
+### New contract baseline
+
+External crystal-scroll-contract-red-20261010.json/log/exit/results records two cases selected with --list before execution, unchanged a255 artifact, real desktop/mobile Chromium, retries0/default5000ms polling. Both failed at the mounted root scroll contract, rather than fixture/setup. Portable recipe: run committed CLS-R030 route test against prior immutable production artifact, then repeat against actual newly built source. Report statistics: {"startTime":"2026-10-10T23:36:28.537Z","duration":16198.766000000001,"expected":0,"skipped":0,"unexpected":2,"flaky":0}.
 
 ## Existing baseline and limits
 
@@ -29,3 +35,11 @@ Reuse same-date retrieved authoritative sources and the already tested PDF scope
 - [MDN getPropertyPriority](https://developer.mozilla.org/en-US/docs/Web/API/CSSStyleDeclaration/getPropertyPriority): important or empty priority, needed for exact inline restoration. Hashc4ea88e422d69b1c3ccff825740a824dce5fad0f6ca2e98f8253da97a3912ef7.
 
 PDF's existing scoped-scroll pattern passed actual six-profile preference/cancellation checks. Reuse its contract/implementation technique, but validate the actual Crystal source; prototype/manual style injection does not establish effect cleanup or release correctness. Shared stylesheet, history/model engines, dependencies, workflows, auth/backend/storage stay outside this repair.
+
+## Actual repair scoped acceptance — 2026-10-10
+
+Source input receipt crystal-scroll-repair-inputs-20261010.json captures SHA256: CrystalWorkspace.tsx ac14bda90329585a19d00ecc1e19dadd4a791ae39fc8a864ba602fd7c4348cdf; browser test bfd49cc034442a380a8fe27fd7e193b3cbf144fa2bf15c98d2ca6874b1c9b658. External immutable build crystal-scroll-repair-dist-20261010 completed15.18s/exit0, type receipt crystal-scroll-repair-typecheck-20261010.log/exit0. Dependency/shared CSS/PDF source unchanged. Original test body comparison with a25535a passed. Initial docs-check filename was nonexistent; corrected scripts/docs-sync.mjs --check plus scripts/check-doc-links.mjs passed180documents, and branch/tool checks passed with unchanged50/171 accepted requirements.
+
+Managed wrappers own preview lifecycle, readinessHTTP200, serviceWorkers block, workers1/retries0, reports/exit capture. Chromium crystal-scroll-repair-chromium-20261010.json/log/exit/results records8/8pass91.595s; native crystal-scroll-repair-native-20261010.json/log/exit/results records8/8pass82.640s, no retries/skips/flaky/globalerrors/exits0. Each profile runs original vacancy/substitution/interstitial/Undo and new CLS-R030 route contract (default, important, reduced-motion; preserve a later changed declaration). Chromium profiles320×568portrait,844×390landscape,1440×900desktop,390×844touch; native Firefox desktop1440×900/compact390×844, WebKit desktop1440×900/touch390×844. Native official host libraries/launch proof reused; disabling advisory host validation does not replace actual engine launches. Physical phones or installed Safari are not certified.
+
+Portable commands: build with pinned Vite; preview immutable output with /inmotools/ base and owned process cleanup; run tests/e2e/crystal-lattice-studio.spec.ts with grep `builds vacancy, substitution and interstitial defects with undo|CLS-R030 keeps automatic reveals local and restores route preferences`, listed projects, retries0 and JSON reporting. Keep original assertion/default5000ms intact. Primary source receipts above are reused within this same date. Scope checks do not replace required owned/full/main/Pages/live gates.

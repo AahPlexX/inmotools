@@ -13,11 +13,9 @@ updated: 2026-10-10
 
 ## Resume here
 
-2026-10-10 23:33 UTC: active [d7a8](../../../.tasks/items/T-crystal-substitution-retry-20261009-d7a8.md) is a narrow dependency repair for failed full38090462219, not an advance of the frozen tool inventory. Main baseline46e952c0453cb30963cfca750bd1e73c846ff01b; claim3dacf00c598559887f757c4e89959426a91d8023 on fix/crystal-lattice-studio in its own worktree. Current Crystal application remains unchanged.
+2026-10-10 23:39 UTC: actual scoped effect and route regression pass16/16 focused production cases without retries/skips/flaky/global errors: Chromium8 in91.595s (320portrait,844landscape,1440desktop,390touch), Firefox/WebKit8 in82.640s (desktop/compact or touch). TypeScript exit0; production build exit0 in15.18s. Original defect test body/assertion/default5000ms is byte-identical to a25535a. New route baseline had failed2/2 on unchanged production artifact. Frozen runtime/tests are ready for publication; owned integration, one changed-source full, main/Pages/qualified-live gates are next. No full-release acceptance or inventory advance.
 
-The original mobile case failed expectedFe/receivedNa on both runner attempts. Local paired diagnostics captured a matching missed pointer activation on DIV, correct selected site/Fe input,24px button and viewport movement; default smooth2/3 and root-auto prototype3/3. Exact evidence, limits and portable reproduction: [VERIFICATION.md](VERIFICATION.md). CI trace downloadHTTP403; no same-cause runner claim or application repair yet.
-
-Scoped scroll/preference contract is specified before code. Next add the route/preference regression, record its unchanged-artifact baseline, implement only the scoped effect, then freeze actual source and validate. Reuse matching accepted evidence and dependency capabilities; preserve original case/assertion/timeout. Shared test/task changes require one fresh full. PDF-R02/R03 remain partial; R04 remains queued. Other Crystal Open work stays in the frozen later position.
+PDF-R02/R03 remain partial,7f9e active, R04c061 queued. Canonical narrow dependency evidence and portable recipe are in Crystal VERIFICATION.md. Shared test change proves scope; shared parent/PDF task changes preserve gate status. Other Crystal work remains frozen later.
 
 ## Documents
 
@@ -68,7 +66,7 @@ Scoped scroll/preference contract is specified before code. Next add the route/p
 | CLS-R027 | verified | unit "standardizes to conventional and primitive cells with provenance"; e2e "previews and applies a standardized symmetry cell" |  |
 | CLS-R028 | partial | unit "applies the identity basis transform without moving sites or changing the cell", "supports a unimodular axis exchange and preserves fractional geometry in the rebased cell", "applies an explicit origin shift and wraps the resulting fractional coordinates", "rejects singular and non-unimodular basis transforms instead of silently changing multiplicity" | Engine function only; no control and no before/after preview |
 | CLS-R029 | partial | unit "treats strain as a homogeneous small-strain tensor and leaves zero strain unchanged" | Engine function only; no control |
-| CLS-R030 | verified | unit "creates vacancy, substitution and interstitial models immutably with provenance"; e2e "builds vacancy, substitution and interstitial defects with undo" | Historical engine/original-case evidence retained; current pointer failure and pending narrow repair tracked in d7a8. |
+| CLS-R030 | verified | unit "creates vacancy, substitution and interstitial models immutably with provenance"; e2e "builds vacancy, substitution and interstitial defects with undo", "CLS-R030 keeps automatic reveals local and restores route preferences" | Scoped repair16/16 local production checks passed; release/full gates pending in d7a8. |
 | CLS-R031 | partial | unit "reports defect concentration from deterministic site identity and chemistry changes" | Engine function only; the Point defects card does not show it |
 | CLS-R032 | partial | unit "builds a bounded cubic (100) slab with the requested material thickness and vacuum", "rejects invalid slab and domain requests before producing partial output" | Engine function only; the test covers cubic (100); no control |
 | CLS-R033 | partial | unit "creates deterministic identity and rotated domain overlays in Cartesian space" | Engine function only; no control or overlay in the viewport |
