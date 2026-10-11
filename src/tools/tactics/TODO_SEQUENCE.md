@@ -2,10 +2,10 @@
 
 > **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
 
-**Updated:** 2026-09-30
-**Branch:** `cursor/matchboard-residuals-wave-8ddf`
-**Base:** `origin/main` `dd12e943576c9e0fb2abbc9772edec7e9cfafd39` (`feat(tactics): production audit for Tactical Matchboard Studio (#92)`)
-Former instruction (no longer applies): **PR:** new draft only. Do not push to PR #76 or PR #92. Do not undraft or merge from this workstream.
+**Updated:** 2026-10-11
+**Branch:** `cursor/matchboard-residuals-restore`
+**Base:** `origin/main` `e134af68a6d8670f545a7bc1a4d568deb3d0b3bf` (`feat(pdf): add range burst and actual-byte size split exports`)
+**PR:** restore draft only. Do not push to PR #76 or PR #92. Do not undraft or merge from this workstream.
 **Prior history, now on main via the squash:** T14 reconciled `origin/main` `637a56960954eea2a6b8045a14c703c9a662b254`; T14 merge `47be37f3f0f74b0ed592f2b0723bf3882e3eb7f6`; T14 runtime `fae25d868ec1fb56d3594872a53fa77ca73f8da7`; stage 1 runtime `0a8e45e38e3de161f8ec8a1362218a0896e9ad26`; stage 1 test-only `4d4b0b2b74d5e2a3856af376160bbdee9209cb84`; earlier runtime `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`.
 
 ## Purpose and source-of-truth roles
@@ -13,12 +13,12 @@ Former instruction (no longer applies): **PR:** new draft only. Do not push to P
 - `FEATURE_MATRIX.md` is the authoritative 67-feature status ledger.
 - `TODO_SEQUENCE.md` is the authoritative execution order and concurrency contract.
 - `HANDOFF.md` is the authoritative resume snapshot and exact next action.
-- `.tasks/IN_PROGRESS.md` is the repository-wide pointer to this workstream.
+- Current task file: `.tasks/items/T-tactical-matchboard-studio-20261011-6d6f.md`. `.tasks/IN_PROGRESS.md` is retired.
 - The implementation plan/spec define accepted scope and completion gates; this queue does not shrink them.
 
 ## Agent coordination protocol
 
-Former instruction (no longer applies): 1. Stay on `cursor/matchboard-residuals-wave-8ddf`. Do not push to PR #76 or PR #92. The user required a new branch and a new draft PR for this residuals wave.
+1. Stay on `cursor/matchboard-residuals-restore`. Do not resume the deleted residuals branch. Do not push to PR #76 or PR #92. Do not undraft or merge the restore draft.
 2. Before every write, compare the last known branch tip to the live branch. If another agent advanced it, refresh the affected files and re-evaluate before writing.
 3. An agent must treat the **Primary files** on an `ACTIVE` item as reserved. Do not concurrently edit those files from another queue item.
 4. A forward-working agent takes the lowest-numbered `READY` item.
@@ -190,9 +190,9 @@ Former instruction (no longer applies): 1. Stay on `cursor/matchboard-residuals-
 
 ### T17-01 — Residuals wave
 - **Status:** DONE
-- **Depends on:** `origin/main` `dd12e943576c9e0fb2abbc9772edec7e9cfafd39`
+- **Depends on:** `origin/main` `e134af68a6d8670f545a7bc1a4d568deb3d0b3bf`
 - **Primary files:** tactical timeline, squad, pitch, board, workspace, export, and persistence modules, tactical tests, and this tool's SSOT. Do not edit Wave B or other tools.
 - **Implementation:** virtualized timeline window of 40 rows and a 2,048-track session cap; roster ceiling of 64 players per team that is not a formation cap; pitch zoom 1–4 and pan; a separately chosen opposition formation; training markings stored on `pitch.overlays`; confirm before Build board; video export cap raised from 12 to 60 frames; board freehand strokes that reuse the video telestration point rule.
-- **Exit evidence:** focused Tactical units **165/165** across 21 `tactics-*.test.ts` files plus e2e selector **3/3**. `tsc --noEmit -p tsconfig.app.json` exit 0. Production build `✓ built in 6.38s`. Full Tactical Playwright spec **80 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. Verified numerator is **67/67**. Newly verified rows: **64, 65, 66, 67**. Rows 3, 57, 58, 61, and 62 were updated in place. Rows 1–63 were not reopened. Help copy changed. No dependency pin changed.
-- **Residual:** PDF page text remains WinAnsi. CoS escalate before adding `@pdf-lib/fontkit` or any other font embedder. Pins and CI were not changed.
+- **Exit evidence:** remeasured 2026-10-11 on runtime `e134af68a6d8670f545a7bc1a4d568deb3d0b3bf` with Node v22.23.3. Focused Tactical units **167/167** across 21 `tactics-*.test.ts` files. `tests/unit/e2e-spec-selection.test.mjs` **8/8**. `tsc --noEmit -p tsconfig.app.json` exit 0. Production build `✓ built in 6.33s`. Full Tactical Playwright spec **80 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. Feature-matrix numerator is **67/67**. Standard tracker is **75/85** verified (85 requirements: 75 verified, 1 implemented, 3 partial, 6 missing). Newly verified matrix rows remain **64, 65, 66, 67**. Rows 3, 57, 58, 61, and 62 stay updated in place. Rows 1–63 were not reopened. No dependency pin changed.
+- **Residual:** PDF page text remains WinAnsi. The owner authorized a follow-on that adds `@pdf-lib/fontkit` and an embedded font. That follow-on is not implemented. Pins and CI were not changed.
 - **Reverse-safe:** complete for this wave. Do not undraft or merge the draft PR from this workstream.

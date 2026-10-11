@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
-updated: 2026-10-05
+updated: 2026-10-11
 ---
 
 # Tactical Matchboard Studio — spec
@@ -207,9 +207,9 @@ None: no function was compared between an ML and a non-ML method.
 
 ## Intent not recorded
 
-- TMS-R73: Unicode PDF text needs a font embedder (`@pdf-lib/fontkit` or equivalent) that is not in `package.json`; adding a dependency is the owner's decision (HANDOFF residual).
 - TMS-R31: which transition kinds count as "chapter transitions" (cut, fade, morph) is not recorded; owner may override.
 
 ## Change log
 
+- 2026-10-11 — Recorded the owner-authorized PDF Unicode follow-on for TMS-R73 (`@pdf-lib/fontkit` plus an embedded font). Not implemented. Page text stays WinAnsi.
 - 2026-10-05 — Created per `docs/DOCUMENTATION_STANDARD.md`. 85 requirements.

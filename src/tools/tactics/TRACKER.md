@@ -6,14 +6,14 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
-updated: 2026-10-05
+updated: 2026-10-11
 ---
 
 # Tactical Matchboard Studio — tracker
 
 ## Resume here
 
-85 requirements: 75 verified, 1 implemented, 3 partial, 6 missing. Next action: build TMS-R82 (site theme in dark), then TMS-R07, R31, R44, R52, R78. Blocker: TMS-R73 needs an owner decision on a font-embedder dependency.
+85 requirements: 75 verified, 1 implemented, 3 partial, 6 missing. Feature matrix rows 1–67 remain verified (67/67). Next action: build TMS-R82 (site theme in dark), then TMS-R07, R31, R44, R52, R78. TMS-R73 is a separate follow-on: the owner authorized `@pdf-lib/fontkit` plus an embedded font, and it is not implemented. Do not add that dependency on the residuals restore.
 
 ## Documents
 
@@ -102,7 +102,7 @@ updated: 2026-10-05
 | TMS-R70 | verified | unit "exports source-honest trajectory and team-geometry metrics" | |
 | TMS-R71 | verified | unit "exposes a video combination only when the container and encoder both accept it", "does not call the encoder for an unconfirmed format and writes a vector frame ZIP"; e2e "exports metadata, analytics, playback, and a capability-checked video fallback" | |
 | TMS-R72 | verified | unit "writes a vector PDF package with info-dictionary fields and a metadata sidecar" | |
-| TMS-R73 | missing | — | Page text uses pdf-lib standard WinAnsi fonts; non-ASCII becomes `?`; the sidecar keeps the original text |
+| TMS-R73 | missing | — | Page text uses pdf-lib standard WinAnsi fonts; non-ASCII becomes `?`; the sidecar keeps the original text. Owner authorized a follow-on with `@pdf-lib/fontkit` and an embedded font; not implemented |
 | TMS-R74 | verified | unit "composes even social-card sizes and escapes active text", "builds a local playback document that cannot execute notes as HTML", "offers a raster format only after the browser write probe succeeds and checks the file signature"; e2e "downloads the current board as SVG" | |
 | TMS-R75 | partial | unit "composes even social-card sizes and escapes active text" | Social cards are square, portrait, story and landscape 1920×1080; no 1200×630 card |
 | TMS-R76 | verified | e2e "reflows and preserves 44px essential targets across phone, tablet, laptop, and desktop widths", "narrow sheets keep the pitch first and return focus" | |
@@ -123,18 +123,20 @@ updated: 2026-10-05
 3. TMS-R07, R31, R44, R52, R78: build.
 4. TMS-R75: 1200×630 card.
 5. TMS-R83: offline test.
-6. TMS-R73: after the owner decides on a font embedder.
+6. TMS-R73: owner authorized `@pdf-lib/fontkit` plus an embedded font as a separate follow-on. Not implemented. Do not add the dependency on the residuals restore.
 
 ## Known limitations
 
-- PDF page text is WinAnsi only (TMS-R73).
+- PDF page text is WinAnsi only (TMS-R73). The owner authorized `@pdf-lib/fontkit` plus an embedded font as a follow-on. That follow-on is not implemented.
 - Video export depends on the browser's WebCodecs encoders; seek precision is limited by the media element.
 - Analysis and tracking use authored or imported samples only.
 
 ## Verification evidence
 
+- 2026-10-11, `cursor/matchboard-residuals-restore` runtime `e134af68a6d8670f545a7bc1a4d568deb3d0b3bf`, Node v22.23.3: `tsc --noEmit -p tsconfig.app.json` exit 0; production build `✓ built in 6.33s`; `vitest run tests/unit/tactics-*.test.ts` 167/167 across 21 files; `tests/unit/e2e-spec-selection.test.mjs` 8/8; Playwright `tests/e2e/tactical-matchboard-studio.spec.ts` 80 passed / 2 skipped / 0 failed; `pnpm tool:check tactical-matchboard-studio --base origin/main` 75/85, no errors.
 - 2026-10-05, `expand/tactical-matchboard-studio` from `main` @ `6c991e75`: `pnpm tool:check tactical-matchboard-studio --base origin/main` 75/85, no errors.
 
 ## Change log
 
+- 2026-10-11 — Residuals restore onto current main. Requirement counts unchanged at 75/85. Feature matrix remains 67/67. TMS-R73 follow-on is owner-authorized and not implemented.
 - 2026-10-05 — Created per `docs/DOCUMENTATION_STANDARD.md`.

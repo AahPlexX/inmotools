@@ -4,14 +4,13 @@
 
 ## Workstream identity
 
-- Branch: `cursor/matchboard-residuals-wave-8ddf`
-- Base: `origin/main` `dd12e943576c9e0fb2abbc9772edec7e9cfafd39` (`feat(tactics): production audit for Tactical Matchboard Studio (#92)`)
-Former instruction (no longer applies): - Do not push to PR #76 or PR #92. Do not reopen those PRs.
-- Do not undraft or merge the new draft PR from this workstream.
-- Milestone: **T17-01 residuals wave is DONE.**
-- Verified functional features: **67/67**. Rows 1–63 stayed verified. Rows 64–67 are the residuals additions. Rows 3, 57, 58, 61, and 62 were updated in place.
-- Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader. The catalog entry now names both teams and the real export set. The unit registration check still requires SVG in `outputs`.
-- Dependencies: exact pins were not changed. `mediabunny` remains `1.58.0`. `jszip` remains `3.10.2`.
+- Branch: `cursor/matchboard-residuals-restore`
+- Runtime code: `origin/main` `e134af68a6d8670f545a7bc1a4d568deb3d0b3bf` (`feat(pdf): add range burst and actual-byte size split exports`). Closed tip `6d6fe379faf01e83db61e43ceb183a5e9f73cc3b` was rebased onto that commit. The three closed-PR commits were already upstream and were dropped. Squash `#100` is `6c5d42a4a95bb3af8a26d6bc5452bc2b31570de1`.
+- Do not resume the deleted residuals branch. Do not push to PR #76 or PR #92. Do not undraft or merge the restore draft.
+- Milestone: **T17-01 residuals wave is DONE on current main.** Feature matrix **67/67**. Standard tracker **75/85** verified (85 requirements: 75 verified, 1 implemented, 3 partial, 6 missing).
+- Verified functional features: **67/67** in `FEATURE_MATRIX.md`. Rows 1–63 stayed verified. Rows 64–67 are the residuals additions. Rows 3, 57, 58, 61, and 62 were updated in place. This restore did not change tracker requirement statuses.
+- Registration: Tactical Matchboard Studio is registered through `src/tools/tactics/tactical-matchboard-studio.meta.ts`. The catalog entry names both teams and the real export set.
+- Dependencies: this restore did not change `package.json` or the lockfile. Installed `mediabunny` is `1.60.0`. `jszip` is `3.10.2`.
 
 Historical SHAs below describe the pre-squash branch. They are not the branch to resume.
 
@@ -25,9 +24,18 @@ Historical SHAs below describe the pre-squash branch. They are not the branch to
 
 ## Exact next sequential action
 
-**Stop.** T17-01 is done. Do not start another feature row, do not reopen rows 1–67, and do not undraft or merge. Resume only for the PDF Unicode residual if CoS approves a font-embedder pin.
+**Stop on this restore.** Do not add `@pdf-lib/fontkit` here. Do not reopen feature-matrix rows 1–67. Do not undraft or merge. After this restore merges, the next Matchboard change is the owner-authorized PDF Unicode follow-on (`@pdf-lib/fontkit` plus an embedded font). PDF page text stays WinAnsi until that follow-on.
 
-Help copy changed: YES. The workspace header sentence, help section `match-setup`, command-bar tooltips, the Build board tip, and the squad-growth note were rewritten. The catalog entry was not changed in this wave. Stage 2 instructional writing applies because help copy changed.
+Help copy changed: YES, in the original wave. The workspace header sentence, help section `match-setup`, command-bar tooltips, the Build board tip, and the squad-growth note were rewritten. This restore did not rewrite them again.
+
+## 2026-10-11 restore onto current main
+
+- Closed PR #93 was unmerged and its branch was deleted. Tip `6d6fe379faf01e83db61e43ceb183a5e9f73cc3b` was rebased onto `origin/main` `e134af68a6d8670f545a7bc1a4d568deb3d0b3bf`.
+- Commit `8b53c349` conflicted in `.tasks/IN_PROGRESS.md`, `FEATURE_MATRIX.md`, `HANDOFF.md`, `TODO_SEQUENCE.md`, `TacticalBoard.tsx`, `TacticalMatchboardWorkspace.tsx`, `TacticalStageOnePanel.tsx`, and `accessibility-engine.ts`. Main already had the final quoted help copy and the retired in-progress list. The commit was skipped so those later main edits stayed.
+- Commit `f79d428f` conflicted in the four help-copy sources. Main already had the quoted control names from the closed tip. The commit was skipped.
+- Commit `6d6fe379` was dropped because its patch was already upstream.
+- `export-engine.ts`, `project-io.ts`, and `tests/unit/tactics-export.test.ts` auto-merged with no difference from main, so the ZIP date fix and `MEDIABUNNY_PIN` `1.60.0` stayed, and `MAX_VIDEO_EXPORT_FRAMES` stayed 60.
+- No Matchboard residual behavior was dropped. No other tool's code was edited.
 
 ## 2026-10-01 fix on `main`: deterministic project ZIP (row 60)
 
@@ -38,7 +46,7 @@ Help copy changed: YES. The workspace header sentence, help section `match-setup
 
 ## T17-01 residuals wave
 
-T17-01 is **DONE** except the PDF encoding half of residual 7. The wave started from main `dd12e943576c9e0fb2abbc9772edec7e9cfafd39`.
+T17-01 is **DONE** except the PDF encoding half of residual 7. The closed PR was rebased onto current main `e134af68a6d8670f545a7bc1a4d568deb3d0b3bf`. Its three commits were already upstream and were dropped.
 
 1. **Timeline virtualization and track cap — closed.** The timeline renders at most 40 track rows, with Previous tracks and Next tracks. The session cap is 2,048 tracks, raised from 256. A project at 2,048 tracks validates. 2,049 tracks are rejected on import, and `addTimelineTrack` refuses a 2,049th track.
 2. **Squad size — closed.** Growth is not limited to formation size. Row 3 still grows a 7-player board to 24 and can grow to 64 roster players on one team. A 65th player is refused. 64 is the Pages-safe roster ceiling, not a format cap. Existing projects above the ceiling are not rejected; only new growth is.
@@ -46,14 +54,16 @@ T17-01 is **DONE** except the PDF encoding half of residual 7. The wave started 
 4. **Separate opposition formation — closed.** The workspace passes a separately chosen formation. A 4v4 board can place a 7v7 opposition. Omitting the formation still mirrors the current squad, which keeps the older engine tests valid.
 5. **Persist training markings — closed.** Starter projects, Build board, rules application, and import of a bare overlay list store penalty areas, goal areas, penalty marks, goals, a centre circle, and corner arcs in `pitch.overlays`. IFAB and futsal overlay lists are left unchanged. SVG and PDF draw the stored list.
 6. **Build board confirm — closed.** Build board opens a confirm dialog before it replaces the board and clears undo. Cancelling leaves the current board and undo history in place.
-7. **Video frame cap — closed. PDF encoding — residual, CoS escalate.** `MAX_VIDEO_EXPORT_FRAMES` is 60, raised from 12. `sampleExportTimes` still refuses a requested cap above 240. The contact-sheet PDF sample cap stays 12. PDF page text remains WinAnsi. pdf-lib `1.17.1` standard fonts cannot draw beyond WinAnsi, and embedding a Unicode font needs `@pdf-lib/fontkit` (or an equivalent), which is not pinned. That pin was not added. No dependency pin or CI file changed.
+7. **Video frame cap — closed. PDF encoding — residual, follow-on not implemented.** `MAX_VIDEO_EXPORT_FRAMES` is 60, raised from 12. `sampleExportTimes` still refuses a requested cap above 240. The contact-sheet PDF sample cap stays 12. PDF page text remains WinAnsi. pdf-lib `1.17.1` standard fonts cannot draw beyond WinAnsi. The owner authorized a follow-on that adds `@pdf-lib/fontkit` and an embedded font. That follow-on is not implemented. This restore did not change a dependency pin or a CI file.
 8. **Board freehand — closed.** Freehand reuses the video telestration point rule: 2 to 2,000 normalized points (`MAX_TELESTRATION_POINTS`). Dragging on the pitch commits a stroke. Add freehand point and Save freehand are the non-drag path. The stroke is an annotation with kind `freehand`.
 
-Evidence: focused Tactical units **165/165** across 21 `tactics-*.test.ts` files and the e2e selector check **3/3**. `tsc --noEmit -p tsconfig.app.json` exits 0. Production build succeeds (`✓ built in 6.38s`). Full Tactical Playwright spec **80 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures** on desktop Chromium and mobile Chromium. Rows 1–63 were not reopened. Newly verified rows: **64, 65, 66, 67**.
+Original wave evidence, before later main fixes: focused Tactical units **165/165** across 21 `tactics-*.test.ts` files. `tsc --noEmit -p tsconfig.app.json` exits 0. Production build succeeds (`✓ built in 6.38s`). Full Tactical Playwright spec **80 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures** on desktop Chromium and mobile Chromium. Rows 1–63 were not reopened. Newly verified rows: **64, 65, 66, 67**.
+
+Remeasured 2026-10-11 on runtime `e134af68a6d8670f545a7bc1a4d568deb3d0b3bf` with Node v22.23.3: focused Tactical units **167/167** across 21 `tactics-*.test.ts` files. `tests/unit/e2e-spec-selection.test.mjs` passes **8/8**. `tsc --noEmit -p tsconfig.app.json` exits 0. Production build succeeds (`✓ built in 6.33s`). Full Tactical Playwright spec **80 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures** on desktop Chromium and mobile Chromium. `pnpm tool:check tactical-matchboard-studio --base origin/main` reports **75/85** verified.
 
 ## Residual backlog, in priority order
 
-1. PDF page text remains WinAnsi. CoS escalate before adding `@pdf-lib/fontkit` or any other font embedder. Do not change pins or CI from this workstream. Non-ASCII notes become `?` on the page while the sidecar keeps the original text.
+1. PDF page text remains WinAnsi. The owner authorized a follow-on that adds `@pdf-lib/fontkit` and an embedded font. That follow-on is not implemented. Do not add the dependency in this restore. Non-ASCII notes become `?` on the page while the sidecar keeps the original text.
 
 ## T16-01 production audit
 
@@ -156,14 +166,14 @@ Stage 1 verified rows **3, 4, 5, 6, 7, 8, 39, 40, and 41**. T16-01 added **61, 6
 
 ## Multi-agent / branch rules
 
-- Stay on `cursor/matchboard-residuals-wave-8ddf`.
+- Stay on `cursor/matchboard-residuals-restore`. Do not resume the deleted residuals branch.
 - Do not push to PR #76 or PR #92. Do not reopen those PRs.
 - Do not undraft or merge the draft PR for this residuals wave.
 - Before every mutation, compare the last known branch tip with the live remote ref. If another agent advanced it, refresh and reconcile before writing.
 - An ACTIVE queue item's Primary files are reserved.
 - Forward agent takes the lowest-numbered READY item. None are READY after T17-01.
 - Never force-push, destructively rebase, delete the branch, or merge partial work.
-- T14 history is recorded below. T15 is superseded because PR #76 was squash-merged to main as `b51a516`. T16-01 is DONE on main as `dd12e94` (PR #92). T17-01 is DONE on this branch.
+- T14 history is recorded below. T15 is superseded because PR #76 was squash-merged to main as `b51a516`. T16-01 is DONE on main as PR #92. T17-01 is on current main through squash `#100` and this restore.
 
 ## Known non-Tactical repository context
 
@@ -176,4 +186,4 @@ Whenever material Tactical state changes, update together:
 - `src/tools/tactics/TODO_SEQUENCE.md`
 - `src/tools/tactics/HANDOFF.md`
 - `.tasks/IN_PROGRESS.md`
-Former instruction (no longer applies): - the draft PR for `cursor/matchboard-residuals-wave-8ddf` when its milestone, count, or evidence becomes stale. Do not edit PR #76 or PR #92.
+- the draft PR for `cursor/matchboard-residuals-restore` when its milestone, count, or evidence becomes stale. Do not edit PR #76 or PR #92. Do not undraft or merge the restore draft.
