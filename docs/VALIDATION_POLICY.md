@@ -7,6 +7,10 @@ updated: 2026-10-11
 
 ## Current checkpoint
 
+2026-10-11 14:40 UTC: static-analysis rollout main70bf90a accepted. [Task8b2c](../.tasks/items/T-static-analysis-20261011-8b2c.md) records exact source, native smoke, dependency proof and all receipts. Static analysis38148037900 passes1276files/196rules/4085warnings/0errors. Pages38148038076 passes4160units/18skips and build5.75s; actual browser plan=[] because the initial additive lint-only proof passes, so no browser install/run. Docs38148038001/build-pages/deploy succeed. tsc remains required; existing lint debt is warning-only except focused unit tests, and warning review does not replace behavioral acceptance.
+
+Previous validation-policy acceptance:
+
 Accepted implementation mainc7658de; [Pages38120639969](https://github.com/AahPlexX/inmotools/actions/runs/38120639969) and [Docs38120639925](https://github.com/AahPlexX/inmotools/actions/runs/38120639925) succeeded2026-10-11. Actual affected browser plan is empty for the policy-only change, so browser installation/execution were skipped;4142units passed/18skipped and build8.11s. Native module-record regression coverage68/68passed, original client assertions/timeouts unchanged. [Validation task](../.tasks/items/T-validation-policy-20261011-4d6b.md) is done and preserves the earlier selector timeout failures.
 
 Existing [full38095819719](https://github.com/AahPlexX/inmotools/actions/runs/38095819719) succeeded on sourceb914:1833browserpasses/171skips54.7m, no retry markers. Application/browser/dependency/build inputs still match except records; matching evidence is reused within that scope. Future changes must select their own applicable gates.

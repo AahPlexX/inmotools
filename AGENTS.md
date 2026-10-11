@@ -33,6 +33,7 @@ git push                                               # after every working ste
 
 | What | Command |
 | --- | --- |
+| Static analysis | `pnpm lint` (warnings and gate scope in [validation policy](docs/VALIDATION_POLICY.md)) |
 | Type check | `pnpm exec tsc --noEmit -p tsconfig.app.json` |
 | Unit tests | `pnpm test:unit` |
 | Build | `pnpm build` |
