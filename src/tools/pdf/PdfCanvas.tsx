@@ -3,6 +3,7 @@ import { normalizedPdfZoom } from './pdf-renderer';
 import { findPdfTextMatches, type PdfTextMatch } from './pdf-text-search';
 import type { PdfJsDocumentSession, PdfRenderedPage } from './pdfjs-browser';
 import './pdf-text-layer.css';
+import PdfThumbnailRail from './PdfThumbnailRail';
 
 type Props = {
   file: File;
@@ -25,6 +26,7 @@ export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady, onP
   const sessionRef = useRef<PdfJsDocumentSession | null>(null);
   const searchRequestRef = useRef(0);
   const [sessionVersion, setSessionVersion] = useState(0);
+  const [thumbnailSource, setThumbnailSource] = useState<{ file: File; session: PdfJsDocumentSession } | null>(null);
   const [rendered, setRendered] = useState<PdfRenderedPage | null>(null);
   const [status, setStatus] = useState('Loading PDF renderer…');
   const [query, setQuery] = useState('');
@@ -37,6 +39,7 @@ export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady, onP
     let activeSession: PdfJsDocumentSession | null = null;
     searchRequestRef.current += 1;
     sessionRef.current = null;
+    setThumbnailSource(null);
     setRendered(null);
     setMatches([]);
     setSearchStatus('Enter text to search this document.');
@@ -57,6 +60,7 @@ export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady, onP
         }
         activeSession = session;
         sessionRef.current = session;
+        setThumbnailSource({ file, session });
         onDocumentReady?.(session.pageCount);
         setSessionVersion((value) => value + 1);
       } catch (error) {
@@ -144,6 +148,7 @@ export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady, onP
   }
 
   return <div>
+    {thumbnailSource?.file === file && onPageRequest ? <PdfThumbnailRail key={sessionVersion} session={thumbnailSource.session} pageNumber={pageNumber} onSelect={onPageRequest} /> : null}
     <div
       style={{
         maxWidth: '100%',

@@ -21,11 +21,12 @@ pnpm dev
 Validation:
 
 ```bash
+pnpm lint
 pnpm test:unit
 pnpm build
-pnpm exec playwright install chromium
-pnpm test:e2e
 ```
+
+Browser validation follows [the validation policy](docs/VALIDATION_POLICY.md): use `scripts/run-browser-validation.mjs` with a reliable base revision for affected tool/dependency checks. Reserve `pnpm test:e2e` for explicit full checkpoints.
 
 ## Privacy model
 

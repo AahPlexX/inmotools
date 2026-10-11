@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-pdf-sanitizer-design.md
 tracker: src/tools/pdf/TRACKER.md
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # PDF Sanitizer — spec
@@ -306,3 +306,12 @@ Before implementation: inspect source structures before mutating form getters. L
 Readable optional-structure defects must produce stable human-readable warnings instead of minified library type errors. Preserve original bytes, readable peers, reader/password/cancellation ownership, and existing output verification. Incomplete required inspection blocks export until the affected source is removed; successful parsing alone is not a clean structural scan. Bound post-parse traversal and warning presentation, distinguish limits/unknowns, and do not claim bounds on the libraries' own parsing/enumeration allocations. PDF null semantics apply: explicit null/undefined indirect references are absent values (PDF32000-1:2008 sections7.3.9–7.3.10), not blanket structural failures; required contextual geometry/types remain checked, and normal flattened output must still download.
 
 Acceptance uses owned plain/form/XFA/UserUnit/action/recovered-object/malformed-Names/cycle/limit specimens, real encrypted fixtures already owned by the project, native reader/queue/remove/clear/export interaction and source-byte equality. Diagnostic controls/long names must wrap across320portrait,844landscape, tablet and desktop, Light/Dark/System, with accessible native disclosure/pagination and actual browser checks. Add meaningful focused unit/browser coverage; shared test edits are justified by this tool contract, using current dependency-selected validation rather than a duplicate full suite.
+
+
+## PDF-R05 thumbnail contract — 2026-10-11
+
+Use the currently owned viewer session; protected viewing must not reopen passwords or become editable. Render only visible thumbnails in a horizontally scrollable, labelled rail. Keep at most20 thumbnail DOM/canvas slots in a navigable page group; larger documents use previous/next groups and the existing direct page input. Fit each thumbnail within120×144 CSS pixels with backing scale1, independent of main zoom/device ratio. Null/error/huge dimensions fail locally rather than allocating an oversized canvas.
+
+Thumbnail render cancellation must use its own abort signal and never replace the main page-number coordinator slot. Source/group/route changes cancel thumbnail renders and prevent stale publication; native page cleanup must wait safely for other renders. Native labelled page buttons/current-page state and group controls support keyboard/touch; controls/long filename/rail stay within viewport in portrait/landscape and all themes. On unsupported observer environments a bounded fallback remains usable.
+
+Acceptance: real20-page source starts with a subset of thumbnails rendered; native rail scroll reveals later pages; selecting a thumbnail and typing a distant page synchronize viewer/rail. A larger source exposes no more20slots. Concurrent same-page rendering/zoom, source switches, repeated Clear, protected input and navigation preserve viewer session ownership and cleanup. Existing PDF tests remain unchanged; affected dependency scope plus focused native responsiveness/theme/accessibility checks qualify the work.

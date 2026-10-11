@@ -178,4 +178,29 @@ export class PdfJsDocumentSession {
     await this.coordinator.destroy();
     await this.loadingTask.destroy();
   }
+
+  async renderThumbnail(pageNumber: number, canvas: HTMLCanvasElement, signal: AbortSignal): Promise<void> {
+    if (this.destroyed || signal.aborted) throw new DOMException('Thumbnail cancelled', 'AbortError');
+    this.assertPageNumber(pageNumber);
+    const page = await this.document.getPage(pageNumber);
+    let task: RenderTask | undefined;
+    const cancel = () => task?.cancel();
+    try {
+      if (this.destroyed || signal.aborted) throw new DOMException('Thumbnail cancelled', 'AbortError');
+      const natural = page.getViewport({ scale: 1 });
+      if (![natural.width, natural.height].every(value => Number.isFinite(value) && value > 0)) throw new Error('Invalid thumbnail dimensions.');
+      const viewport = page.getViewport({ scale: Math.min(120 / natural.width, 144 / natural.height) });
+      const context = canvas.getContext('2d', { alpha: false });
+      if (!context) throw new Error('Thumbnail canvas is unavailable.');
+      canvas.width = Math.max(1, Math.min(120, Math.ceil(viewport.width)));
+      canvas.height = Math.max(1, Math.min(144, Math.ceil(viewport.height)));
+      task = page.render({ canvas, canvasContext: context, viewport, background: '#ffffff' });
+      signal.addEventListener('abort', cancel, { once: true });
+      if (signal.aborted) cancel();
+      await task.promise;
+    } finally {
+      signal.removeEventListener('abort', cancel);
+      page.cleanup();
+    }
+  }
 }

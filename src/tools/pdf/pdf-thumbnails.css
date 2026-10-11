@@ -1,0 +1,8 @@
+.pdf-thumbnail-section { min-width: 0; max-width: 100%; margin-bottom: 16px; }
+.pdf-thumbnail-section .button-row { flex-wrap: wrap; }
+.pdf-thumbnail-rail { display: flex; gap: 10px; overflow-x: auto; max-width: 100%; padding: 8px 4px; border: 1px solid var(--line); border-radius: 8px; }
+.pdf-thumbnail { flex: 0 0 138px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.pdf-thumbnail[aria-current="page"] { outline: 2px solid var(--signal); outline-offset: -2px; }
+.pdf-thumbnail-image { display: flex; align-items: center; justify-content: center; width: 120px; height: 144px; }
+.pdf-thumbnail canvas { max-width: 120px; max-height: 144px; }
+.pdf-thumbnail small { white-space: normal; overflow-wrap: anywhere; }
