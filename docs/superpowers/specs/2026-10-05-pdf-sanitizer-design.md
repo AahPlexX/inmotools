@@ -11,7 +11,7 @@ updated: 2026-10-10
 
 # PDF Sanitizer — spec
 
-As built at `947272db` (last code change under `src/tools/pdf/`). Requirement prefix: `PDF`. Status of each requirement: [TRACKER.md](../../../src/tools/pdf/TRACKER.md). History: [2026-09-12 PDF Workstation design](2026-09-12-pdf-workstation-design.md) (capabilities 1–146, cited below as "formerly <n>"), [STATUS.md](../../../src/tools/pdf/STATUS.md), [plan](../plans/2026-09-12-pdf-workstation.md). Owner input: [owner feature notes 2026-10-05](../../research/owner-feature-notes-2026-10-05.md#pdf-sanitizer-pdf-editor--document-studio).
+Baseline snapshot at `947272db`, recorded 2026-10-05; current accepted runtime and continuation are recorded in [TRACKER.md](../../../src/tools/pdf/TRACKER.md#resume-here). Requirement prefix: `PDF`. Status of each requirement: [TRACKER.md](../../../src/tools/pdf/TRACKER.md). History: [2026-09-12 PDF Workstation design](2026-09-12-pdf-workstation-design.md) (capabilities 1–146, cited below as "formerly <n>"), [STATUS.md](../../../src/tools/pdf/STATUS.md), [plan](../plans/2026-09-12-pdf-workstation.md). Owner input: [owner feature notes 2026-10-05](../../research/owner-feature-notes-2026-10-05.md#pdf-sanitizer-pdf-editor--document-studio).
 
 ## Purpose
 

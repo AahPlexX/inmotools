@@ -15,7 +15,9 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-2026-10-11 08:04 UTC: frozen cursor PDF-R04/c061 active/partial. Source5cded997 is on main/live; required selected regression failed54passed/4failed (original flattening downloads, both profiles/retries), semantic null repair448b0ce now passes54PDFunits/types/build and18affected native cases; fresh repaired main/selected CI/live remain pending, so no R04 acceptance or next-item advance. The [PDF tracker](../../src/tools/pdf/TRACKER.md#resume-here) and [verification](../../src/tools/pdf/VERIFICATION.md#current-checkpoint) contain reproduced null-reference cause, actual CI/local/live receipts and repair action. PDF-R02/R03 remain verified; current validation policy retains scoped checks and failure history. R05 preparation is queued externally only.
+2026-10-11 08:11 UTC: PDF-R04 verified and c061 done on main f992c97. Required selected Pages 38123605973 / job 114423240582 SUCCESS: 4,154 unit passes / 18 skips, build 8.14s, all 58 browser cases in nine PDF specs passed with no browser skips/failures/retry markers; deployment/Docs successful. Local 54 PDF units / 18 affected native and qualified-live 10 passes are accepted in their recorded scopes; matching earlier geometry/protected evidence is reused precisely. Prior failed flattening regression and semantic-null repair remain documented. PDF now has 36 / 167 verified requirements.
+
+Next frozen cursor: PDF-R05 lazy thumbnail page rail, [T-pdf-sanitizer-20261011-4b3a](T-pdf-sanitizer-20261011-4b3a.md) queued; no application implementation. The [PDF tracker](../../src/tools/pdf/TRACKER.md#resume-here), [verification](../../src/tools/pdf/VERIFICATION.md#current-checkpoint) and next task provide the exact source, current research, shared render-cancellation constraint and activation/validation steps. PDF-R02/R03 remain verified. Current validation policy retains dependency-selected checks and explicit full checkpoints; no duplicate repository-wide browser gate or inventory reorder.
 
 ### Historical checkpoint — before dependency activation
 
@@ -237,3 +239,5 @@ Portable PDF fixture reproduction: use pinned pdf-lib1.17.1 to create two pages 
 - 2026-10-10 23:39 UTC: scoped Crystal dependency repair16/16actual production checks passed; required changed-source release/full gates pending, PDF acceptance remains open.
 
 - 2026-10-10 23:48 UTC: narrow Crystal repair integrated maincfb7dd3, owned/Pages/live passed; exact changed-source full38095819719 still running. PDF cursor held, accepted scopes reused, no raw five-file-match claim.
+
+- 2026-10-11 08:11 UTC: PDF-R04 accepted after repaired selected/native/live gates; queued R05 with current official API and ownership facts.

@@ -3,7 +3,7 @@ task: T-pdf-sanitizer-20261009-c061
 tool: pdf-sanitizer
 doc: task
 kind: fix
-state: active
+state: done
 branch: fix/pdf-sanitizer
 created: 2026-10-09
 updated: 2026-10-11
@@ -16,11 +16,13 @@ Complete PDF-R04 in frozen inventory order after PDF-R02/R03 acceptance. Show ac
 
 ## Resume here
 
-2026-10-11 08:04 UTC: semantic null repair448b0ce passed54PDFunits8.88s, TypeScript/build13.31s and18affected native browser cases51.881s, no skips/retries/errors. Immutable r04-null-repair-dist is the runtime candidate. Fresh native coverage is six malformed/action/remove/export cycles plus12original flattening cases (with/without authored replacement) in six profiles; original test bodies/assertions/timeouts are unchanged. Twelve earlier R04 geometry/protected cases are reusable only for their identical specimen/behavior branches; do not claim all cases ran freshly on this revision.
+2026-10-11 08:11 UTC: PDF-R04 verified; diagnostics task c061 done. Runtime/source main f992c97b4a6800dda8c82316ae028e372722ed90 is accepted. Pages 38123605973 / validate job 114423240582 completed SUCCESS: 4,154 unit passes / 18 skips, 374 unit files passed / 2 skipped, build 8.14s; all 58 browser cases in the nine selected PDF specs passed (1.9m), no browser skips/failures or retry markers. Deployment job 114423342079 and Docs 38123606016 succeeded. Repository-wide browser validation was not dispatched; scope selection is recorded in the final CI receipt.
 
-Pinned official PDF/null and copier/flatten source receipts are currentHTTP200; the unit red reproduction and prior main selected54pass/4failure, including retries, remain historical failures. Required contextual geometry/types, malformed-object/form/attachment checks, traversal limits, XFA/signature/export refusal and protected reader ownership remain enforced. Source byte equality, unknown-vs-zero summaries and inert indicators remain covered.
+Local null-repaired candidate 448b0ce / r04-null-repair-dist: 54 PDF units passed (8.88s), TypeScript/build passed (13.31s), 18 affected native browser cases passed (51.881s), no retries/skips/errors. Those cases include the original flattening/export behaviors and malformed-source recovery in all six browser profiles. Twelve earlier geometry/protected cases are reused only in their matching unchanged specimen/behavior branches, not claimed as fresh final-source runs. Final live qualification at 08:07:01 UTC fetched root and three critical PDF assets with HTTP 200; PDF workspace JavaScript/CSS and reader helper byte-match the repaired candidate. Ten focused live cases passed (27.258s), including both original flattening behaviors, with no skips/retries/errors.
 
-R04partial/c061active, main/live still5cded997 until repaired publication. Next fresh guard and GitHub MCP direct-main source/record push, selected9PDFspecs/required units/build/Pages/current live receipt, then accept or repair. No unchanged full-suite redispatch, PR, dependency or parser/library modification. R05 preparation is queued only.
+Fixed readable malformed optional-source rejection, opaque optional-structure errors, absent structural/action diagnostics, false unknown-as-zero summaries and false flattening refusal caused by treating legal null references as errors. Source bytes and required contextual/preservation guards remain intact; reader scope and post-parse limits are explicit. Prior failed CI 38122886351 (54 passes / 4 original flattening failures, including retries) and initial test-expectation/host-setup failures remain historical evidence; no failure is relabelled successful.
+
+Next frozen item: PDF-R05 lazy thumbnail page rail, queued task T-pdf-sanitizer-20261011-4b3a; no R05 implementation or acceptance. Read its current-source cancellation/ownership facts and official API receipt, refresh actual main/time, activate the task, specify the bounded client cycle before code, then use meaningful dependency-selected validation. No PR, new dependency, parser modification, auth/backend or stored password. Records-only publication does not change the accepted runtime.
 
 ### Historical queued preparation — retained evidence, not current instructions
 
@@ -50,3 +52,5 @@ If the PDF worktree already exists, scripts/task-start.mjs returns from the reus
 - 2026-10-11 07:52 UTC: final10local passes plus8precisely matching reused scopes; summary unknown-inventory defect corrected. Awaiting guarded main/selected CI/Pages/live.
 
 - 2026-10-11 08:03 UTC: actual null semantics repaired from refreshed authoritative evidence;54PDFunits/types/build pass. Original failing native cases running, no release/acceptance.
+
+- 2026-10-11 08:11 UTC: R04 verified on main f992c97; selected CI 58 browser passes / 4,154 unit passes, deployment and current live 10 passes. Task done; next frozen R05 task T-pdf-sanitizer-20261011-4b3a queued. Historical failures retained.
