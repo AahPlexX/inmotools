@@ -6,7 +6,7 @@
 
 - Branch: `cursor/matchboard-pdf-unicode`
 - Base: `origin/main` `e134af68a6d8670f545a7bc1a4d568deb3d0b3bf`
-- Tip: filled after the gate commit
+- Tip: `9a298eeebdf2981f5babfe0512b6c7f2da33a287`
 - Draft pull request: do not undraft or merge
 - Page text outside basic Latin uses bundled Noto Sans through `@pdf-lib/fontkit` 1.1.1. A letter outside that subset is shown as ?. metadata.json keeps the original letter.
 - Lazy chunk: `pdf-unicode-font-*.js`, 1,023.46 kB, gzip 493.18 kB, from the 2026-10-11 production build. It loads only when the coaching PDF contains a character outside basic Latin.
