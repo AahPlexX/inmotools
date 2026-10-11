@@ -13,11 +13,11 @@ updated: 2026-10-11
 
 ## Resume here
 
-2026-10-11 07:52 UTC: PDF-R04 final local affected browser run10/10passed51.042s, no skips/retries/errors. Six profiles cover desktop/touch Chromium, desktop/compact Firefox and desktop/mobile WebKit. All WebKit application cases now executed successfully with verified cached host libraries; the earlier host-validation failures remain preserved. The final collapsed summary accurately labels unknown inventories and its explicit assertions pass in all six profiles.
+2026-10-11 08:04 UTC: semantic null repair448b0ce passed54PDFunits8.88s, TypeScript/build13.31s and18affected native browser cases51.881s, no skips/retries/errors. Immutable r04-null-repair-dist is the runtime candidate. Fresh native coverage is six malformed/action/remove/export cycles plus12original flattening cases (with/without authored replacement) in six profiles; original test bodies/assertions/timeouts are unchanged. Twelve earlier R04 geometry/protected cases are reusable only for their identical specimen/behavior branches; do not claim all cases ran freshly on this revision.
 
-The18-case local acceptance matrix is a documented partition, not18fresh runs on one revision: final-source ten cases plus four Chromium/Firefox geometry/theme/non-overlap passes from the repaired run and four unchanged protected-reader passes from the initial run. Only the collapsed editable summary changed after the earlier matching passes; protected branch, geometry/diagnostic styles and test bodies used for reuse are unchanged. No cases are counted twice. Physical hardware certification is not implied.
+Pinned official PDF/null and copier/flatten source receipts are currentHTTP200; the unit red reproduction and prior main selected54pass/4failure, including retries, remain historical failures. Required contextual geometry/types, malformed-object/form/attachment checks, traversal limits, XFA/signature/export refusal and protected reader ownership remain enforced. Source byte equality, unknown-vs-zero summaries and inert indicators remain covered.
 
-Final summary-only candidate r04-summary-dist: TypeScript/build pass,51matching PDF units retained for unchanged engine/helpers. Source research refreshed today from eight pinned official sources with HTTP200/hash-identical receipts. Next publish through GitHub MCP to fresh guarded main4d82d228, obtain selected9PDFspecs/required units/build/Pages and qualified-live receipts, then acceptR04 or repair. R04 remains partial until those gates complete. No repository-wide browser redispatch, assertion/timeout weakening, dependency upgrade or PR.
+R04partial/c061active, main/live still5cded997 until repaired publication. Next fresh guard and GitHub MCP direct-main source/record push, selected9PDFspecs/required units/build/Pages/current live receipt, then accept or repair. No unchanged full-suite redispatch, PR, dependency or parser/library modification. R05 preparation is queued only.
 
 ## Documents
 
@@ -215,7 +215,7 @@ Final summary-only candidate r04-summary-dist: TypeScript/build pass,51matching 
 
 ## Known limitations
 
-- Protected PDFs can be opened for local read-only viewing; protected inputs remain excluded from editable processing and downloads. Final corrected-source acceptance is pending.
+- Protected PDFs can be opened for local read-only viewing; protected inputs remain excluded from editable processing and downloads. PDF-R02/R03 are verified; protected-source modification remains refused.
 - Source form fields must be flattened before page copying; editable source fields are not carried into the output.
 - Page-level annotations (and any actions they carry) are kept in the rebuilt output.
 

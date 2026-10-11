@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-2026-10-11 07:52 UTC: frozen cursor PDF-R04/c061 active, implementation and meaningful red/green regressions present; source is unreleased with the18-case local browser matrix accepted as an explicit10fresh+8matching-scope partition; selected/main/Pages/qualified-live gates pending. PDF-R02/R03 remain verified and7f9e done. Main4d82d228 contains the accepted dependency-selected validation policy. The [PDF tracker](../../src/tools/pdf/TRACKER.md#resume-here) and [verification](../../src/tools/pdf/VERIFICATION.md#current-checkpoint) hold exact current sources, run partitions, failures and next action. Scope-reuse is recorded precisely; no duplicate repository-wide browser pass. No inventory advance or R04 acceptance is claimed while required gates remain pending.
+2026-10-11 08:04 UTC: frozen cursor PDF-R04/c061 active/partial. Source5cded997 is on main/live; required selected regression failed54passed/4failed (original flattening downloads, both profiles/retries), semantic null repair448b0ce now passes54PDFunits/types/build and18affected native cases; fresh repaired main/selected CI/live remain pending, so no R04 acceptance or next-item advance. The [PDF tracker](../../src/tools/pdf/TRACKER.md#resume-here) and [verification](../../src/tools/pdf/VERIFICATION.md#current-checkpoint) contain reproduced null-reference cause, actual CI/local/live receipts and repair action. PDF-R02/R03 remain verified; current validation policy retains scoped checks and failure history. R05 preparation is queued externally only.
 
 ### Historical checkpoint — before dependency activation
 

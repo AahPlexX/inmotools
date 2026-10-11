@@ -4,6 +4,7 @@ import {
   PDFDocument,
   PDFHexString,
   PDFName,
+  PDFNull,
   PDFNumber,
   StandardFonts,
   TextAlignment,
@@ -571,7 +572,8 @@ function inspectParsedPdf(document: PDFDocument): PdfInspection {
     let rotation = 0;
     try { rotation = page.getRotation().angle; if (!Number.isFinite(rotation) || rotation % 90 !== 0) throw new Error('Invalid rotation'); }
     catch { diagnosticWarning(diagnostics, `Page ${index + 1} rotation could not be inspected; displayed dimensions use zero rotation.`); rotation = 0; }
-    const rawUnit = document.context.lookup(page.node.get(PDFName.of('UserUnit')));
+    const resolvedUnit = document.context.lookup(page.node.get(PDFName.of('UserUnit')));
+    const rawUnit = resolvedUnit === PDFNull ? undefined : resolvedUnit;
     let userUnit = rawUnit instanceof PDFNumber ? rawUnit.asNumber() : 1;
     if ((rawUnit && !(rawUnit instanceof PDFNumber)) || !Number.isFinite(userUnit) || userUnit <= 0 || userUnit > 75_000) {
       diagnosticWarning(diagnostics, `Page ${index + 1} has an invalid UserUnit; displayed dimensions use the default unit.`); userUnit = 1;

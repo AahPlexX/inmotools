@@ -1,4 +1,4 @@
-import { PDFDocument, PDFName, PDFNumber, PDFString, degrees } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFNull, PDFNumber, PDFRef, PDFString, degrees } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { inspectPdf, splicePdfs } from '../../src/tools/pdf/pdf-engine';
 import { inspectDocumentDiagnostics, inspectFormFieldCount, inspectReaderDiagnostics } from '../../src/tools/pdf/pdf-diagnostics';
@@ -11,6 +11,34 @@ async function specimen() {
 const bytes = async (document: PDFDocument) => new Uint8Array(await document.save({ useObjectStreams: false, updateFieldAppearances: false }));
 
 describe('PDF-R04 source diagnostics', () => {
+  it('treats absent indirect and explicit null optional values as null while refusing missing required geometry', async () => {
+    const document = await specimen();
+    document.catalog.set(PDFName.of('Names'), PDFNull);
+    document.catalog.set(PDFName.of('AcroForm'), PDFNull);
+    document.catalog.set(PDFName.of('Metadata'), PDFRef.of(999));
+    document.catalog.set(PDFName.of('OpenAction'), PDFRef.of(998));
+    document.getPage(0).node.set(PDFName.of('UserUnit'), PDFNull);
+    const inspection = await inspectPdf(await bytes(document));
+    expect(inspection.diagnostics).toMatchObject({ complete: true, hasXfa: false, hasXmp: false, indicators: [], warnings: [] });
+    expect(inspection.formFieldCount).toBe(0);
+    expect(inspection.attachments).toEqual([]);
+    document.getPage(0).node.set(PDFName.of('MediaBox'), PDFRef.of(997));
+    await expect(inspectPdf(await bytes(document))).rejects.toThrow(/unreadable required page geometry/);
+  });
+  it.each([false, true])('accepts diagnostics after flattening a source form (authored replacement: %s)', async (authored) => {
+    const document = await specimen();
+    const field = document.getForm().createTextField('source.name');
+    field.addToPage(document.getPage(0), { x: 20, y: 120, width: 150, height: 24 });
+    field.setText('Source value');
+    const source = new Uint8Array(await document.save());
+    const output = await splicePdfs([{ bytes: source, flatten: true }], {
+      formFields: authored ? [{ type: 'text', name: 'replacement.note', page: 1, x: 20, y: 30, width: 150, height: 24, value: 'Reviewed' }] : [],
+    });
+    const inspected = await inspectPdf(output);
+    expect(inspected.diagnostics.warnings).toEqual([]);
+    expect(inspected.diagnostics.complete).toBe(true);
+    expect(inspected.formFieldCount).toBe(authored ? 1 : 0);
+  });
   it('leaves parsed forms and XFA untouched and makes scan limits explicit', async () => {
     const document = await specimen();
     document.getForm().createTextField('owned-field');

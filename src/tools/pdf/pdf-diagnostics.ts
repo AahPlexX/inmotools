@@ -1,4 +1,4 @@
-import { PDFArray, PDFDict, PDFDocument, PDFInvalidObject, PDFName, PDFObject, PDFRef, PDFStream } from 'pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFInvalidObject, PDFName, PDFNull, PDFObject, PDFRef, PDFStream } from 'pdf-lib';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 export interface PdfDiagnostics {
@@ -39,20 +39,25 @@ export function inspectDocumentDiagnostics(document: PDFDocument, objectLimit = 
     formsInspected: true, metadataInspected: true, attachmentsInspected: true,
     indicators: [], warnings: [], scannedObjects: 0, objectLimit, pageDimensions: [],
   };
-  const resolve = (value: PDFObject | undefined) => value instanceof PDFRef ? document.context.lookup(value) : value;
+  const resolve = (value: PDFObject | undefined) => {
+    const resolved = value instanceof PDFRef ? document.context.lookup(value) : value;
+    // PDF32000-1:2008 §7.3.10: an undefined indirect reference is null, not an error.
+    return resolved === PDFNull ? undefined : resolved;
+  };
   const optionalDict = (key: string, section: 'formsInspected' | 'metadataInspected' | 'attachmentsInspected') => {
     const raw = document.catalog.get(PDFName.of(key));
     if (!raw) return;
     const value = resolve(raw);
+    if (!value) return;
     if (value instanceof PDFDict) return value;
     result[section] = false;
     diagnosticWarning(result, `${key} should be a dictionary; this optional inspection is incomplete.`);
   };
   const form = optionalDict('AcroForm', 'formsInspected');
-  result.hasXfa = form ? form.has(PDFName.of('XFA')) : result.formsInspected ? false : null;
+  result.hasXfa = form ? Boolean(resolve(form.get(PDFName.of('XFA')))) : result.formsInspected ? false : null;
   if (result.hasXfa) diagnosticWarning(result, 'XFA forms are present; dynamic content preservation cannot be verified. Export is blocked for this source.');
   optionalDict('Names', 'attachmentsInspected');
-  const metadata = document.catalog.get(PDFName.of('Metadata'));
+  const metadata = resolve(document.catalog.get(PDFName.of('Metadata')));
   result.hasXmp = Boolean(metadata);
   if (metadata && !(resolve(metadata) instanceof PDFStream)) {
     result.metadataInspected = false;
@@ -69,7 +74,7 @@ export function inspectDocumentDiagnostics(document: PDFDocument, objectLimit = 
     while (stack.length) {
       const current = stack.pop()!;
       const value = resolve(current.value);
-      if (!value) { diagnosticWarning(result, 'Unresolved object reference found; structural inspection is incomplete.'); continue; }
+      if (!value) continue;
       if (visited.has(value)) continue;
       if (visited.size >= objectLimit || edges >= EDGE_LIMIT) {
         diagnosticWarning(result, 'Diagnostic traversal limit reached; remaining objects were not inspected.');
@@ -85,6 +90,7 @@ export function inspectDocumentDiagnostics(document: PDFDocument, objectLimit = 
         if (action instanceof PDFName && ACTIONS.has(action.decodeText())) indicators.add(action.decodeText());
         for (const [key, child] of dictionary.entries()) {
           if (++edges > EDGE_LIMIT) break;
+          if (!resolve(child)) continue;
           const name = key.decodeText();
           if (name === 'JS' || name === 'JavaScript') indicators.add('JavaScript');
           if (name === 'OpenAction') indicators.add('OpenAction');
