@@ -6,8 +6,9 @@
 
 - Branch: `cursor/matchboard-pdf-unicode`
 - Base: `origin/main` `e134af68a6d8670f545a7bc1a4d568deb3d0b3bf`
-- Tip: `9a298eeebdf2981f5babfe0512b6c7f2da33a287`
-- Draft pull request: do not undraft or merge
+- Implementation: `9a298eeebdf2981f5babfe0512b6c7f2da33a287`
+- Tip: this docs-only commit
+- The implementation is complete and verified. Draft pull request #121 awaits the Chief of Staff's squash-merge. After that merge, nothing for PDF Unicode remains in flight; resume from main.
 - Page text outside basic Latin uses bundled Noto Sans through `@pdf-lib/fontkit` 1.1.1. A letter outside that subset is shown as ?. metadata.json keeps the original letter.
 - Lazy chunk: `pdf-unicode-font-*.js`, 1,023.46 kB, gzip 493.18 kB, from the 2026-10-11 production build. It loads only when the coaching PDF contains a character outside basic Latin.
 
@@ -15,8 +16,7 @@
 
 - Branch: `cursor/matchboard-residuals-wave-8ddf`
 - Base: `origin/main` `dd12e943576c9e0fb2abbc9772edec7e9cfafd39` (`feat(tactics): production audit for Tactical Matchboard Studio (#92)`)
-Former instruction (no longer applies): - Do not push to PR #76 or PR #92. Do not reopen those PRs.
-- Do not undraft or merge the new draft PR from this workstream.
+Former instruction (no longer applies): - Do not push to PR #76 or PR #92. Do not reopen those PRs. That residuals-wave draft pull request is done on main.
 - Milestone: **T17-01 residuals wave is DONE.**
 - Verified functional features: **67/67**. Rows 1–63 stayed verified. Rows 64–67 are the residuals additions. Rows 3, 57, 58, 61, and 62 were updated in place.
 - Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader. The catalog entry now names both teams and the real export set. The unit registration check still requires SVG in `outputs`.
@@ -34,7 +34,7 @@ Historical SHAs below describe the pre-squash branch. They are not the branch to
 
 ## Exact next sequential action
 
-**Stop.** The PDF Unicode residual is implemented on `cursor/matchboard-pdf-unicode`. Do not undraft or merge that draft pull request. Do not start another feature row and do not reopen rows 1–67. Basic Latin page text still uses Helvetica. A letter outside the bundled Noto Sans subset is shown as ? on the page. metadata.json keeps the original letter.
+**Stop.** PDF Unicode page text is complete and verified (implementation `9a298eeebdf2981f5babfe0512b6c7f2da33a287`). Draft pull request #121 awaits the Chief of Staff's squash-merge. After that merge, nothing for PDF Unicode remains in flight; resume from main. Rows 1–67 stay closed. Basic Latin page text still uses Helvetica. A letter outside the bundled Noto Sans subset is shown as ? on the page. metadata.json keeps the original letter.
 
 Help copy changed: YES. The workspace header sentence, help section `match-setup`, command-bar tooltips, the Build board tip, and the squad-growth note were rewritten. The catalog entry was not changed in this wave. Stage 2 instructional writing applies because help copy changed.
 
@@ -167,7 +167,7 @@ Stage 1 verified rows **3, 4, 5, 6, 7, 8, 39, 40, and 41**. T16-01 added **61, 6
 
 - Stay on `cursor/matchboard-residuals-wave-8ddf`.
 - Do not push to PR #76 or PR #92. Do not reopen those PRs.
-- Do not undraft or merge the draft PR for this residuals wave.
+- The residuals-wave draft pull request instruction no longer applies. That wave is done on main.
 - Before every mutation, compare the last known branch tip with the live remote ref. If another agent advanced it, refresh and reconcile before writing.
 - An ACTIVE queue item's Primary files are reserved.
 - Forward agent takes the lowest-numbered READY item. None are READY after T17-01.

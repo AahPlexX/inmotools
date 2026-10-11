@@ -3,7 +3,7 @@ task: T-tactical-matchboard-studio-20261011-u73
 tool: tactical-matchboard-studio
 doc: task
 kind: expand
-state: active
+state: done
 branch: cursor/matchboard-pdf-unicode
 created: 2026-10-11
 updated: 2026-10-11
@@ -27,9 +27,10 @@ Owner exception to GOVERNANCE.md §3 and the branch workflow: this task does not
 
 ## Resume here
 
-TMS-R73 is verified on `cursor/matchboard-pdf-unicode`. The draft pull request stays draft. Do not undraft or merge. Do not start another feature row.
+PDF Unicode page text is complete and verified (implementation `9a298eeebdf2981f5babfe0512b6c7f2da33a287`). Draft pull request #121 awaits the Chief of Staff's squash-merge. It is not merged. After that merge, nothing for PDF Unicode remains in flight; resume from main.
 
 ## Log
 
 - 2026-10-11: claimed `cursor/matchboard-pdf-unicode` from `origin/main` `e134af68a6d8670f545a7bc1a4d568deb3d0b3bf`. `@pdf-lib/fontkit` 1.1.1 and the Noto Sans v2.015 subset embed Matchboard PDF page text outside basic Latin. A letter outside the subset is shown as ?.
 - 2026-10-11: implementation `9a298eeebdf2981f5babfe0512b6c7f2da33a287`. `pnpm exec tsc --noEmit -p tsconfig.app.json` is inside `pnpm build`, which succeeded. `pnpm lint` exited 0. `tests/unit/tactics-*.test.ts` 169/169. `tests/e2e/tactical-matchboard-studio.spec.ts` 80 passed, 2 skipped. `pnpm docs:check` passed. `pnpm tool:check tactical-matchboard-studio --base origin/main` is 76/85 with no errors. `pnpm branch:check` rejects this branch name, which is the owner exception so integrate.yml cannot auto-merge it. Lazy chunk `pdf-unicode-font-*.js` is 1,023.46 kB, gzip 493.18 kB.
+- 2026-10-11: notices corrected to the subset files (1,792 glyphs; GDEF, GPOS, and GSUB present; GSUB and GPOS feature lists empty; DSIG absent). Integrating commit: none yet. Draft pull request #121 awaits the Chief of Staff's squash-merge.

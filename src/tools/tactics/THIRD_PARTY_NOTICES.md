@@ -10,7 +10,7 @@ Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-gree
 
 License: SIL Open Font License, Version 1.1. The full license is [OFL.txt](fonts/OFL.txt). The license requires that copy of the copyright notice and license to travel with the font files. It does not require a credit line on a document that uses the font. The font is not sold by itself.
 
-Subset kept for the page font: U+0000–007E, U+00A0–024F, U+02B0–02FF, U+0300–036F, U+0370–03FF, U+0400–052F, U+1E00–1EFF, U+1F00–1FFF, U+2000–206F, U+20A0–20CF, U+2116, and U+2122. Layout features and the DSIG table were dropped. A character outside this subset is drawn as ? on the page. `metadata.json` keeps the original character.
+Subset kept for the page font: U+0000–007E, U+00A0–024F, U+02B0–02FF, U+0300–036F, U+0370–03FF, U+0400–052F, U+1E00–1EFF, U+1F00–1FFF, U+2000–206F, U+20A0–20CF, U+2116, and U+2122. Each subset file has 1,792 glyphs and contains the GDEF, GPOS, and GSUB tables. The GSUB and GPOS feature lists are empty. The DSIG table is absent. A character outside this subset is drawn as ? on the page. `metadata.json` keeps the original character.
 
 Unhinted source sizes from the release zip: Regular 431,364 bytes, Bold 432,376 bytes. Subset sizes in this repository: Regular 116,848 bytes (gzip 64,926), Bold 116,952 bytes (gzip 66,762).
 
