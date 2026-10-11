@@ -32,6 +32,12 @@ Automatic tool branch integrations own their selected validation. Their main dep
 
 Reuse passing evidence only when the relevant source, tests/fixtures, dependency lock, evaluator/configuration and environment assumptions match. Record exact revisions/digests, scope, results/skips/retries, limits and the next action. Documentation-only differences do not invalidate matching application/browser evidence. A selector/workflow change needs meaningful selector/workflow regression checks; unchanged browser runtime/tests do not justify a duplicate full run. A running unchanged full is retained and read once when complete.
 
+## Automated checks before custom coverage
+
+Use the installed TypeScript compiler, axe/Playwright and fast-check where their capabilities fit the changed behavior. Axe covers automatically detectable accessibility violations; retain focused keyboard, focus, responsive geometry and interaction-cycle checks. Property-based checks suit parsers, ranges and invariants; real browser checks remain necessary for downloads, rendering, cancellation and resource disposal. Preserve existing tests; add new custom coverage for material gaps.
+
+Oxlint is the preferred lint addition, subject to the [static-analysis compatibility task](../.tasks/items/T-static-analysis-20261011-8b2c.md). Current isolated trial reports a type-check difference from the passing tsc gate, so tsc remains required. No linter has been installed into the repo yet. Avoid overlapping lint/format tools or repository-wide formatting churn; Prettier remains a tool runtime dependency. Optional Knip requires reviewed dynamic-import/worker configuration before any unused-code conclusion. Static rules replace code-pattern assertions only where equivalent coverage is demonstrated; behavior still needs behavioral evidence.
+
 ## Primary references — checked 2026-10-11
 
 - [Playwright CLI](https://playwright.dev/docs/test-cli): explicit file filters select suites while retaining project/retry settings.
