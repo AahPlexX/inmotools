@@ -124,6 +124,10 @@ git push                                       # integrate.yml merges into main 
 - Never force-push or rewrite `main`.
 - A branch that changes `.github/workflows/` is merged into `main` by hand after the same checks (a workflow token cannot push workflow files).
 
+### Validation scope
+
+[Validation policy](VALIDATION_POLICY.md) defines applicable gates. Shared ownership remains governed by the branch/task rules, but shared-file location alone does not require a full browser run. Batch related ordered requirements, keep spec/tracker/task/evidence current in the working commit, validate affected tools/dependency consumers and custom interaction/responsive/accessibility gaps, and reuse only matching accepted evidence. Full scope remains required for broad/unknown impact and explicit stable/final checkpoints.
+
 ### Shared folders
 
 When two tools share one folder (for example `src/tools/music/` holds MIDI Harmony Lab and Audio Mastering), each tracker is named `<TOOL>_TRACKER.md` (for example `HARMONY_TRACKER.md`) and its header `tracker:` field gives that path.

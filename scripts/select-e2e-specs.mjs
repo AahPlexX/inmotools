@@ -3,9 +3,10 @@
 // a spec belongs to a tool when it opens that tool's route (`#/tools/<slug>`) or one
 // of its legacy aliases, both read from the tool's `<slug>.meta.ts`.
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { listMetaFiles, META_SUFFIX } from './tool-registry.mjs';
+import { clientDependencies, consumersOf } from './client-dependencies.mjs';
 
 export const FULL_SUITE = '__FULL_SUITE__';
 const E2E_DIR = 'tests/e2e';
@@ -16,8 +17,11 @@ const GLOBAL_CLIENT_PATHS = [
   'index.html',
   'package.json',
   'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
   'vite.config.ts',
   'playwright.config.ts',
+  'tsconfig.app.json',
+  'tsconfig.json',
   'scripts/tool-registry.mjs',
   'src/App.tsx',
   'src/catalog.ts',
@@ -25,9 +29,14 @@ const GLOBAL_CLIENT_PATHS = [
   'src/styles.css',
   'src/overlay-fixes.css',
   'src/components/',
-  'src/lib/',
   'src/tools/workspaces.tsx',
 ];
+
+const POLICY_SCRIPTS = new Set([
+  'scripts/select-e2e-specs.mjs', 'scripts/client-dependencies.mjs', 'scripts/run-browser-validation.mjs',
+  'scripts/docs-sync.mjs', 'scripts/check-doc-links.mjs', 'scripts/tool-docs.mjs',
+  'scripts/tool-check.mjs', 'scripts/branch-check.mjs', 'scripts/task-start.mjs',
+]);
 
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
@@ -53,24 +62,53 @@ export function specsByFolder(root = process.cwd()) {
 }
 
 export function selectE2eSpecs(paths, root = process.cwd()) {
+  if (paths.some((path) => path !== path.trim() || /[\r\n]/.test(path))) return [FULL_SUITE];
   const normalized = paths.map((path) => path.trim()).filter(Boolean);
   if (normalized.some((path) => GLOBAL_CLIENT_PATHS.some((globalPath) =>
     globalPath.endsWith('/') ? path.startsWith(globalPath) : path === globalPath,
   ))) return [FULL_SUITE];
 
   let byFolder;
+  let graph;
   const specs = new Set();
-  for (const path of normalized) {
-    if (/^tests\/e2e\/.+\.spec\.ts$/.test(path)) specs.add(path);
-
-    const folder = path.match(/^src\/tools\/([^/]+)\//)?.[1];
-    if (!folder) continue;
+  const folders = new Set(listMetaFiles(root).map((meta) => meta.folder));
+  const addFolder = (folder) => {
     byFolder ??= specsByFolder(root);
-    const toolSpecs = byFolder.get(folder) ?? [];
-    for (const spec of toolSpecs) specs.add(spec);
-    // Catalog copy appears on the home page and in the tool layout; a folder with
-    // no spec of its own is covered by the catalog-wide specs.
-    if (path.endsWith(META_SUFFIX) || toolSpecs.length === 0) for (const spec of CATALOG_SPECS) specs.add(spec);
+    const owned = byFolder.get(folder) ?? [];
+    for (const spec of owned.length ? owned : CATALOG_SPECS) specs.add(spec);
+  };
+  for (const path of normalized) {
+    if (path.startsWith('public/') || path.startsWith('tests/fixtures/')) return [FULL_SUITE];
+    const isSpec = /^tests\/e2e\/.+\.spec\.ts$/.test(path);
+    if (isSpec) {
+      if (!existsSync(join(root, path))) return [FULL_SUITE];
+      specs.add(path);
+      continue;
+    }
+    const folder = path.match(/^src\/tools\/([^/]+)\//)?.[1];
+    // Records do not execute in the client; fixtures/public assets are handled
+    // above and unknown source files below cannot silently select zero tests.
+    if (path.endsWith('.md') && (!path.startsWith('src/') || /\/(?:README|TRACKER|[A-Z_]+_TRACKER|VERIFICATION|HANDOFF|STATUS|WORK_LOG)\.md$/.test(path))) continue;
+    if (!folder && !path.startsWith('src/lib/') && !path.startsWith('tests/e2e/')) {
+      if (path.startsWith('tests/unit/') || path.startsWith('docs/') || path.startsWith('.tasks/') || POLICY_SCRIPTS.has(path) || /^\.github\/workflows\/[^/]+\.yml$/.test(path)) continue;
+      return [FULL_SUITE];
+    }
+    if (folder && !folders.has(folder)) return [FULL_SUITE];
+    graph ??= clientDependencies(root);
+    if (graph.uncertain || (path.startsWith('tests/e2e/') && graph.uncertainTests)) return [FULL_SUITE];
+    const seeds = folder ? [path, ...graph.files.filter((file) => file.startsWith(`src/tools/${folder}/`))] : [path];
+    const affected = consumersOf(graph, seeds);
+    if (folder) addFolder(folder);
+    let found = Boolean(folder);
+    for (const consumer of affected) {
+      if (consumer === path) continue;
+      const dependent = consumer.match(/^src\/tools\/([^/]+)\//)?.[1];
+      if (dependent) { addFolder(dependent); found = true; }
+      else if (/^tests\/e2e\/.+\.spec\.ts$/.test(consumer)) { specs.add(consumer); found = true; }
+      else if (consumer.startsWith('src/') && !consumer.startsWith('src/lib/')) return [FULL_SUITE];
+    }
+    if (!found) return [FULL_SUITE];
+    if (path.endsWith(META_SUFFIX)) for (const spec of CATALOG_SPECS) specs.add(spec);
   }
 
   return [...specs];

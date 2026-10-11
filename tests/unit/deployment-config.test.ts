@@ -61,8 +61,8 @@ describe('deployment and bundler contracts', () => {
 
   it('skips the full suite for Markdown-only changes and checks them in the docs workflow', () => {
     const pages = read('.github/workflows/pages.yml');
-    expect(pages.match(/paths-ignore:\n\s+- '\*\*\/\*\.md'/g)).toHaveLength(2);
-    expect(read('.github/workflows/focused-tool.yml')).toContain("- '**/*.md'");
+    expect(pages.match(/paths-ignore:\n\s+- 'docs\/\*\*\/\*\.md'/g)).toHaveLength(2);
+    expect(read('.github/workflows/focused-tool.yml')).toContain('workflow_dispatch:');
     const docs = read('.github/workflows/docs.yml');
     expect(docs).toContain('pnpm docs:check');
     expect(JSON.parse(read('package.json')).scripts['docs:check']).toContain('node scripts/check-doc-links.mjs');
@@ -78,8 +78,8 @@ describe('deployment and bundler contracts', () => {
 
   it('selects PR browser specs from the PR base/head diff instead of synthetic merge-ref noise', () => {
     const workflow = read('.github/workflows/pages.yml');
-    expect(workflow).toContain('HEAD_SHA: ${{ github.event.pull_request.head.sha }}');
-    expect(workflow).toContain('git diff --name-only "$BASE_SHA"..."$HEAD_SHA"');
-    expect(workflow).not.toContain('git diff --name-only "$BASE_SHA"...HEAD');
+    expect(workflow).toContain('BASE_SHA: ${{ github.event.pull_request.base.sha }}');
+    expect(workflow).toContain('HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}');
+    expect(workflow).toContain('node scripts/run-browser-validation.mjs');
   });
 });

@@ -1,15 +1,7 @@
 name: Web Layout Studio validation
 
+# Pages owns automatic main/PR validation; custom coverage remains callable.
 on:
-  push:
-    branches: [main, feat/web-layout-studio]
-    paths:
-      - 'src/tools/web-layout/**'
-      - 'tests/unit/web-layout.test.ts'
-      - 'tests/e2e/web-layout.spec.ts'
-      - '.github/workflows/web-layout.yml'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
   workflow_dispatch:
 
 permissions:

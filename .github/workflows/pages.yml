@@ -1,17 +1,35 @@
 name: Validate and deploy Pages
 
 on:
-  # Markdown-only changes run .github/workflows/docs.yml instead of the full suite.
+  # Record-only changes run .github/workflows/docs.yml instead of the full suite.
   push:
     branches: [main]
     paths-ignore:
-      - '**/*.md'
+      - 'docs/**/*.md'
+      - '.tasks/**/*.md'
+      - '*.md'
+      - 'src/tools/**/README.md'
+      - 'src/tools/**/TRACKER.md'
+      - 'src/tools/**/*_TRACKER.md'
+      - 'src/tools/**/VERIFICATION.md'
+      - 'src/tools/**/HANDOFF.md'
+      - 'src/tools/**/STATUS.md'
+      - 'src/tools/**/WORK_LOG.md'
       - 'scripts/check-doc-links.mjs'
       - 'scripts/docs-sync.mjs'
   pull_request:
     branches: [main]
     paths-ignore:
-      - '**/*.md'
+      - 'docs/**/*.md'
+      - '.tasks/**/*.md'
+      - '*.md'
+      - 'src/tools/**/README.md'
+      - 'src/tools/**/TRACKER.md'
+      - 'src/tools/**/*_TRACKER.md'
+      - 'src/tools/**/VERIFICATION.md'
+      - 'src/tools/**/HANDOFF.md'
+      - 'src/tools/**/STATUS.md'
+      - 'src/tools/**/WORK_LOG.md'
       - 'scripts/check-doc-links.mjs'
       - 'scripts/docs-sync.mjs'
   # integrate.yml dispatches this after it has validated and pushed a merge to main
@@ -19,9 +37,18 @@ on:
   workflow_dispatch:
     inputs:
       validate:
-        description: Run the full validation suite as well as deploying
+        description: Run required validation as well as deploying
         type: boolean
         default: true
+      scope:
+        description: Affected scope or explicit full stable-batch checkpoint
+        type: choice
+        options: [affected, full]
+        default: affected
+      base_ref:
+        description: Base commit for affected manual validation (missing or invalid uses full)
+        type: string
+        default: ''
 
 permissions:
   actions: read
@@ -54,33 +81,15 @@ jobs:
         run: pnpm test:unit
       - name: Build
         run: pnpm build
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
       - name: Browser tests
         env:
           EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "$EVENT_NAME" != "pull_request" ]]; then
-            pnpm test:e2e
-            exit 0
-          fi
-
-          git diff --name-only "$BASE_SHA"..."$HEAD_SHA" > /tmp/inmotools-changed-paths.txt
-          E2E_SPECS="$(node scripts/select-e2e-specs.mjs /tmp/inmotools-changed-paths.txt)"
-          if [[ -z "$E2E_SPECS" || "$E2E_SPECS" == "__FULL_SUITE__" ]]; then
-            echo "Cross-cutting or unmapped change detected; running the full browser suite."
-            pnpm test:e2e
-          else
-            echo "Running focused browser specs:"
-            printf '%s\n' "$E2E_SPECS"
-            # Spec paths are repository-controlled and contain no whitespace.
-            # shellcheck disable=SC2086
-            pnpm exec playwright test $E2E_SPECS
-          fi
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_REF: ${{ inputs.base_ref }}
+          BROWSER_SCOPE: ${{ inputs.scope || 'affected' }}
+        run: node scripts/run-browser-validation.mjs
       - name: Upload Playwright failure evidence
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7

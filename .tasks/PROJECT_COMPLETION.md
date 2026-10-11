@@ -4,6 +4,10 @@ This file defines the finish line for the `inmotools` repository. It is a comple
 
 Live progress is in the task files in `items/` (one per piece of work, `state: active | next | backlog | done | rejected`; listed in the generated `ITEMS.md`) and, per tool, in the tracker. Completion of a tool's requirements is computed by `pnpm tool:check <slug>`. `DONE.md`, `WORK_LOG.md` and `REJECTED.md` are the record from before task files; `IN_PROGRESS.md`, `NEXT.md` and `BACKLOG.md` are retired and only list where their entries went.
 
+## Validation scope
+
+Use [validation policy](../docs/VALIDATION_POLICY.md) for workstream gates and evidence reuse. Tool integrations require their owned/affected dependency coverage, not a repository-wide run solely because a test/shared file changed. Batch related ordered requirements and record the checkpoint boundary in the task. Broad/unknown changes and stable batch/final release/project checkpoints require a full suite. Unrelated full-checkpoint failures remain tracked; affected failures still block their scope. No pending/failed check is passing evidence.
+
 ## Completion states
 
 ### Workstream complete
@@ -23,7 +27,7 @@ A tool, feature, audit, or other workstream is complete only when all of the fol
 The current release is complete only when:
 
 1. Every `active` task file is workstream-complete, or set to `next`, `backlog` or `rejected` with the reason.
-2. The repository's required validation workflows are green on the exact integrated `origin/main` revision.
+2. The required scope workflows are green for integrated `origin/main`, using only matching evidence reuse allowed by the validation policy; the final release full checkpoint is green on its frozen runtime/tests/dependency/configuration inputs. Documentation-only differences need fresh records checks, not another unchanged full.
 3. GitHub Pages deployment for that integrated revision is successful when the changed scope affects the deployed application.
 4. `origin/main` is not behind any branch containing intended completed work, and no completed work is stranded on another branch.
 5. A task audit finds no known blocker inside the release scope without a task file.

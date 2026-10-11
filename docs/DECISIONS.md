@@ -1,6 +1,6 @@
 ---
 doc: decisions
-updated: 2026-10-04
+updated: 2026-10-11
 ---
 
 # Decisions, exceptions and open questions
@@ -11,6 +11,7 @@ Owner decisions and repository-wide facts that are not universal rules. Universa
 
 | Date | Decision |
 | --- | --- |
+| 2026-10-11 | Validation is dependency-selected, with related ordered work batched and matching accepted evidence reused. Full browser scope applies to broad/uncertain changes and explicit stable/final checkpoints, not every integration or tool-test edit. One automatic browser owner handles each event; custom workflows remain manually callable. [Policy](VALIDATION_POLICY.md). |
 | 2026-10-04 | Excluded features are either `prohibited` (with the rule, term, licence, key, LLM or browser limit as the reason) or not recorded at all; there is no `not planned` status. |
 | 2026-10-04 | AI means large language models: prohibited (they need keys or accounts and are unreliable). Other ML is permitted on the device, decided case by case with the ML ruleset ([standard](DOCUMENTATION_STANDARD.md#machine-learning-and-ai)); long-term per-user learning is not built because there are no accounts. |
 | 2026-10-04 | Owner feature notes (per-tool wish lists, including names, libraries and storage schemas) are input for specs, not facts. Where they differ from the repository, the repository wins: existing code, tests, libraries, names, slugs, storage and earlier decisions stay as they are. A note's feature that fits the platform rules and is not built becomes a `missing` requirement; one that breaks a rule or an earlier decision is `prohibited` with the reason, or is left out if it is merely unwanted. Notes about tools that are not in the catalog are ignored unless the owner asks for a new tool. |

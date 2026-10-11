@@ -26,6 +26,7 @@ git push                                               # after every working ste
 - **New tool:** add `src/tools/<folder>/<slug>.meta.ts` (copy an existing one), a spec and a tracker. The catalog entry, home-page link, route and index row follow from those files; no shared file is edited.
 - **No pull requests.** Pushing `feature/`, `expand/` or `fix/<slug>` is the integration request; the branch is deleted once merged. If a run fails, read its log, fix on the branch, push again.
 - **Stay in your lane:** only your tool's folder, spec, tracker and task file. Shared files need a `fix/<slug>` branch and a reason in the task file.
+- **Validation scope:** follow [docs/VALIDATION_POLICY.md](docs/VALIDATION_POLICY.md). Batch related ordered fixes, run selected tool/dependency tests, reuse matching accepted evidence, and keep full runs for broad/unknown changes and stable/final checkpoints. A tool test edit does not require a second repository-wide run.
 - **Before you stop:** tracker **Resume here** and the task file's **Resume here** updated, everything committed and pushed.
 
 ## Checks
@@ -35,7 +36,7 @@ git push                                               # after every working ste
 | Type check | `pnpm exec tsc --noEmit -p tsconfig.app.json` |
 | Unit tests | `pnpm test:unit` |
 | Build | `pnpm build` |
-| Browser tests | `pnpm exec playwright test tests/e2e/<spec>.spec.ts` (all: `pnpm test:e2e`) |
+| Browser tests | Selected tool/dependency specs via `scripts/run-browser-validation.mjs`; explicit full checkpoint: `pnpm test:e2e` |
 | Completion | `pnpm tool:check <slug>` |
 | Records and links | `pnpm docs:sync` then `pnpm docs:check` |
 | Branch name | `pnpm branch:check` |

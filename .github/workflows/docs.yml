@@ -1,7 +1,7 @@
 name: Documentation checks
 
 # Runs instead of the full browser suite when a push or PR changes only Markdown
-# (pages.yml and focused-tool.yml ignore Markdown-only changes). It runs the unit
+# (pages.yml ignores Markdown-only changes). It runs the unit
 # tests that read Markdown files and checks links in the standard documents.
 on:
   push:

@@ -35,8 +35,8 @@ jobs:
         with:
           runtime: node@24
           install: false
-      - name: Install dependencies and Chromium
-        run: pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - name: Merge, check and push to main
         env:
           BRANCH: ${{ github.ref_name }}
@@ -70,9 +70,9 @@ jobs:
               fi
             fi
             light=false
-            if [[ -n "$tested_base" ]] && ! git diff --name-only "$tested_base" origin/main | grep -qv '\.md$'; then
+            if [[ -n "$tested_base" ]] && BEFORE_SHA="$tested_base" HEAD_SHA="$(git rev-parse origin/main)" node --input-type=module -e 'import { validationPlan, canReuseBrowserValidation } from "./scripts/run-browser-validation.mjs"; process.exit(canReuseBrowserValidation(validationPlan({eventName: "push", beforeSha: process.env.BEFORE_SHA, headSha: process.env.HEAD_SHA})) ? 0 : 1)'; then
               light=true
-              echo "main gained only Markdown since the tested merge; skipping build and browser tests on this attempt."
+              echo "main gained only records without browser impact since the tested merge; reusing build and browser checks on this attempt."
             fi
             changed="$(git diff --name-only origin/main HEAD)"
             if [[ -z "$changed" ]]; then
@@ -101,16 +101,9 @@ jobs:
             node scripts/check-doc-links.mjs
             pnpm test:unit
 
-            if [[ "$light" == false ]] && grep -qv '\.md$' <<< "$changed"; then
-              pnpm build
-              specs="$(node scripts/select-e2e-specs.mjs <<< "$changed")"
-              if [[ "$specs" == "__FULL_SUITE__" ]]; then
-                pnpm test:e2e
-              elif [[ -n "$specs" ]]; then
-                # Spec paths are repository-controlled and contain no whitespace.
-                # shellcheck disable=SC2086
-                pnpm exec playwright test $specs
-              fi
+            if [[ "$light" == false ]]; then
+              EVENT_NAME=push BEFORE_SHA="$(git rev-parse origin/main)" HEAD_SHA="$(git rev-parse HEAD)" \
+                node scripts/run-browser-validation.mjs --build
             fi
 
             tested_base="$(git rev-parse origin/main)"

@@ -1,34 +1,7 @@
 name: Sightline Velocity validation
 
+# Pages owns automatic main/PR validation; custom coverage remains callable.
 on:
-  push:
-    branches: [main, feat/sightline-velocity, 'fix/sightline-*']
-    paths:
-      - 'src/tools/sightline/**'
-      - 'src/catalog.ts'
-      - 'src/tools/workspaces.tsx'
-      - 'tests/unit/sightline-*.test.ts'
-      - 'tests/unit/sightline-*.test.tsx'
-      - 'tests/e2e/sightline.spec.ts'
-      - 'scripts/select-e2e-specs.mjs'
-      - 'vite.config.ts'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/sightline.yml'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'src/tools/sightline/**'
-      - 'src/catalog.ts'
-      - 'src/tools/workspaces.tsx'
-      - 'tests/unit/sightline-*.test.ts'
-      - 'tests/unit/sightline-*.test.tsx'
-      - 'tests/e2e/sightline.spec.ts'
-      - 'scripts/select-e2e-specs.mjs'
-      - 'vite.config.ts'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/sightline.yml'
   workflow_dispatch:
 
 permissions:

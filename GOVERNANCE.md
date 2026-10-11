@@ -1,6 +1,6 @@
 # Repository Governance
 
-**As of:** 2026-10-03
+**As of:** 2026-10-11
 
 Binding rules for every person and automated agent that creates, reads, updates or deletes anything in this repository. A current request from the owner and this file must both be satisfied; if they conflict, stop the affected work and report the conflict.
 
@@ -49,11 +49,14 @@ A change to `.github/workflows/` cannot be pushed by a workflow token; such a br
 ## 4. Parallel work
 
 - One branch per tool at a time: the branch is the claim. Never commit to another tool's branch or edit another tool's folder, spec or tracker.
-- Shared files (anything outside `src/tools/<folder>/`, that tool's spec, and `.tasks/items/`) change only on `fix/<slug>` with the reason in the task file, and run the full browser suite.
+- Shared files (anything outside `src/tools/<folder>/`, that tool's spec, and `.tasks/items/`) change only on `fix/<slug>` with the reason in the task file, and run the affected browser scope defined by [validation policy](docs/VALIDATION_POLICY.md). File location alone does not require a full suite.
 - Sync with `git fetch origin && git merge origin/main` on the branch; resolve conflicts there, never on `main`.
-- Repository-wide work that belongs to no tool (the site shell, shared components, scripts) is done in its own worktree on a local branch that is not pushed, has a task file without a `tool:` field, runs the full checks including the full browser suite, and is merged into `main` by hand; tool branches then sync with `main`.
+- Repository-wide work that belongs to no tool (the site shell, shared components, scripts) is done in its own worktree on a local branch that is not pushed, has a task file without a `tool:` field, runs required unit/build/docs and dependency-selected browser checks under the validation policy, and is merged into `main` by hand; tool branches then sync with `main`.
 
 ## 5. Evidence
+
+- Follow [validation policy](docs/VALIDATION_POLICY.md): batch related ordered work; validate owned behavior and dependency consumers; use full scope for broad/uncertain changes and explicit stable/final checkpoints. Scoped test edits alone do not require a second full run. Unrelated checkpoint failures remain tracked separately; affected failures block their scope.
+- Reuse passing evidence only with matching relevant source/tests/fixtures/dependencies/evaluator/environment identities. Running or failed checks are never passing evidence. Current tracker/task/verification records accompany working changes; avoid redundant record-only integrations when the same working commit can carry them.
 
 - Repository facts come from the repository or its host, not from memory. Re-read state before writing when others may be working.
 - External facts (standards, APIs, tool behaviour) come from authoritative or primary sources, with enough corroboration for at least 95% evidence-based confidence; resolve conflicting sources before acting. If that cannot be reached, stop that work and report the missing evidence.
@@ -80,6 +83,8 @@ A change to `.github/workflows/` cannot be pushed by a workflow token; such a br
 Outside the repository, at the end of each session: what changed, verification evidence with the commit it ran on, open items and blockers, external sources with dates, and questions for the owner.
 
 ## Change history
+
+- **2026-10-11:** Owner approved dependency-selected validation and batching; replaced full-suite requirements based solely on shared file location. Explicit stable/final full checkpoints and conservative broad/unknown fallback remain.
 
 - **2026-10-03:** Rewritten as universal rules only. Added the work cycle (task:start, computed completion, integration without pull requests), parallel-work rules and per-task files; tool-specific facts moved to docs/DECISIONS.md and the per-tool documents.
 - **2026-10-01:** Added the documentation standard, tool index and agent entry point to the SSOT directory.

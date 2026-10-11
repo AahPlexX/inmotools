@@ -1,16 +1,7 @@
 name: Typing Workstation validation
 
+# Pages owns automatic main/PR validation; custom coverage remains callable.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/tools/typing/**'
-      - 'tests/unit/typing-*.test.ts'
-      - 'tests/e2e/typing.spec.ts'
-      - '.github/workflows/typing-workstation.yml'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
   workflow_dispatch:
 
 concurrency:
