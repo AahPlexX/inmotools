@@ -3,7 +3,48 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
+import { parseAllDocuments } from 'yaml';
 import { FULL_SUITE, selectE2eSpecs } from './select-e2e-specs.mjs';
+
+// Only additive, isolated lint tooling qualifies. All existing lock records and
+// every package field except the two lint devDependencies and lint script match.
+export function lintOnlyDependencyChange(paths, readBase, readHead) {
+  const allowed = new Set(['package.json', 'pnpm-lock.yaml', '.oxlintrc.json', 'tsconfig.lint.json', '.github/workflows/lint.yml', 'scripts/run-browser-validation.mjs', 'tests/unit/validation-runner.test.mjs']);
+  if (!paths.includes('package.json') || !paths.includes('pnpm-lock.yaml') || paths.some(path => !allowed.has(path) && !(path.endsWith('.md') && (path.startsWith('docs/') || path.startsWith('.tasks/') || !path.includes('/') || /^src\/tools\/.+\/(?:README|TRACKER|VERIFICATION|HANDOFF|STATUS|WORK_LOG)\.md$/.test(path))))) return false;
+  try {
+    const stripPackage = text => {
+      const value = JSON.parse(text);
+      delete value.devDependencies?.oxlint;
+      delete value.devDependencies?.['oxlint-tsgolint'];
+      delete value.scripts?.lint;
+      return value;
+    };
+    const basePackage = readBase('package.json');
+    const headPackage = readHead('package.json');
+    const old = JSON.parse(basePackage); const next = JSON.parse(headPackage);
+    if (old.devDependencies?.oxlint || old.devDependencies?.['oxlint-tsgolint'] || old.scripts?.lint) return false;
+    if (next.devDependencies?.oxlint !== '1.87.0' || next.devDependencies?.['oxlint-tsgolint'] !== '7.0.2004' || next.scripts?.lint !== 'oxlint --type-aware --tsconfig tsconfig.lint.json src tests scripts') return false;
+    if (!isDeepStrictEqual(stripPackage(basePackage), stripPackage(headPackage))) return false;
+    const parse = text => parseAllDocuments(text).map(doc => { if (doc.errors.length) throw doc.errors[0]; return doc.toJSON(); });
+    const oldLocks = parse(readBase('pnpm-lock.yaml')); const newLocks = parse(readHead('pnpm-lock.yaml'));
+    if (oldLocks.length !== newLocks.length || !oldLocks.length) return false;
+    for (let i = 0; i < oldLocks.length; i++) {
+      const before = oldLocks[i]; const after = newLocks[i];
+      delete after.importers?.['.']?.devDependencies?.oxlint;
+      delete after.importers?.['.']?.devDependencies?.['oxlint-tsgolint'];
+      for (const section of ['packages', 'snapshots']) {
+        for (const key of Object.keys(after[section] ?? {})) {
+          if (Object.hasOwn(before[section] ?? {}, key)) continue;
+          if (!/^(?:oxlint(?:-tsgolint)?@|@oxlint(?:-tsgolint)?\/)/.test(key)) return false;
+          delete after[section][key];
+        }
+      }
+      if (!isDeepStrictEqual(before, after)) return false;
+    }
+    return true;
+  } catch { return false; }
+}
 
 export function validationPlan({ root = process.cwd(), eventName, beforeSha, baseSha, headSha, baseRef, scope = 'affected' } = {}) {
   const full = (reason) => ({ specs: [FULL_SUITE], paths: [], reason });
@@ -17,6 +58,9 @@ export function validationPlan({ root = process.cwd(), eventName, beforeSha, bas
     const resolvedHead = resolve(headSha);
     const revisions = eventName === 'pull_request' ? [`${resolvedBase}...${resolvedHead}`] : [resolvedBase, resolvedHead];
     const paths = execFileSync('git', ['diff', '--name-only', '--no-renames', '-z', ...revisions, '--'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+    const show = (ref, path) => execFileSync('git', ['show', `${ref}:${path}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const comparisonBase = eventName === 'pull_request' ? execFileSync('git', ['merge-base', resolvedBase, resolvedHead], { cwd: root, encoding: 'utf8' }).trim() : resolvedBase;
+    if (lintOnlyDependencyChange(paths, path => show(comparisonBase, path), path => show(resolvedHead, path))) return { specs: [], paths, base: comparisonBase, head: resolvedHead, reason: 'Verified additive lint-only dependencies; browser inputs unchanged' };
     const specs = selectE2eSpecs(paths, root);
     return { specs, paths, base: resolvedBase, head: resolvedHead, reason: specs[0] === FULL_SUITE ? 'Broad or uncertain impact' : 'Affected scope' };
   } catch {

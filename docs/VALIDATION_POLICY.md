@@ -24,6 +24,10 @@ Existing [full38095819719](https://github.com/AahPlexX/inmotools/actions/runs/38
 
 The shared-file location alone does not require a full browser run. Use scripts/select-e2e-specs.mjs as the scope resolver; preserve full fallback for uncertain impact. Tool requirements can be accepted after their applicable scoped gates. A separate unrelated checkpoint failure stays in its task, while a failure affecting the current tool or dependency blocks that scope. Preserve frozen requirement order and record any outstanding full checkpoint; never represent pending or failed evidence as passing.
 
+## Isolated static-analysis dependency rollout
+
+The initial pinned Oxlint addition may reuse matching browser evidence only after scripts/run-browser-validation.mjs proves all existing package fields, runtime/build/test dependencies and every existing lock record unchanged. Only the two named dev-only tools, their own binding packages, lint command/config/workflow, policy implementation/tests and canonical records qualify. Any runtime/fixture/build setting, unknown package, existing dependency mutation, malformed metadata or unsupported comparison falls back to full. Explicit full still always runs. This narrowly reviewed initial-rollout exception does not generalize to later lint upgrades or other development dependencies. Required build, unit, docs and lint checks remain.
+
 ## Execution and reuse
 
 Batch related, ordered requirements within one tool into a working change. Keep its tracker/task/evidence current in that commit. Run required unit/build/docs checks and selected browser specs; write custom tests for material gaps. Keep original assertions/timeouts and client-cycle coverage. Publish completed working steps without redundant documentation-only integrations when records can accompany the work.
@@ -36,7 +40,7 @@ Reuse passing evidence only when the relevant source, tests/fixtures, dependency
 
 Use the installed TypeScript compiler, axe/Playwright and fast-check where their capabilities fit the changed behavior. Axe covers automatically detectable accessibility violations; retain focused keyboard, focus, responsive geometry and interaction-cycle checks. Property-based checks suit parsers, ranges and invariants; real browser checks remain necessary for downloads, rendering, cancellation and resource disposal. Preserve existing tests; add new custom coverage for material gaps.
 
-Oxlint is the preferred lint addition, subject to the [static-analysis compatibility task](../.tasks/items/T-static-analysis-20261011-8b2c.md). Current isolated trial reports a type-check difference from the passing tsc gate, so tsc remains required. No linter has been installed into the repo yet. Avoid overlapping lint/format tools or repository-wide formatting churn; Prettier remains a tool runtime dependency. Optional Knip requires reviewed dynamic-import/worker configuration before any unused-code conclusion. Static rules replace code-pattern assertions only where equivalent coverage is demonstrated; behavior still needs behavioral evidence.
+Oxlint is the preferred lint addition, subject to the [static-analysis compatibility task](../.tasks/items/T-static-analysis-20261011-8b2c.md). Current isolated trial reports a type-check difference from the passing tsc gate, so tsc remains required. Oxlint1.87.0/oxlint-tsgolint7.0.2004 are pinned dev-only additions. Run pnpm lint; the separate Static analysis workflow preserves complete diagnostics and reports counts. Existing findings start as warnings; focused unit tests fail the gate. Avoid overlapping lint/format tools or repository-wide formatting churn; Prettier remains a tool runtime dependency. Optional Knip requires reviewed dynamic-import/worker configuration before any unused-code conclusion. Static rules replace code-pattern assertions only where equivalent coverage is demonstrated; behavior still needs behavioral evidence.
 
 ## Primary references — checked 2026-10-11
 

@@ -2,8 +2,8 @@
 task: T-static-analysis-20261011-8b2c
 doc: task
 kind: fix
-state: next
-branch: repository-validation-policy
+state: active
+branch: fix/static-analysis
 created: 2026-10-11
 updated: 2026-10-11
 ---
@@ -16,11 +16,19 @@ Use existing dependencies to avoid unnecessary custom tests. Evaluate the recomm
 
 ## Resume here
 
+2026-10-11 14:38 UTC: rollout implemented locally; publication/CI pending. Oxlint1.87.0 and oxlint-tsgolint7.0.2004 pinned dev-only, frozen pnpm12.3.4 install passes. .oxlintrc.json enables the requested TypeScript/Oxc/React/JSX-a11y/import/promise rules and Vitest in unit tests only; Unicorn restricted to six requested rules, ESLint core retained. Node/JSDoc/react-perf/Next/Vue/Jest and alpha JS plugins skipped per table. React Compiler correctness checks enabled at warn including refs/immutability; no React Compiler build transform enabled. tsconfig.lint.json covers src/tests/scripts, ES2022 unchanged, no TypeScript replacement or automatic fixes. pnpm lint and separate Static analysis workflow configured; full diagnostics saved as CI artifact with concise counts.
+
+Final scan:1276files/196rules,4085warnings/0errors, exit0 (49.63s on this concurrent local host). Findings are review candidates, not proven bugs. Existing debt starts as warnings; focused Vitest unit tests fail immediately. Smoke exit1 proves focused-test enforcement and detects floating promises, import cycle/self-import, missing keys, invalid Hooks, accumulating spread and assertion-free test. Temporary smoke files removed. Scoped policy regressions37/37pass across four existing files; final runner/deployment checks25/25pass across two files. TypeScript exit0; production build exit0 (39.20s). Docs/links pass. No unchanged repository-wide local test/browser run.
+
+Initial lint-only dependency exception verifies exact additive dev tools, unchanged existing package/lock records and strictly known non-runtime paths; runtime/fixture/unknown changes, malformed metadata or explicit full checkpoints still use full. Six meaningful regression cases added to existing validation-runner.test.mjs; no new test file. Next commit, verify actual source comparison produces empty browser scope, publish via GitHub MCP to origin/main, and read required main/docs/lint acceptance. Earlier PDF draft remains isolated and unaccepted.
+
+## Historical compatibility experiment — 14:29 UTC
+
 2026-10-11 14:29 UTC: compatibility evaluation complete; adoption remains queued. Official Oxlint type-aware documentation retrieved HTTP200 today supports type-aware/type-check mode, TypeScript7+ and no-floating-promises; its CLI labels type checking experimental. Registry versions actually evaluated: oxlint1.87.0 and oxlint-tsgolint7.0.2004, installed only in the external evidence directory. Repo installed TypeScript7.0.2 and Node24.19.0 verified; tsconfig.app.json has no baseUrl and includes only src. scripts/tool-check.mjs checks requirement records/evidence and does not lint code. No dependency/config/build/workflow changes or test deletions have been made.
 
 Actual experiment on local candidate bd2520f (subsequent e51d2b5 changes records only): 786files, two enabled rules, exit1, 12floating-promise diagnostics and one TS2300 duplicate src declaration in src/types/vite-assets.d.ts. Reference `tsc --noEmit -p tsconfig.app.json` exits0 on the same source. This demonstrates a compatibility difference, not an established compiler bug or twelve established application bugs. Review each before repair; do not mechanically add void or suppress diagnostics. Runtime PDF-R05 is separately partial and must not be published as accepted.
 
-## Next actions
+## Historical rollout planning (superseded by current checkpoint)
 
 1. Prefer Oxlint as the single lint tool. Use a small meaningful rule set and baseline reviewed existing debt without hiding newly introduced findings. Resolve/disclose the TS2300 difference before considering replacement of tsc; preserve tsc meanwhile.
 2. Type-aware mode must explicitly use tsconfig.app.json (no root tsconfig.json exists). The isolated tool launcher resolves tsgolint from its working directory; the first repo-cwd experiment failed executable lookup and ran no lint. The corrected command below ran real analysis.

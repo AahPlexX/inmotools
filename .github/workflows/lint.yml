@@ -1,0 +1,45 @@
+name: Static analysis
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - '.oxlintrc.json'
+      - 'tsconfig*.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/lint.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v3
+        with:
+          runtime: node@24
+          install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Run configured static analysis
+        run: pnpm --silent lint --format json > "$RUNNER_TEMP/oxlint-report.json"
+      - name: Summarize findings
+        if: always()
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; const report=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/oxlint-report.json","utf8")); const rows=report.diagnostics??[]; const counts={}; for(const row of rows) counts[row.severity]=(counts[row.severity]??0)+1; console.log(JSON.stringify({files:report.number_of_files,rules:report.number_of_rules,findings:counts},null,2));'
+      - name: Preserve complete diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: oxlint-report-${{ github.run_id }}
+          path: ${{ runner.temp }}/oxlint-report.json
+          if-no-files-found: error
+          retention-days: 14

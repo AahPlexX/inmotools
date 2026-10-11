@@ -3,7 +3,8 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { validationPlan, runBrowserValidation, runValidation, canReuseBrowserValidation } from '../../scripts/run-browser-validation.mjs';
+import { validationPlan, runBrowserValidation, runValidation, canReuseBrowserValidation, lintOnlyDependencyChange } from '../../scripts/run-browser-validation.mjs';
+import { stringify } from 'yaml';
 import { FULL_SUITE } from '../../scripts/select-e2e-specs.mjs';
 
 const roots = [];
@@ -92,5 +93,47 @@ describe('validation event behavior', () => {
     commands.length = 0;
     expect(runValidation({ paths: ['src/App.tsx'], specs: [FULL_SUITE] }, { build: true, run: (args) => { commands.push(args); return 7; } })).toBe(7);
     expect(commands).toEqual([['build']]);
+  });
+});
+
+
+describe('isolated lint dependency browser scope', () => {
+  function fixture() {
+    const oldPackage = { dependencies: { runtime: '1' }, devDependencies: { vitest: '5' }, scripts: { build: 'tsc && vite build' } };
+    const newPackage = structuredClone(oldPackage);
+    Object.assign(newPackage.devDependencies, { oxlint: '1.87.0', 'oxlint-tsgolint': '7.0.2004' });
+    newPackage.scripts.lint = 'oxlint --type-aware --tsconfig tsconfig.lint.json src tests scripts';
+    const oldLock = { importers: { '.': { dependencies: { runtime: { version: '1' } }, devDependencies: { vitest: { version: '5' } } } }, packages: { 'runtime@1': { integrity: 'original' } }, snapshots: { 'runtime@1': {} } };
+    const newLock = structuredClone(oldLock);
+    Object.assign(newLock.importers['.'].devDependencies, { oxlint: { version: '1.87.0' }, 'oxlint-tsgolint': { version: '7.0.2004' } });
+    Object.assign(newLock.packages, { 'oxlint@1.87.0': {}, '@oxlint/binding-linux-x64-gnu@1.87.0': {} });
+    newLock.snapshots['oxlint@1.87.0'] = {};
+    const paths = ['package.json', 'pnpm-lock.yaml', '.oxlintrc.json'];
+    const check = (extra = []) => lintOnlyDependencyChange([...paths, ...extra], path => path === 'package.json' ? JSON.stringify(oldPackage) : stringify(oldLock), path => path === 'package.json' ? JSON.stringify(newPackage) : stringify(newLock));
+    return { oldPackage, newPackage, oldLock, newLock, check };
+  }
+  it('accepts only isolated additive lint tooling and record changes', () => {
+    expect(fixture().check(['docs/VALIDATION_POLICY.md'])).toBe(true);
+  });
+  it('retains full scope for changed runtime versions, scripts or existing compiler tools', () => {
+    for (const change of [f => { f.newPackage.dependencies.runtime = '2'; }, f => { f.newPackage.scripts.build = 'different'; }, f => { f.newPackage.devDependencies.vitest = '6'; }]) {
+      const f = fixture(); change(f); expect(f.check()).toBe(false);
+    }
+  });
+  it('retains full scope for changed existing lock records or unknown new packages', () => {
+    for (const change of [f => { f.newLock.packages['runtime@1'].integrity = 'changed'; }, f => { f.newLock.packages['unexpected@1'] = {}; }, f => { delete f.newLock.snapshots['runtime@1']; }]) {
+      const f = fixture(); change(f); expect(f.check()).toBe(false);
+    }
+  });
+  it('retains full scope for runtime, fixtures, unclassified config and runtime Markdown', () => {
+    for (const path of ['src/App.tsx', 'tests/fixtures/input.md', 'src/tools/alpha/data.md', 'vite.config.ts', '.github/workflows/pages.yml']) expect(fixture().check([path])).toBe(false);
+  });
+  it('does not generalize the initial rollout exception to later lint upgrades', () => {
+    const f = fixture(); f.oldPackage.devDependencies.oxlint = '1.87.0'; expect(f.check()).toBe(false);
+    f.newPackage.devDependencies.oxlint = '1.88.0'; expect(f.check()).toBe(false);
+  });
+  it('falls back safely on missing or malformed metadata', () => {
+    expect(lintOnlyDependencyChange(['package.json', 'pnpm-lock.yaml'], () => '{', () => '{')).toBe(false);
+    expect(lintOnlyDependencyChange(['package.json'], () => '{}', () => '{}')).toBe(false);
   });
 });
