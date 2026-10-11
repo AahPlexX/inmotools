@@ -6,16 +6,18 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-crystal-lattice-studio-design.md
 tracker: src/tools/crystal/TRACKER.md
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # Crystal Lattice Studio — tracker
 
 ## Resume here
 
-2026-10-10 23:48 UTC: frozen repair sourceb914406311360ef3c2f4612f0b8add878842fb5e is integrated on maincfb7dd3cb82005bf46b7173750a6b7777479f523; complete trees equal. [Owned38095818585](https://github.com/AahPlexX/inmotools/actions/runs/38095818585), job114341374604 SUCCESS:4119unitpasses/18skips,370files/2skips, build5.36s,77browserpasses/5skips2.2m, no retry marker. [Pages38096031158](https://github.com/AahPlexX/inmotools/actions/runs/38096031158) SUCCESS on this main. Qualified-live8/8passed64.641s, no retries/skips/flaky/globalerrors/exit0, including320portrait/844landscape and original defect plus preference cycle. Focused local16/16 pass remains exact source acceptance. No open PRs and source branch deletion confirmed.
+2026-10-11 00:45 UTC: narrow dependency repair accepted; taskd7a8 done. Required [full38095819719](https://github.com/AahPlexX/inmotools/actions/runs/38095819719)/job114341370995 SUCCESS on sourceb914406311360ef3c2f4612f0b8add878842fb5e:1833browserpasses/171skips54.7m, no retry markers or flaky summary;4119unitpasses/18skips. Current main3bd5aa7 adds validation tooling/records, with application/browser/dependency/build inputs unchanged from that frozen source. Prior full38090462219 remains a historical failure.
 
-Required [full38095819719](https://github.com/AahPlexX/inmotools/actions/runs/38095819719), validatejob114341370995, exact sourceb914 remains in progress. Its records/unit/build stages succeeded; browser outcome/counts are pending. Do not redispatch unchanged source or claim full completion. PDF-R02/R03 remain partial,7f9e active; R04c061 stays queued. Next read completed full job logs once, record actual counts/retries/failures, then complete or repair the gate and resume PDF acceptance. Other Crystal work stays in the frozen later inventory position.
+Existing owned38095818585/job114341374604 SUCCESS77Crystalbrowserpasses/5skips2.2m,4119units/18skips and build5.36s; maincfb7dd3/Pages38096031158 SUCCESS; focused local16/16 and qualified-live8/8pass64.641s, no retries/skips/globalerrors in those focused scopes. Original defect assertions/default timeout remain unchanged. Generated root/Crystal filenames and preload order differed between local and served builds; exact limited comparison below remains canonical, not a raw five-file equality claim.
+
+PDF-R02/R03 can now be accepted in their own records; next frozen PDF-R04/c061 has no implementation. This narrow repair does not advance the full Crystal inventory position. Use [validation policy](../../../docs/VALIDATION_POLICY.md) for future dependency-selected/custom gates and full broad/uncertain/stable/final checkpoints. Do not repeat this unchanged passing full. Physical devices and universal absence of failures are not certified.
 
 ## Documents
 
@@ -66,7 +68,7 @@ Required [full38095819719](https://github.com/AahPlexX/inmotools/actions/runs/38
 | CLS-R027 | verified | unit "standardizes to conventional and primitive cells with provenance"; e2e "previews and applies a standardized symmetry cell" |  |
 | CLS-R028 | partial | unit "applies the identity basis transform without moving sites or changing the cell", "supports a unimodular axis exchange and preserves fractional geometry in the rebased cell", "applies an explicit origin shift and wraps the resulting fractional coordinates", "rejects singular and non-unimodular basis transforms instead of silently changing multiplicity" | Engine function only; no control and no before/after preview |
 | CLS-R029 | partial | unit "treats strain as a homogeneous small-strain tensor and leaves zero strain unchanged" | Engine function only; no control |
-| CLS-R030 | verified | unit "creates vacancy, substitution and interstitial models immutably with provenance"; e2e "builds vacancy, substitution and interstitial defects with undo", "CLS-R030 keeps automatic reveals local and restores route preferences" | Scoped repair16/16 local production checks passed; release/full gates pending in d7a8. |
+| CLS-R030 | verified | unit "creates vacancy, substitution and interstitial models immutably with provenance"; e2e "builds vacancy, substitution and interstitial defects with undo", "CLS-R030 keeps automatic reveals local and restores route preferences" | Scoped repair16/16 local,77owned/5skips,8qualified-live and replacement full38095819719 passed; narrow d7a8 done. |
 | CLS-R031 | partial | unit "reports defect concentration from deterministic site identity and chemistry changes" | Engine function only; the Point defects card does not show it |
 | CLS-R032 | partial | unit "builds a bounded cubic (100) slab with the requested material thickness and vacuum", "rejects invalid slab and domain requests before producing partial output" | Engine function only; the test covers cubic (100); no control |
 | CLS-R033 | partial | unit "creates deterministic identity and rotated domain overlays in Cartesian space" | Engine function only; no control or overlay in the viewport |

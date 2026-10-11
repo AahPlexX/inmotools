@@ -7,7 +7,7 @@ updated: 2026-10-11
 
 ## Current checkpoint
 
-Implementation and exact-main workflow qualification are tracked in [validation task](../.tasks/items/T-validation-policy-20261011-4d6b.md). Existing [full38095819719](https://github.com/AahPlexX/inmotools/actions/runs/38095819719) succeeded on sourceb914:1833browserpasses/171skips54.7m, no retry markers. Application/browser/dependency/build inputs match through baseline main68cd844 except records; the policy work changes tooling/workflows and has its own focused regression gate. Full acceptance is limited to that recorded scope, not future changes.
+Initial exact-main selector timeouts are recorded; the native module-record fix and exact-main workflow qualification are tracked in [validation task](../.tasks/items/T-validation-policy-20261011-4d6b.md). Existing [full38095819719](https://github.com/AahPlexX/inmotools/actions/runs/38095819719) succeeded on sourceb914:1833browserpasses/171skips54.7m, no retry markers. Application/browser/dependency/build inputs match through baseline main68cd844 except records; the policy work changes tooling/workflows and has its own focused regression gate. Full acceptance is limited to that recorded scope, not future changes.
 
 ## Required scope
 
@@ -35,4 +35,4 @@ Reuse passing evidence only when the relevant source, tests/fixtures, dependency
 - [Playwright CLI](https://playwright.dev/docs/test-cli): explicit file filters select suites while retaining project/retry settings.
 - [GitHub Actions workflow events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows) and [syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax): push/PR/dispatch contexts and typed inputs.
 - [Git diff](https://git-scm.com/docs/git-diff): compare actual push endpoints, PR merge base, and include deleted/renamed paths without rename detection.
-- [Prettier plugin parser contract](https://prettier.io/docs/plugins): existing pinned parser returns the actual TypeScript AST; no new parser dependency.
+- [Pinned Rolldown parser source](https://github.com/rolldown/rolldown/blob/v1.2.7/packages/rolldown/src/utils/parse.ts): Vite already provides the native TypeScript parser; module records avoid unnecessary AST deserialization. No new dependency.

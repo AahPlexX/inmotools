@@ -74,6 +74,18 @@ describe('dependency-aware browser scope', () => {
     expect(select(root, ['src/tools/alpha/Workspace.tsx'])).toEqual(specs('alpha'));
   });
 
+  it('decodes escaped requests, namespace re-exports and escaped CommonJS loaders without dropping consumers', () => {
+    const root = fixture({
+      'src/tools/beta/Workspace.tsx': 'export * as all from "../alpha/Workspace";',
+      'src/tools/gamma/Workspace.tsx': '// Unicode before the request: 😀 π\nconst load = import("../be\\u0074a/Workspace");',
+    });
+    expect(select(root, ['src/tools/alpha/Workspace.tsx'])).toEqual(specs('alpha', 'beta', 'gamma'));
+    writeFileSync(join(root, 'src/tools/beta/Workspace.tsx'), 'const load = r\\u0065quire("../alpha/Workspace");');
+    expect(select(root, ['src/tools/alpha/Workspace.tsx'])).toEqual(specs('alpha', 'beta', 'gamma'));
+    writeFileSync(join(root, 'src/tools/beta/Workspace.tsx'), 'const load = import.meta["glob"]("../alpha/*.tsx");');
+    expect(select(root, ['src/tools/alpha/Workspace.tsx'])).toEqual([FULL_SUITE]);
+  });
+
   it('falls back to full on unknown runtime files, fixtures, deleted specs and shell consumers', () => {
     const root = fixture({
       'src/lib/helper.ts': 'export const value = 1;',

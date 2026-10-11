@@ -3,10 +3,10 @@ task: T-pdf-sanitizer-20261009-7f9e
 tool: pdf-sanitizer
 doc: task
 kind: fix
-state: active
+state: done
 branch: fix/pdf-sanitizer
 created: 2026-10-09
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # Open encrypted PDFs read-only with cancellable password prompts and preserve mixed intake
@@ -16,7 +16,7 @@ Continue the frozen ordered tool audit at PDF-R02; implement supported local pas
 
 ## Resume here
 
-2026-10-10 23:51 UTC: PDF canonical tracker/verification refreshed in its own fix/pdf-sanitizer worktree after Crystal records integration38096363472 succeeded on main9f812e9. PDF application/all PDF unit/browser tests remain unchanged from a25535a; accepted PDF scopes are reused, completion remains33/167 verified,22partial/111missing/1implemented. Required replacement full38095819719/job114341370995 remains in progress, sourceb914. R02/R03 partial; R04c061 queued. [PDF tracker](../../src/tools/pdf/TRACKER.md#resume-here) and [verification](../../src/tools/pdf/VERIFICATION.md) carry current dependency/source/gate and next action. This is a records-only step; no extra browser gate or runtime change.
+2026-10-11 00:45 UTC: done; PDF-R02/R03 verified after replacement full38095819719/job114341370995 succeeded:1833browserpasses/171skips54.7m, no retry markers;4119unitpasses/18skips. Frozen PDF runtime a25535a and owned/local/live passing scopes are unchanged; canonical tracker/verification record exact receipts and limits. Previous failed full remains preserved. Explicitly activated c061 at PDF-R04; no R04 implementation and no unchanged full rerun. Main3bd5aa7 adds scoped validation policy without changing application/browser/dependency/build inputs.
 
 ### Dependency acceptance checkpoint — 2026-10-10 23:48 UTC
 
@@ -72,3 +72,5 @@ Current mainb6c1ab0 contains records only beyond integrated candidate; all non-M
 - 2026-10-10 23:48 UTC: narrow Crystal repair integrated maincfb7dd3, owned/Pages/live passed; exact changed-source full38095819719 still running. PDF cursor held, accepted scopes reused, no raw five-file-match claim.
 
 - 2026-10-10 23:51 UTC: own PDF canonical records refreshed after repaired Crystal records reached main9f812e9; unchanged PDF source/tests verified, matching accepted scopes reused, current full running and cursor held.
+
+- 2026-10-11 00:45 UTC: actual replacement full success recorded; frozen scope reused under current validation policy.

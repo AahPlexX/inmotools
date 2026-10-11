@@ -16,11 +16,13 @@ Use dependency-aware and custom tests to reduce repetitive overhead; repository-
 
 ## Resume here
 
-2026-10-11 00:43 UTC: scoped dependency selection, conservative fallback, shared event runner and single automatic browser owner are implemented. Final focused41/41passed in6.34s after tightening the merge-race reuse shortcut: runtime Markdown must select browser checks rather than count as records. No application/browser assertions, timeouts, dependency versions, auth or database changes.
+2026-10-11 07:12 UTC: implementation3bd5aa7 is on main; its exact-main Pages38099439330/job114352125001 failed four existing selector unit timeouts5000ms (sheets, Sightline, Crystal mapping and geo-intel wiring). Browser/build validation steps were skipped, not accepted. Documentation run38099439331 passed. Root issue is dependency-analysis cost under CI load; original assertions/timeouts are retained.
 
-Own worktree /workspace/inmotools-validation-policy based on main68cd844; local repository-validation-policy branch is not pushed. External receipts: /workspace/inmotools-implementation-evidence/validation-policy-20261011. Earlier broad unit pass4140/17skipped (373files/2skipped,178.38s) predates the final runner/workflow safeguards; final focused checks cover those changes. Actual existing full38095819719/job114341370995 SUCCESS:1833browserpasses/171skips54.7m, no retry markers;4119unitpasses/18skips. Runtime/browser/dependency/build input comparison to b914 is records-only. That full is reused, not repeated. PDF/Crystal formal records are a separate follow-up in their own worktrees.
+Own repository-validation-policy worktree now replaces full Prettier AST walks with the already pinned Vite/Rolldown1.2.7 native parser module records, decoding dynamic requests with the same parser and retaining AST walks for workers/globs/CommonJS/escaped identifiers. No package/lock/runtime/browser change. Official pinned parse source retrieved2026-10-11, receipt rolldown-primary.json. Final focused68/68passed8files10.57s including Unicode-prefix request decoding and all four previously timed-out mappings; log policy-final-0711.log. Current actual cold graph1522.67ms,1006files, no uncertain runtime imports; computed browser-only loader retains helper-change fallback.
 
-YAML/Bash/docs and diff checks pass. Next: commit implementation and publish directly to main by GitHub MCP after fresh SHA guard. Verify the new exact-main CI scope and result before marking this task done. Primary official sources checked2026-10-11 are in docs/VALIDATION_POLICY.md and the external primary-sources receipt.
+Existing full38095819719/job114341370995 SUCCESS:1833browserpasses/171skips54.7m, no retry markers;4119unitpasses/18skips, unchanged runtime/browser/dependency/build inputs. Earlier4140unitpass/17skip predates final safeguards and is not final candidate evidence. Completed PDF/Crystal own-worktree records are merged into this local candidate (PDF80b8ef5, Crystal2f26a41): R02/R03 verified,7f9e/d7a8 done, orderedR04c061 explicitly active with no implementation; not yet on main.
+
+Final focused exit0, YAML/Bash and182-document checks pass. Next publish through GitHub MCP directly to main after fresh SHA guard, then verify actual exact-main CI selects no browser scope and passes before marking this policy task done. External receipts /workspace/inmotools-implementation-evidence/validation-policy-20261011; no PR or new full dispatch.
 
 ## Acceptance requirements
 
@@ -40,3 +42,7 @@ YAML/Bash/docs and diff checks pass. Next: commit implementation and publish dir
 - 2026-10-11 00:34 UTC: implementation and documented scope policy present; meaningful fixtures cover transitive consumers, deleted modules/helpers/unknown runtime, cache invalidation and workflow ownership/event modes. Checks pending; old failures preserved.
 
 - 2026-10-11 00:43 UTC: existing full completed successfully and scope identity recorded; merge-race Markdown optimization now consults the dependency selector. Final checks/publication pending.
+
+- 2026-10-11 07:11 UTC: actual first-main CI timeout failures retained; native module-record optimization implemented and prepared per-tool completion records await publication.
+
+- 2026-10-11 07:12 UTC: final68focused checks passed10.57s, docs/syntax passed; own-tool completion records merged into the guarded main publication candidate.

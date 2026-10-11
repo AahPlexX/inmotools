@@ -1,8 +1,11 @@
-// Tooling-only impact graph using the repository's pinned TypeScript parser.
+// Tooling-only impact graph using Vite's already pinned native TypeScript parser.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, posix } from 'node:path';
-import { parsers } from 'prettier/plugins/babel';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const viteRequire = createRequire(require.resolve('vite/package.json'));
+const { parseSync, Visitor } = await import(viteRequire.resolve('rolldown/utils'));
 
 const CODE = /\.[cm]?[jt]sx?$/;
 const EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts', '.css', '/index.ts', '/index.tsx', '/index.js'];
@@ -23,27 +26,37 @@ function references(source, path) {
     imports.forEach((match) => refs.push(match[1]));
     return { refs, uncertain: imports.length !== [...source.matchAll(/@import\b/g)].length || refs.some((ref) => ref.includes('\\')) };
   }
-  const ast = parsers['babel-ts'].parse(source, { filepath: path });
+  const parsed = parseSync(path, source);
+  if (parsed.errors.length) throw new Error(parsed.errors[0].message);
   const literal = (node) => ['Literal', 'StringLiteral'].includes(node?.type) && typeof node.value === 'string' ? node.value : null;
   function add(node) {
     const value = literal(node);
     if (value === null) uncertain = true;
     else refs.push(value);
   }
-  function walk(node) {
-    if (!node || typeof node !== 'object' || typeof node.type !== 'string') return;
-    if (['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type) && node.source) add(node.source);
-    if (node.type === 'ImportExpression') add(node.source);
-    if (node.type === 'CallExpression' && node.callee?.name === 'require') add(node.arguments[0]);
-    if (node.type === 'CallExpression' && ['glob', 'globEager'].includes(node.callee?.property?.name)) uncertain = true;
-    if (node.type === 'NewExpression' && node.callee?.name === 'URL' && node.arguments[1]?.object?.type === 'MetaProperty') add(node.arguments[0]);
-    for (const [key, value] of Object.entries(node)) {
-      if (['comments', 'tokens', 'loc', 'range'].includes(key)) continue;
-      if (Array.isArray(value)) value.forEach(walk);
-      else walk(value);
-    }
+  // Native module records avoid deserializing/walking unrelated component
+  // bodies. Dynamic requests are decoded by the same parser, never by regex.
+  for (const entry of parsed.module.staticImports) refs.push(entry.moduleRequest.value);
+  for (const statement of parsed.module.staticExports) for (const entry of statement.entries) {
+    if (entry.moduleRequest) refs.push(entry.moduleRequest.value);
   }
-  walk(ast);
+  for (const entry of parsed.module.dynamicImports) {
+    const expression = source.slice(entry.moduleRequest.start, entry.moduleRequest.end);
+    const request = parseSync('request.ts', `import(${expression})`);
+    if (request.errors.length) throw new Error(request.errors[0].message);
+    add(request.program.body[0].expression.source);
+  }
+  // import.meta covers worker URLs/globs. Unicode escapes and loader words
+  // request a full AST walk; false positives only cost time, never coverage.
+  if (parsed.module.importMetas.length || /require|glob|\\u/.test(source)) new Visitor({
+    CallExpression: (node) => {
+      if (node.callee?.name === 'require') add(node.arguments[0]);
+      if (['glob', 'globEager'].includes(node.callee?.property?.name ?? literal(node.callee?.property))) uncertain = true;
+    },
+    NewExpression: (node) => {
+      if (node.callee?.name === 'URL' && node.arguments[1]?.object?.type === 'MetaProperty') add(node.arguments[0]);
+    },
+  }).visit(parsed.program);
   return { refs, uncertain };
 }
 

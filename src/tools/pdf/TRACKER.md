@@ -6,18 +6,18 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-pdf-sanitizer-design.md
 tracker: src/tools/pdf/TRACKER.md
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # PDF Sanitizer — tracker
 
 ## Resume here
 
-2026-10-10 23:51 UTC: PDF-R02/R03 remain partial; [7f9e](../../../.tasks/items/T-pdf-sanitizer-20261009-7f9e.md) active and [R04c061](../../../.tasks/items/T-pdf-sanitizer-20261009-c061.md) queued. PDF application/tests still match frozen a25535ad10b41d865b492f294f98fbffa124c29e; matching accepted PDF20Chromium/40native, owned52 and live20 scopes are reused. Prior required full38090462219 remains failed.
+2026-10-11 00:45 UTC: PDF-R02/R03 accepted; task7f9e done. Required replacement [full38095819719](https://github.com/AahPlexX/inmotools/actions/runs/38095819719)/job114341370995 SUCCESS on sourceb914406311360ef3c2f4612f0b8add878842fb5e:1833browserpasses/171skips54.7m, no retry markers or flaky summary;4119unitpasses/18skips,370files/2skips. Old full38090462219 remains a historical failure, not relabeled. PDF runtime remains a25535a; current main3bd5aa7 changes validation tooling/records, with no application/browser/dependency/build input change. Matching accepted PDF20Chromium/40native, owned52 and qualified-live20 scopes are reused with their recorded limits.
 
-Narrow [Crystal d7a8](../../../.tasks/items/T-crystal-substitution-retry-20261009-d7a8.md) dependency repair sourceb914406311360ef3c2f4612f0b8add878842fb5e integrated on maincfb7dd3cb82005bf46b7173750a6b7777479f523. Owned38095818585 succeeded77Crystalbrowserpasses/5skips,4119unitpasses/18skips, build5.36s; Pages38096031158 succeeded; qualified-live8/8passed64.641s with no retries/skips/errors, local16/16passed. Original assertion/timeout preserved. [Crystal verification](../crystal/VERIFICATION.md) carries exact source/served-code comparisons, primary receipts and limits. Generated filenames/preload-list order differed from local build; raw five-file equality is not claimed for this Crystal release.
+Narrow [Crystal d7a8](../../../.tasks/items/T-crystal-substitution-retry-20261009-d7a8.md) dependency repair is accepted:77ownedbrowserpasses/5skips,16local and8qualified-live passes, prior main/Pages receipts and replacement full success. [Crystal verification](../crystal/VERIFICATION.md) preserves actual served/root generated-filename and preload-order differences; no raw five-file equality is claimed for Crystal.
 
-Required replacement [full38095819719](https://github.com/AahPlexX/inmotools/actions/runs/38095819719), validatejob114341370995, exact sourceb914 remains in progress with records/unit/build stages succeeded and browser result pending. Do not duplicate this running gate, close R02/R03, or advance R04 before reading its completed actual outcome. Next read completed job logs once and update both dependency/PDF records; if green, accept preceding items and explicitly activate c061 (task-start worktree reuse returns before queued activation). Physical devices and universal absence of failures are not certified.
+Frozen cursor is now PDF-R04; [c061](../../../.tasks/items/T-pdf-sanitizer-20261009-c061.md) explicitly active, no R04 implementation. Next refresh current main/time and existing authoritative source receipts, specify bounded diagnostics and meaningful associated-defect acceptance, then implement and run applicable selected/custom checks under [validation policy](../../../docs/VALIDATION_POLICY.md). Do not repeat unchanged passing browser/full receipts. Current policy main qualification is separately tracked in validation task4d6b. Physical devices and universal absence of failures are not certified.
 
 ## Documents
 
@@ -35,8 +35,8 @@ Required replacement [full38095819719](https://github.com/AahPlexX/inmotools/act
 | ID | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | PDF-R01 | verified | e2e "merges multiple source PDFs in the visible queue order" |  |
-| PDF-R02 | partial | unit "does not create a loading task after the caller already cancelled"; e2e "PDF-R02 opens AES256 with password retry and actual reader text, search, pages and zoom" | Frozen a25535a is on main; local20Chromium/40native, owned52 and live20 pass. Prior full38090462219 failed at Crystal; repaired dependency is on main, replacement full38095819719 is running and final acceptance stays open. |
-| PDF-R03 | partial | e2e "PDF-R03 keeps empty-user protected documents read-only and produces no protected download" | Existing engine refusal preserved;3realfixture unit cases and protected appcase pass in recorded scopes. Final acceptance remains co-gated with R02; replacement full38095819719 is running after narrow Crystal repair. |
+| PDF-R02 | verified | unit "does not create a loading task after the caller already cancelled"; e2e "PDF-R02 opens AES256 with password retry and actual reader text, search, pages and zoom" | Frozen a25535a accepted: local20Chromium/40native, owned52, qualified-live20 and replacement full38095819719 passed. |
+| PDF-R03 | verified | e2e "PDF-R03 keeps empty-user protected documents read-only and produces no protected download" | Engine refusal retained; real protected fixtures and app scope pass; replacement full38095819719 succeeded with R02. |
 | PDF-R04 | partial | unit "reports final page geometry for workstation page-box tooling" | Page count, size, form fields, Info metadata, page geometry and attachments are shown; encryption detail, active content and structural warnings are not |
 | PDF-R05 | missing | — |  |
 | PDF-R06 | verified | e2e "merges multiple source PDFs in the visible queue order"; unit "combines local PDFs without changing the source buffers" |  |

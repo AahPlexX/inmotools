@@ -5,7 +5,7 @@ kind: fix
 state: active
 branch: fix/markdown-workbench
 created: 2026-10-06
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # Ordered requirement implementation
@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-2026-10-10 23:48 UTC: frozen cursorPDF-R02/R03;7f9e active/R04c061 next. Narrow [Crystal d7a8](T-crystal-substitution-retry-20261009-d7a8.md) dependency repair sourceb914406 is on maincfb7dd3, complete trees equal; owned38095818585 SUCCESS77browserpasses/5skips,4119unitpasses/18skips, build5.36s; Pages38096031158 SUCCESS; qualified-live8/8pass64.641s without retries/skips/errors. Actual source comparison handles observed generated filenames/preload-list order explicitly; five-file raw byte equality is not claimed. [Crystal verification](../../src/tools/crystal/VERIFICATION.md) preserves exact receipts/limits. Required changed-source full38095819719/job114341370995 remains in progress with records/unit/build stages succeeded and browser outcome pending. Preserve accepted unchanged PDF scopes, leave R02/R03 partial and R04 queued. Next read completed full logs once and record actual result before PDF acceptance/advance; do not duplicate the running full.
+2026-10-11 00:45 UTC: PDF-R02/R03 verified,7f9e done; frozen cursorPDF-R04/c061 explicitly active with no implementation. Narrow Crystal d7a8 dependency is accepted after replacement full38095819719/job114341370995 SUCCESS:1833browserpasses/171skips54.7m, no retry markers;4119unitpasses/18skips. Matching PDF and Crystal owned/local/live receipts are reused; historical failed full is preserved. Current main3bd5aa7 adds scoped dependency validation and single automatic browser ownership without changing app/browser/dependency/build inputs. [PDF tracker](../../src/tools/pdf/TRACKER.md#resume-here), [Crystal verification](../../src/tools/crystal/VERIFICATION.md) and [validation policy](../../docs/VALIDATION_POLICY.md) are canonical. Next refresh main/time/primary sources, specify and implement ordered R04 diagnostics/associated defects with applicable selected/custom checks; no duplicate unchanged full or inventory reorder.
 
 ### Historical checkpoint — before dependency activation
 

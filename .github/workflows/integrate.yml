@@ -5,7 +5,7 @@ name: Integrate branch into main
 # branch. If main moves during the run, the push is rejected and the run retries on
 # the new main. Nothing is merged unless every check passes on the merged result.
 # A conflict only in the generated .tasks/ITEMS.md is resolved by regenerating it.
-# On a retry, if main gained only Markdown changes since the tested merge, the
+# On a retry, if main gained only records with no browser impact since the tested merge, the
 # build and browser tests are not repeated (unit tests and doc checks still run).
 # A push whose only change is the claim made by `pnpm task:start` is not merged, so
 # the branch stays on origin as the claim until it carries work.

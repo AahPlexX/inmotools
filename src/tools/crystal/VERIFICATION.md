@@ -1,7 +1,7 @@
 ---
 tool: crystal-lattice-studio
 doc: research
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # Point-defect gate dependency verification
@@ -10,9 +10,11 @@ Current state: [TRACKER.md](TRACKER.md). Current task: [d7a8](../../../.tasks/it
 
 ## Current checkpoint
 
-2026-10-10 23:48 UTC: frozen repair sourceb914406311360ef3c2f4612f0b8add878842fb5e is integrated on maincfb7dd3cb82005bf46b7173750a6b7777479f523; complete trees equal. [Owned38095818585](https://github.com/AahPlexX/inmotools/actions/runs/38095818585), job114341374604 SUCCESS:4119unitpasses/18skips,370files/2skips, build5.36s,77browserpasses/5skips2.2m, no retry marker. [Pages38096031158](https://github.com/AahPlexX/inmotools/actions/runs/38096031158) SUCCESS on this main. Qualified-live8/8passed64.641s, no retries/skips/flaky/globalerrors/exit0, including320portrait/844landscape and original defect plus preference cycle. Focused local16/16 pass remains exact source acceptance. No open PRs and source branch deletion confirmed.
+2026-10-11 00:45 UTC: narrow dependency repair accepted; taskd7a8 done. Required [full38095819719](https://github.com/AahPlexX/inmotools/actions/runs/38095819719)/job114341370995 SUCCESS on sourceb914406311360ef3c2f4612f0b8add878842fb5e:1833browserpasses/171skips54.7m, no retry markers or flaky summary;4119unitpasses/18skips. Current main3bd5aa7 adds validation tooling/records, with application/browser/dependency/build inputs unchanged from that frozen source. Prior full38090462219 remains a historical failure.
 
-Required [full38095819719](https://github.com/AahPlexX/inmotools/actions/runs/38095819719), validatejob114341370995, exact sourceb914 remains in progress. Its records/unit/build stages succeeded; browser outcome/counts are pending. Do not redispatch unchanged source or claim full completion. PDF-R02/R03 remain partial,7f9e active; R04c061 stays queued. Next read completed full job logs once, record actual counts/retries/failures, then complete or repair the gate and resume PDF acceptance. Other Crystal work stays in the frozen later inventory position.
+Existing owned38095818585/job114341374604 SUCCESS77Crystalbrowserpasses/5skips2.2m,4119units/18skips and build5.36s; maincfb7dd3/Pages38096031158 SUCCESS; focused local16/16 and qualified-live8/8pass64.641s, no retries/skips/globalerrors in those focused scopes. Original defect assertions/default timeout remain unchanged. Generated root/Crystal filenames and preload order differed between local and served builds; exact limited comparison below remains canonical, not a raw five-file equality claim.
+
+PDF-R02/R03 can now be accepted in their own records; next frozen PDF-R04/c061 has no implementation. This narrow repair does not advance the full Crystal inventory position. Use [validation policy](../../../docs/VALIDATION_POLICY.md) for future dependency-selected/custom gates and full broad/uncertain/stable/final checkpoints. Do not repeat this unchanged passing full. Physical devices and universal absence of failures are not certified.
 
 ### New contract baseline
 
