@@ -13,7 +13,7 @@ updated: 2026-10-11
 
 ## Resume here
 
-2026-10-11 19:28 UTC: R05 verified; task4b3a done. Main3be3493b9a820e1324e3c7b2ed1bac20e5d35b6e Pages38167795102/validate114553877122 SUCCESS:4160units/18skips,374files/2skips72.54s; build7.71s; all62selectedbrowsercases in10PDFspecs passed2.1m, no browser skips/retry markers. Build/deploy, Docs38167795095 and Static analysis38167795103 succeed. Qualified live4/4desktop/mobile26.3s; workspaceJS/CSS/readerhelper eachHTTP200 byte-equal to candidate-dist, root module only fetched. Local six ordinary native passes precisely reused, six corrected protected native passes37.5s; earlier wrong-all-workers assertion failures and zero-case duplicate-Playwright setup failure preserved. Diagnostic proves PDF worker closes and Markdown creates table-formula.worker. Focused lint25files0errors/56warnings, original reader4/password6 units/types/build reused for unchanged bd2520f thumbnail runtime. PDF37/167verified,1implemented/19partial/110missing. Next frozen cursorR07 range/R08burst/R09actual-size-ceiling, active task91d4; no new split implementation yet.
+Current main0e2bc88: R05 verified on3be3493 with selected62/native6+6/live4 receipts. Active split task91d4 draftc1b2f34 passes10unit cases, TypeScript and production build; scoped lint42warnings/0errors; native12/12 acceptance passed1.8m, main/live gates pending; see task Resume here for exact source/progress. Next validate R07ranges, R08burst and R09actual-size packing in frozen order.
 
 ## Documents
 
@@ -36,9 +36,9 @@ updated: 2026-10-11
 | PDF-R04 | verified | `tests/unit/pdf-diagnostics.test.ts`; `tests/e2e/pdf-diagnostics.spec.ts`; original form-flattening/export cases in `pdf.spec.ts` and `pdf-form-authoring.spec.ts` | Accurate non-mutating diagnostics, recoverable optional errors, null semantics, inert indicators, unknown inventories, physical dimensions and explicit protected/scan limits. Main f992c97: 54 focused units, 18 affected native, 58 selected CI and 10 live passes; scope reuse/failure history in VERIFICATION.md. |
 | PDF-R05 | verified | `tests/e2e/pdf-thumbnails.spec.ts` | Bounded lazy rail, independent thumbnail cancellation, protected-session reuse. Main3be3493 accepted: native ordinary6/protected6, selected62/10specs, live4 and matching served assets; failure/reuse evidence in VERIFICATION.md. |
 | PDF-R06 | verified | e2e "merges multiple source PDFs in the visible queue order"; unit "combines local PDFs without changing the source buffers" |  |
-| PDF-R07 | missing | — | One output per export; a range selection extracts into that output (PDF-R11) |
-| PDF-R08 | missing | — |  |
-| PDF-R09 | missing | — |  |
+| PDF-R07 | partial | `pdf-split.ts`; `PdfSplitPanel.tsx` | Local10units/native12/build/lint pass; main/live acceptance pending. |
+| PDF-R08 | partial | `pdf-split.ts`; `PdfSplitPanel.tsx` | Local10units/native12/build/lint pass; main/live acceptance pending. |
+| PDF-R09 | partial | `pdf-split.ts`; `PdfSplitPanel.tsx` | Local actual-byte packing passes; main/live acceptance pending. |
 | PDF-R10 | missing | — |  |
 | PDF-R11 | verified | e2e "extracts an exact selected page range into the rebuilt output"; unit "validates ranges before processing and preserves explicit order/repeats" |  |
 | PDF-R12 | verified | e2e "keeps an empty Even preset distinct from All and reorders output without requiring drag gestures"; unit "keeps an empty preset distinct from the all-pages sentinel" |  |

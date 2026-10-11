@@ -1,0 +1,10 @@
+.pdf-split-section { margin-top: 18px; min-width: 0; max-width: 100%; }
+.pdf-split-section h3 { margin-top: 0; }
+.pdf-split-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+.pdf-split-section .field { min-width: 0; }
+.pdf-split-section .button-row { flex-wrap: wrap; }
+.pdf-split-status, .pdf-split-section .help-text { overflow-wrap: anywhere; }
+.pdf-split-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+.pdf-split-part { min-width: 0; overflow-wrap: anywhere; gap: 8px; }
+.pdf-split-part strong, .pdf-split-part span { max-width: 100%; white-space: normal; }
+.pdf-split-part .action-button { max-width: 100%; }

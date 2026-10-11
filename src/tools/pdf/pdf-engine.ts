@@ -609,6 +609,45 @@ export async function flattenAndSanitizePdf(bytes: Uint8Array): Promise<Uint8Arr
   return splicePdfs([{ bytes, flatten: true }]);
 }
 
+/** Copies a verified, prepared output without reparsing it for every split candidate. */
+export async function createPdfSplitWriter(
+  bytes: Uint8Array,
+  options: Pick<PdfOutputOptions, 'metadata' | 'attachments'> = {},
+  signal?: AbortSignal,
+) {
+  signal?.throwIfAborted();
+  const source = await PDFDocument.load(bytes.slice(), { updateMetadata: false });
+  signal?.throwIfAborted();
+  if (source.isEncrypted) throw new Error('Protected PDFs cannot be split into editable output.');
+  const inspection = inspectParsedPdf(source);
+  if (!inspection.diagnostics.complete) throw new Error('Split source diagnostics are incomplete; no files were prepared.');
+  if (inspection.formFieldCount) throw new Error('Split output cannot preserve editable fields. Flatten source forms and remove newly authored fields first.');
+  if (inspection.metadataFields.length && !options.metadata) throw new Error('Prepared metadata must be supplied to preserve it in split files.');
+  const expectedAttachments = (options.attachments ?? []).map(item => item.name).sort();
+  if (JSON.stringify(inspection.attachments.map(item => item.name).sort()) !== JSON.stringify(expectedAttachments)) {
+    throw new Error('Prepared attachments must be supplied to preserve them in every split file.');
+  }
+  return {
+    pageCount: source.getPageCount(),
+    async write(pages: number[]): Promise<Uint8Array> {
+      signal?.throwIfAborted();
+      if (!pages.length || pages.some(page => !Number.isInteger(page) || page < 1 || page > source.getPageCount())) {
+        throw new Error('Split pages must be valid page numbers in the prepared output.');
+      }
+      const output = await PDFDocument.create({ updateMetadata: false });
+      const copied = await output.copyPages(source, pages.map(page => page - 1));
+      copied.forEach(page => output.addPage(page));
+      signal?.throwIfAborted();
+      applyMetadata(output, options.metadata);
+      await attachPdfFiles(output, options.attachments ?? []);
+      signal?.throwIfAborted();
+      const result = new Uint8Array(await output.save({ updateFieldAppearances: false }));
+      signal?.throwIfAborted();
+      return result;
+    },
+  };
+}
+
 export async function splicePdfs(selections: PdfSelection[], options: PdfOutputOptions = {}): Promise<Uint8Array> {
   if (!selections.length) throw new Error('Add at least one PDF.');
   const output = await PDFDocument.create({ updateMetadata: false });

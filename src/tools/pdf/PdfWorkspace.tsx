@@ -21,6 +21,7 @@ import PdfSourceFormInventory from './PdfSourceFormInventory';
 import PdfOverlayPanel from './PdfOverlayPanel';
 import PdfExportSummaryPanel from './PdfExportSummaryPanel';
 import PdfCanvas from './PdfCanvas';
+import PdfSplitPanel, { type PdfPreparedOutput } from './PdfSplitPanel';
 import PdfPasswordDialog, { type PdfPasswordRequest } from './PdfPasswordDialog';
 import PdfDiagnosticsPanel from './PdfDiagnosticsPanel';
 import type { PdfReaderDiagnostics } from './pdf-diagnostics';
@@ -648,38 +649,52 @@ export default function PdfWorkspace() {
     }
   }
 
+  const splitRevision = useMemo(() => ({}), [items, flatten, metadata, outputFilename, blankPages, geometryEdits, stagedAttachments, stagedFormFields, overlayDraft]);
+
+  async function buildPreparedOutput(signal?: AbortSignal): Promise<PdfPreparedOutput> {
+    signal?.throwIfAborted();
+    const selections = await Promise.all(items.map(async (item, index) => ({
+      bytes: new Uint8Array(await item.file.arrayBuffer()),
+      pages: pageStates[index].pages,
+      rotate: item.rotate,
+      flatten,
+    })));
+    signal?.throwIfAborted();
+    const blankDefinitions: PdfBlankPageDefinition[] = blankPages.map(({ afterPage, width, height, count }) => ({ afterPage, width, height, count }));
+    const attachments: PdfAttachmentDefinition[] = await attachmentDefinitionsFromStages(stagedAttachments);
+    signal?.throwIfAborted();
+    const filename = safePdfFilename(outputFilename, outputName());
+    const overlayOptions = await overlayOptionsFromDraft(overlayDraft, filename);
+    signal?.throwIfAborted();
+    const rebuiltBytes = await splicePdfs(selections, {
+      metadata: authoredMetadata,
+      blankPages: blankDefinitions,
+      pageBoxEdits,
+      attachments,
+      formFields: stagedFormFields,
+    });
+    signal?.throwIfAborted();
+    const bytes = await applyPdfOverlaysToBytes(rebuiltBytes, overlayOptions);
+    signal?.throwIfAborted();
+    const outputInspection = await inspectPdf(bytes);
+    if (!outputInspection.diagnostics.complete) throw new Error('Output diagnostics are incomplete; no download was created.');
+    if (outputInspection.formFieldCount !== stagedFormFields.length) {
+      throw new Error(`Output verification expected ${stagedFormFields.length} authored form field${stagedFormFields.length === 1 ? '' : 's'} but found ${outputInspection.formFieldCount}; no download was created.`);
+    }
+    const expectedAttachmentNames = attachments.map((attachment) => attachment.name).sort();
+    const actualAttachmentNames = outputInspection.attachments.map((attachment) => attachment.name).sort();
+    if (JSON.stringify(actualAttachmentNames) !== JSON.stringify(expectedAttachmentNames)) {
+      throw new Error('Output verification found an attachment inventory mismatch; no download was created.');
+    }
+    signal?.throwIfAborted();
+    return { bytes, filename, metadata: authoredMetadata, attachments };
+  }
+
   async function process() {
     if (!items.length || hasPageError || formPolicyBlocked || diagnosticsBlocked || blankPlanError || geometryError || attachmentError || formAuthoringError || overlayError) return;
     setBusy(true);
     try {
-      const selections = await Promise.all(items.map(async (item, index) => ({
-        bytes: new Uint8Array(await item.file.arrayBuffer()),
-        pages: pageStates[index].pages,
-        rotate: item.rotate,
-        flatten,
-      })));
-      const blankDefinitions: PdfBlankPageDefinition[] = blankPages.map(({ afterPage, width, height, count }) => ({ afterPage, width, height, count }));
-      const attachments: PdfAttachmentDefinition[] = await attachmentDefinitionsFromStages(stagedAttachments);
-      const filename = safePdfFilename(outputFilename, outputName());
-      const overlayOptions = await overlayOptionsFromDraft(overlayDraft, filename);
-      const rebuiltBytes = await splicePdfs(selections, {
-        metadata: authoredMetadata,
-        blankPages: blankDefinitions,
-        pageBoxEdits,
-        attachments,
-        formFields: stagedFormFields,
-      });
-      const bytes = await applyPdfOverlaysToBytes(rebuiltBytes, overlayOptions);
-      const outputInspection = await inspectPdf(bytes);
-      if (!outputInspection.diagnostics.complete) throw new Error('Output diagnostics are incomplete; no download was created.');
-      if (outputInspection.formFieldCount !== stagedFormFields.length) {
-        throw new Error(`Output verification expected ${stagedFormFields.length} authored form field${stagedFormFields.length === 1 ? '' : 's'} but found ${outputInspection.formFieldCount}; no download was created.`);
-      }
-      const expectedAttachmentNames = attachments.map((attachment) => attachment.name).sort();
-      const actualAttachmentNames = outputInspection.attachments.map((attachment) => attachment.name).sort();
-      if (JSON.stringify(actualAttachmentNames) !== JSON.stringify(expectedAttachmentNames)) {
-        throw new Error('Output verification found an attachment inventory mismatch; no download was created.');
-      }
+      const { bytes, filename, attachments } = await buildPreparedOutput();
       downloadBytes(bytes, filename, 'application/pdf');
       const delta = bytes.byteLength - sourceBytes;
       const sourceFormSummary = formFieldTotal > 0
@@ -882,6 +897,7 @@ export default function PdfWorkspace() {
 
       {diagnosticsBlocked ? <p className="notice" role="alert">Export is blocked because a source has incomplete diagnostics. Review its document diagnostics or remove it to export the remaining files.</p> : null}
       <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked || diagnosticsBlocked || Boolean(blankPlanError) || Boolean(geometryError) || Boolean(attachmentError) || Boolean(formAuthoringError) || Boolean(overlayError)} onClick={() => void process()}>Process and download</button></div>
+      <PdfSplitPanel revision={splitRevision} pageCount={outputPageCount} busy={busy} onBusyChange={setBusy} prepare={buildPreparedOutput} fieldsBlocked={stagedFormFields.length > 0} blocked={!items.length || hasPageError || formPolicyBlocked || diagnosticsBlocked || Boolean(blankPlanError) || Boolean(geometryError) || Boolean(attachmentError) || Boolean(formAuthoringError) || Boolean(overlayError)} />
       <div className="status-line" role="status">{busy ? 'Processing PDF bytes locally…' : status}</div>
       <div className="notice"><strong>Current sanitization boundary</strong><p className="help-text">Output is rebuilt into a new PDF, so source document-level Info/catalog metadata and embedded files are not intentionally carried forward. Replacement metadata, output attachments, newly authored editable fields, and export overlays are opt-in. Selected page content and page-level annotations are preserved; this stage is not yet the workstation's planned malware analysis, secure redaction, or active-content sanitization system.</p></div>
     </div>
