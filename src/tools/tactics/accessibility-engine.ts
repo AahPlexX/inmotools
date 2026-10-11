@@ -343,6 +343,14 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
       'Click an arrow or other drawing (a mark on the pitch). Then choose "Remove drawing", or press Delete or Backspace while focus is on the pitch or the page background. The drawing disappears. Players stay on the pitch. In a text field, Backspace still deletes typed characters.',
     ],
   },
+  {
+    id: 'pdf-export',
+    title: 'Download a coaching PDF',
+    paragraphs: [
+      'Open Professional export. Choose Download PDF package. This browser saves one file that holds two files: coaching.pdf, the printable page, and metadata.json, a text copy of the export fields. Nothing is uploaded.',
+      'On the page, accented letters (such as é), Greek letters (such as Α), and Cyrillic letters (such as И) stay as you typed them in the title, the club, the notes, or a drawing label. A team name or player name that uses one of those letters is printed as Teams: followed by the names, and the pitch drawing uses the space that remains. A letter outside those sets is shown as ? on the page. metadata.json still has the letter you typed.',
+    ],
+  },
 ];
 
 export function assertUniqueShortcutChords(shortcuts: readonly TacticalShortcut[]): void {

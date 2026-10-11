@@ -87,6 +87,7 @@ describe('tactical accessibility contracts', () => {
       'motion',
       'recovery',
       'match-setup',
+      'pdf-export',
     ]);
   });
 

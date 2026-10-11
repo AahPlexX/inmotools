@@ -2,6 +2,15 @@
 
 > **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
 
+## Unicode PDF page text
+
+- Branch: `cursor/matchboard-pdf-unicode`
+- Base: `origin/main` `e134af68a6d8670f545a7bc1a4d568deb3d0b3bf`
+- Tip: filled after the gate commit
+- Draft pull request: do not undraft or merge
+- Page text outside basic Latin uses bundled Noto Sans through `@pdf-lib/fontkit` 1.1.1. A letter outside that subset is shown as ?. metadata.json keeps the original letter.
+- Lazy chunk: `pdf-unicode-font-*.js`, 1,023.46 kB, gzip 493.18 kB, from the 2026-10-11 production build. It loads only when the coaching PDF contains a character outside basic Latin.
+
 ## Workstream identity
 
 - Branch: `cursor/matchboard-residuals-wave-8ddf`
@@ -25,7 +34,7 @@ Historical SHAs below describe the pre-squash branch. They are not the branch to
 
 ## Exact next sequential action
 
-**Stop.** T17-01 is done. Do not start another feature row, do not reopen rows 1–67, and do not undraft or merge. Resume only for the PDF Unicode residual if CoS approves a font-embedder pin.
+**Stop.** The PDF Unicode residual is implemented on `cursor/matchboard-pdf-unicode`. Do not undraft or merge that draft pull request. Do not start another feature row and do not reopen rows 1–67. Basic Latin page text still uses Helvetica. A letter outside the bundled Noto Sans subset is shown as ? on the page. metadata.json keeps the original letter.
 
 Help copy changed: YES. The workspace header sentence, help section `match-setup`, command-bar tooltips, the Build board tip, and the squad-growth note were rewritten. The catalog entry was not changed in this wave. Stage 2 instructional writing applies because help copy changed.
 
@@ -46,14 +55,14 @@ T17-01 is **DONE** except the PDF encoding half of residual 7. The wave started 
 4. **Separate opposition formation — closed.** The workspace passes a separately chosen formation. A 4v4 board can place a 7v7 opposition. Omitting the formation still mirrors the current squad, which keeps the older engine tests valid.
 5. **Persist training markings — closed.** Starter projects, Build board, rules application, and import of a bare overlay list store penalty areas, goal areas, penalty marks, goals, a centre circle, and corner arcs in `pitch.overlays`. IFAB and futsal overlay lists are left unchanged. SVG and PDF draw the stored list.
 6. **Build board confirm — closed.** Build board opens a confirm dialog before it replaces the board and clears undo. Cancelling leaves the current board and undo history in place.
-7. **Video frame cap — closed. PDF encoding — residual, CoS escalate.** `MAX_VIDEO_EXPORT_FRAMES` is 60, raised from 12. `sampleExportTimes` still refuses a requested cap above 240. The contact-sheet PDF sample cap stays 12. PDF page text remains WinAnsi. pdf-lib `1.17.1` standard fonts cannot draw beyond WinAnsi, and embedding a Unicode font needs `@pdf-lib/fontkit` (or an equivalent), which is not pinned. That pin was not added. No dependency pin or CI file changed.
+7. **Video frame cap — closed. PDF encoding — closed after T17.** `MAX_VIDEO_EXPORT_FRAMES` is 60, raised from 12. `sampleExportTimes` still refuses a requested cap above 240. The contact-sheet PDF sample cap stays 12. T17 left page text on WinAnsi and did not pin a font embedder. That half is closed on `cursor/matchboard-pdf-unicode`: `@pdf-lib/fontkit` 1.1.1 and the bundled Noto Sans subset draw page text outside basic Latin. A letter that subset does not include is shown as ?.
 8. **Board freehand — closed.** Freehand reuses the video telestration point rule: 2 to 2,000 normalized points (`MAX_TELESTRATION_POINTS`). Dragging on the pitch commits a stroke. Add freehand point and Save freehand are the non-drag path. The stroke is an annotation with kind `freehand`.
 
 Evidence: focused Tactical units **165/165** across 21 `tactics-*.test.ts` files and the e2e selector check **3/3**. `tsc --noEmit -p tsconfig.app.json` exits 0. Production build succeeds (`✓ built in 6.38s`). Full Tactical Playwright spec **80 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures** on desktop Chromium and mobile Chromium. Rows 1–63 were not reopened. Newly verified rows: **64, 65, 66, 67**.
 
 ## Residual backlog, in priority order
 
-1. PDF page text remains WinAnsi. CoS escalate before adding `@pdf-lib/fontkit` or any other font embedder. Do not change pins or CI from this workstream. Non-ASCII notes become `?` on the page while the sidecar keeps the original text.
+1. Closed on `cursor/matchboard-pdf-unicode`. Coaching PDF page text outside basic Latin uses the bundled Noto Sans subset through `@pdf-lib/fontkit` 1.1.1. Accented Latin, Greek, and Cyrillic letters stay on the page. A letter that subset does not include is shown as ?. metadata.json keeps the original letter. The font and fontkit load only when that export needs them. No font is fetched at export time.
 
 ## T16-01 production audit
 
@@ -66,7 +75,7 @@ T16-01 is **DONE**. The audit started from main at the PR #76 squash. Findings t
 
 Evidence: focused Tactical units **162/162** across 21 `tactics-*.test.ts` files and the e2e selector check **3/3**. `tsc --noEmit -p tsconfig.app.json` exits 0. Production build succeeds (`✓ built in 6.46s`). Full Tactical Playwright spec **72 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures** on desktop Chromium and mobile Chromium. The new browser scenario places an opposition, moves the ball, and removes a drawing. Rows 1–60 were not reopened. Newly verified rows: **61, 62, 63**.
 
-T16 left eight residuals, recorded on the T16 queue item: timeline virtualization and the 256-track cap, uncapped squad size, no pitch zoom or pan, mirrored opposition, render-time training markings, Build board without a confirm, a 12-frame video cap, and WinAnsi PDF page text. T17 closed seven of them and the video-cap half of the last one. Scenario comparison still memoizes an unchanged project diff. No dependency was added or upgraded.
+T16 left eight residuals, recorded on the T16 queue item: timeline virtualization and the 256-track cap, uncapped squad size, no pitch zoom or pan, mirrored opposition, render-time training markings, Build board without a confirm, a 12-frame video cap, and WinAnsi PDF page text. T17 closed seven of them and the video-cap half of the last one. The PDF encoding half is closed on `cursor/matchboard-pdf-unicode`. Scenario comparison still memoizes an unchanged project diff. T17 added no dependency. The Unicode PDF change pins `@pdf-lib/fontkit` 1.1.1.
 
 ## T14-01 closure evidence
 

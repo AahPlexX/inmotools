@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
-updated: 2026-10-05
+updated: 2026-10-11
 ---
 
 # Tactical Matchboard Studio — spec
@@ -34,13 +34,13 @@ Out of scope:
 - Platform rules: no accounts or authentication; no server, backend or server-side database (static GitHub Pages); everything runs in the browser and project data stays in this browser (IndexedDB via Dexie, downloads); network use is limited to the site's own files ([DOCUMENTATION_STANDARD.md](../../DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec)).
 - No large language models; other ML only under the ML ruleset (none is used).
 - Canonical positions are normalized `[0,1]` pitch coordinates; physical dimensions are stored separately; time is integer milliseconds.
-- Libraries stay as pinned in `package.json`: Three.js (3D), pdf-lib 1.17.1 (PDF, standard WinAnsi fonts), MediaBunny (video), JSZip (`web-layout-zip`), Dexie.
+- Libraries stay as pinned in `package.json`: Three.js (3D), pdf-lib 1.17.1 (PDF), `@pdf-lib/fontkit` 1.1.1 (Matchboard coaching PDF only), the bundled Noto Sans 2.015 subset in `src/tools/tactics/fonts/` (SIL OFL 1.1; see [THIRD_PARTY_NOTICES.md](../../../src/tools/tactics/THIRD_PARTY_NOTICES.md)), MediaBunny (video), JSZip (`web-layout-zip`), Dexie. The font and fontkit load only when a coaching PDF contains a character outside basic Latin. No font is fetched at export time.
 - Video export is offered only for combinations the browser's WebCodecs encoder confirms.
 - Rulesets carry provenance; validators are authoring aids, not officiating decisions.
 
 ## Architecture and engine
 
-- Engines and libraries: `three@0.185.1` renders the 3D view and its OrbitControls; `dexie@4.4.6` stores projects and snapshots; `jszip@3.10.2` writes and reads project and frame-sequence ZIPs; `pdf-lib@1.17.1` writes PDF exports; `papaparse@5.7.0` reads and writes CSV; `mediabunny@1.60.0` encodes MP4/WebM video from a canvas.
+- Engines and libraries: `three@0.185.1` renders the 3D view and its OrbitControls; `dexie@4.4.6` stores projects and snapshots; `jszip@3.10.2` writes and reads project and frame-sequence ZIPs; `pdf-lib@1.17.1` writes PDF exports; `@pdf-lib/fontkit@1.1.1` embeds the Matchboard coaching PDF's Noto Sans subset; `papaparse@5.7.0` reads and writes CSV; `mediabunny@1.60.0` encodes MP4/WebM video from a canvas.
 - Workers: none.
 - Storage: IndexedDB database `inmotools-tactical-matchboard` (Dexie) with `projects` (saved projects) and `snapshots` (autosave and named snapshots) stores (`persistence-engine.ts`).
 - Browser APIs: WebGL (through Three.js) for the 3D view, which shows an error notice and leaves the 2D board usable when WebGL fails or the context is lost; WebCodecs (through Mediabunny `canEncodeVideo`) decides which video formats are offered, and frame-sequence ZIP export covers browsers that cannot encode; Canvas 2D paints exported frames; HTMLVideoElement with Blob object URLs plays local review video.
@@ -174,7 +174,7 @@ Out of scope:
 | TMS-R70 | Analytics CSV/JSON with per-track distance and speed and team geometry, each row stating it is a geometric measurement (formerly 50) | Download analytics JSON; rows carry the claim boundary |
 | TMS-R71 | Client-side video export through WebCodecs and MediaBunny, offered only for encoder-confirmed MP4/WebM combinations, with frame-sequence ZIP fallback (formerly 57) | The first offered format downloads with MP4 or WebM magic bytes |
 | TMS-R72 | Vector coaching PDF with contact sheet, packaged with a metadata sidecar (formerly 58) | Download the PDF ZIP; `coaching.pdf` contains vector pitch operators |
-| TMS-R73 | PDF page text keeps non-ASCII characters instead of replacing them with `?` (formerly part of 58) | A note with "é" and "ß" appears unchanged in the PDF |
+| TMS-R73 | Coaching PDF page text keeps accented Latin, Greek, and Cyrillic letters. A letter the embedded Noto Sans subset does not include is shown as ? and the ZIP still downloads. metadata.json keeps the original letter (formerly part of 58) | A page with José, Αθήνα, Иванов, é, and ß shows those letters from the embedded Unicode font. A note with 字 shows ? on the page and 字 in metadata.json |
 | TMS-R74 | Still export (SVG, PNG, JPEG, WebP after a write probe), social cards (square, portrait, story, landscape) and standalone HTML playback (formerly 59) | Download the board as SVG and PNG; the HTML plays without a remote script |
 | TMS-R75 | OpenGraph social card export at 1200×630 for link previews | Export the OpenGraph card; the image is 1200×630 |
 
@@ -207,9 +207,9 @@ None: no function was compared between an ML and a non-ML method.
 
 ## Intent not recorded
 
-- TMS-R73: Unicode PDF text needs a font embedder (`@pdf-lib/fontkit` or equivalent) that is not in `package.json`; adding a dependency is the owner's decision (HANDOFF residual).
 - TMS-R31: which transition kinds count as "chapter transitions" (cut, fade, morph) is not recorded; owner may override.
 
 ## Change log
 
+- 2026-10-11 — TMS-R73: coaching PDF page text uses the bundled Noto Sans subset through `@pdf-lib/fontkit` 1.1.1. Letters outside that subset are shown as ?. The owner authorized the pin.
 - 2026-10-05 — Created per `docs/DOCUMENTATION_STANDARD.md`. 85 requirements.
