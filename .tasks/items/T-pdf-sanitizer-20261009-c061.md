@@ -16,7 +16,11 @@ Complete PDF-R04 in frozen inventory order after PDF-R02/R03 acceptance. Show ac
 
 ## Resume here
 
-2026-10-11 00:45 UTC: explicitly active at frozen PDF-R04; preceding7f9e is done and R02/R03 verified after replacement full38095819719 SUCCESS (1833browserpasses/171skips54.7m, no retry markers). No R04 application implementation. Main3bd5aa7 contains scoped dependency validation policy; PDF source/tests remain frozen and accepted. Next refresh actual main/time and authoritative source evidence, specify bounded diagnostics/associated optional-structure defects before code, and use selected/custom checks with full fallback only for broad/uncertain impact or stable/final checkpoints. See current tracker/verification and docs/VALIDATION_POLICY.md.
+2026-10-11 07:52 UTC: PDF-R04 final local affected browser run10/10passed51.042s, no skips/retries/errors. Six profiles cover desktop/touch Chromium, desktop/compact Firefox and desktop/mobile WebKit. All WebKit application cases now executed successfully with verified cached host libraries; the earlier host-validation failures remain preserved. The final collapsed summary accurately labels unknown inventories and its explicit assertions pass in all six profiles.
+
+The18-case local acceptance matrix is a documented partition, not18fresh runs on one revision: final-source ten cases plus four Chromium/Firefox geometry/theme/non-overlap passes from the repaired run and four unchanged protected-reader passes from the initial run. Only the collapsed editable summary changed after the earlier matching passes; protected branch, geometry/diagnostic styles and test bodies used for reuse are unchanged. No cases are counted twice. Physical hardware certification is not implied.
+
+Final summary-only candidate r04-summary-dist: TypeScript/build pass,51matching PDF units retained for unchanged engine/helpers. Source research refreshed today from eight pinned official sources with HTTP200/hash-identical receipts. Next publish through GitHub MCP to fresh guarded main4d82d228, obtain selected9PDFspecs/required units/build/Pages and qualified-live receipts, then acceptR04 or repair. R04 remains partial until those gates complete. No repository-wide browser redispatch, assertion/timeout weakening, dependency upgrade or PR.
 
 Confirmed preparation: queue summaries omit encryption/action/structural diagnostics. Owned malformed unused object99is recovered by pdf-lib asPDFInvalidObject without user warning; both authored pages still queue. Catalog JavaScript name-tree/OpenAction indicators remain inert and are not reported. One-page UserUnit2/Rotate90 hybrid AcroForm/XFA specimen proves raw dimensions differ from rendered dimensions and getForm removes XFA in memory. These are library/baseline facts, not R04 implementation acceptance.
 
@@ -36,3 +40,9 @@ If the PDF worktree already exists, scripts/task-start.mjs returns from the reus
 - 2026-10-10 23:12 UTC: preceding required full concludedfailure in the existing Crystal mobile substitution assertion, including retry. Queued state retained; current research and owned diagnostics baselines preserved. No R04 application implementation.
 
 - 2026-10-11 00:45 UTC: actual replacement full success recorded; frozen scope reused under current validation policy.
+
+- 2026-10-11 07:38 UTC: scoped draft and source/records committed; red5/5, current51units/types/build pass, first native/browser gates pending.
+
+- 2026-10-11 07:43 UTC: initial8/10 browser result retained; new-case casing corrected, cached native host libraries reused;14affected cases pending and four matching protected passes reused.
+
+- 2026-10-11 07:52 UTC: final10local passes plus8precisely matching reused scopes; summary unknown-inventory defect corrected. Awaiting guarded main/selected CI/Pages/live.

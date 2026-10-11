@@ -13,11 +13,11 @@ updated: 2026-10-11
 
 ## Resume here
 
-2026-10-11 00:45 UTC: PDF-R02/R03 accepted; task7f9e done. Required replacement [full38095819719](https://github.com/AahPlexX/inmotools/actions/runs/38095819719)/job114341370995 SUCCESS on sourceb914406311360ef3c2f4612f0b8add878842fb5e:1833browserpasses/171skips54.7m, no retry markers or flaky summary;4119unitpasses/18skips,370files/2skips. Old full38090462219 remains a historical failure, not relabeled. PDF runtime remains a25535a; current main3bd5aa7 changes validation tooling/records, with no application/browser/dependency/build input change. Matching accepted PDF20Chromium/40native, owned52 and qualified-live20 scopes are reused with their recorded limits.
+2026-10-11 07:52 UTC: PDF-R04 final local affected browser run10/10passed51.042s, no skips/retries/errors. Six profiles cover desktop/touch Chromium, desktop/compact Firefox and desktop/mobile WebKit. All WebKit application cases now executed successfully with verified cached host libraries; the earlier host-validation failures remain preserved. The final collapsed summary accurately labels unknown inventories and its explicit assertions pass in all six profiles.
 
-Narrow [Crystal d7a8](../../../.tasks/items/T-crystal-substitution-retry-20261009-d7a8.md) dependency repair is accepted:77ownedbrowserpasses/5skips,16local and8qualified-live passes, prior main/Pages receipts and replacement full success. [Crystal verification](../crystal/VERIFICATION.md) preserves actual served/root generated-filename and preload-order differences; no raw five-file equality is claimed for Crystal.
+The18-case local acceptance matrix is a documented partition, not18fresh runs on one revision: final-source ten cases plus four Chromium/Firefox geometry/theme/non-overlap passes from the repaired run and four unchanged protected-reader passes from the initial run. Only the collapsed editable summary changed after the earlier matching passes; protected branch, geometry/diagnostic styles and test bodies used for reuse are unchanged. No cases are counted twice. Physical hardware certification is not implied.
 
-Frozen cursor is now PDF-R04; [c061](../../../.tasks/items/T-pdf-sanitizer-20261009-c061.md) explicitly active, no R04 implementation. Next refresh current main/time and existing authoritative source receipts, specify bounded diagnostics and meaningful associated-defect acceptance, then implement and run applicable selected/custom checks under [validation policy](../../../docs/VALIDATION_POLICY.md). Do not repeat unchanged passing browser/full receipts. Current policy main qualification is separately tracked in validation task4d6b. Physical devices and universal absence of failures are not certified.
+Final summary-only candidate r04-summary-dist: TypeScript/build pass,51matching PDF units retained for unchanged engine/helpers. Source research refreshed today from eight pinned official sources with HTTP200/hash-identical receipts. Next publish through GitHub MCP to fresh guarded main4d82d228, obtain selected9PDFspecs/required units/build/Pages and qualified-live receipts, then acceptR04 or repair. R04 remains partial until those gates complete. No repository-wide browser redispatch, assertion/timeout weakening, dependency upgrade or PR.
 
 ## Documents
 
@@ -37,7 +37,7 @@ Frozen cursor is now PDF-R04; [c061](../../../.tasks/items/T-pdf-sanitizer-20261
 | PDF-R01 | verified | e2e "merges multiple source PDFs in the visible queue order" |  |
 | PDF-R02 | verified | unit "does not create a loading task after the caller already cancelled"; e2e "PDF-R02 opens AES256 with password retry and actual reader text, search, pages and zoom" | Frozen a25535a accepted: local20Chromium/40native, owned52, qualified-live20 and replacement full38095819719 passed. |
 | PDF-R03 | verified | e2e "PDF-R03 keeps empty-user protected documents read-only and produces no protected download" | Engine refusal retained; real protected fixtures and app scope pass; replacement full38095819719 succeeded with R02. |
-| PDF-R04 | partial | unit "reports final page geometry for workstation page-box tooling" | Page count, size, form fields, Info metadata, page geometry and attachments are shown; encryption detail, active content and structural warnings are not |
+| PDF-R04 | partial | unit "reports final page geometry for workstation page-box tooling", "keeps readable pages when optional Names is malformed and marks inspection incomplete"; e2e "PDF-R04 protected reader diagnostics show actual encryption handler and remain excluded from output" | Diagnostics draft implemented;51units/types/build pass. Focused browser/selected CI/main/qualified-live gates pending. Explicit reader scan limits and unknowns; no complete safety certification. |
 | PDF-R05 | missing | — |  |
 | PDF-R06 | verified | e2e "merges multiple source PDFs in the visible queue order"; unit "combines local PDFs without changing the source buffers" |  |
 | PDF-R07 | missing | — | One output per export; a range selection extracts into that output (PDF-R11) |
@@ -204,7 +204,7 @@ Frozen cursor is now PDF-R04; [c061](../../../.tasks/items/T-pdf-sanitizer-20261
 
 ## Open work
 
-1. Finish corrected-source PDF-R02/R03 acceptance, then PDF-R04 in frozen inventory order. PDF-R31, PDF-R33 and PDF-R05 remain later viewer work.
+1. Finish PDF-R04 diagnostics acceptance in frozen inventory order; PDF-R02/R03 are verified. PDF-R31, PDF-R33 and PDF-R05 remain later viewer work.
 2. PDF-R68, PDF-R78, PDF-R79: fill existing fields and form-data interchange.
 3. PDF-R07, PDF-R08, PDF-R145: multi-output splitting with ZIP.
 4. PDF-R38–PDF-R49: editing layer.

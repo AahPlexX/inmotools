@@ -22,6 +22,8 @@ import PdfOverlayPanel from './PdfOverlayPanel';
 import PdfExportSummaryPanel from './PdfExportSummaryPanel';
 import PdfCanvas from './PdfCanvas';
 import PdfPasswordDialog, { type PdfPasswordRequest } from './PdfPasswordDialog';
+import PdfDiagnosticsPanel from './PdfDiagnosticsPanel';
+import type { PdfReaderDiagnostics } from './pdf-diagnostics';
 import type { PdfJsDocumentSession } from './pdfjs-browser';
 import {
   attachmentDefinitionsFromStages,
@@ -50,7 +52,7 @@ type PdfItem = {
   rotate: 0 | 90 | 180 | 270;
 };
 
-type ProtectedPdfItem = { id: string; file: File; session: PdfJsDocumentSession };
+type ProtectedPdfItem = { id: string; file: File; session: PdfJsDocumentSession; readerDiagnostics: PdfReaderDiagnostics | null };
 
 type MetadataDraft = {
   title: string;
@@ -337,6 +339,7 @@ export default function PdfWorkspace() {
   const rotationCount = sourcePlan.filter((row) => row.rotate !== 0).length;
   const formFieldTotal = items.reduce((sum, item) => sum + item.inspection.formFieldCount, 0);
   const formPolicyBlocked = formFieldTotal > 0 && !flatten;
+  const diagnosticsBlocked = items.some((item) => !item.inspection.diagnostics.complete);
   const authoredMetadata = metadataForExport(metadata);
   const authoredMetadataCount = authoredMetadata ? Object.values(authoredMetadata).filter((value) => value !== undefined).length : 0;
   const geometryError = geometryValidationError(outputPlan, geometryEdits);
@@ -451,7 +454,11 @@ export default function PdfWorkspace() {
               });
               if (controller.signal.aborted) { await session.destroy(); break; }
               protectedSessionsRef.current.set(id, session);
-              setProtectedItems((current) => [...current, { id, file, session }]);
+              const readerDiagnostics = await session.getDiagnostics().catch(() => null);
+              if (controller.signal.aborted || child.signal.aborted) {
+                protectedSessionsRef.current.delete(id); await session.destroy(); break;
+              }
+              setProtectedItems((current) => [...current, { id, file, session, readerDiagnostics }]);
               setViewerSourceId(id);
               setViewerPage(1);
               readOnly += 1;
@@ -642,7 +649,7 @@ export default function PdfWorkspace() {
   }
 
   async function process() {
-    if (!items.length || hasPageError || formPolicyBlocked || blankPlanError || geometryError || attachmentError || formAuthoringError || overlayError) return;
+    if (!items.length || hasPageError || formPolicyBlocked || diagnosticsBlocked || blankPlanError || geometryError || attachmentError || formAuthoringError || overlayError) return;
     setBusy(true);
     try {
       const selections = await Promise.all(items.map(async (item, index) => ({
@@ -664,6 +671,7 @@ export default function PdfWorkspace() {
       });
       const bytes = await applyPdfOverlaysToBytes(rebuiltBytes, overlayOptions);
       const outputInspection = await inspectPdf(bytes);
+      if (!outputInspection.diagnostics.complete) throw new Error('Output diagnostics are incomplete; no download was created.');
       if (outputInspection.formFieldCount !== stagedFormFields.length) {
         throw new Error(`Output verification expected ${stagedFormFields.length} authored form field${stagedFormFields.length === 1 ? '' : 's'} but found ${outputInspection.formFieldCount}; no download was created.`);
       }
@@ -705,6 +713,7 @@ export default function PdfWorkspace() {
         <strong>{item.file.name}</strong>
         <p className="help-text">{item.session.pageCount} pages · {bytesLabel(item.file.size)} · Read-only. This encrypted PDF cannot be modified or included in output by this workstation.</p>
         <p className="help-text">Remove this read-only source when finished to release its viewer memory.</p>
+        {item.readerDiagnostics ? <PdfDiagnosticsPanel filename={item.file.name} {...item.readerDiagnostics} pages={item.readerDiagnostics.firstPage ? [{ page: 1, ...item.readerDiagnostics.firstPage }] : []} firstPageOnly /> : <p className="help-text">Document diagnostics unavailable; this source remains read-only.</p>}
         <div className="button-row">
           <button className="action-button secondary" type="button" onClick={() => { setViewerSourceId(item.id); setViewerPage(1); }}>View read-only</button>
           <button className="action-button secondary" type="button" aria-label={`Remove read-only ${item.file.name}`} onClick={() => removeProtected(item.id)}>Remove read-only</button>
@@ -726,7 +735,9 @@ export default function PdfWorkspace() {
             <div>
               <strong style={{ overflowWrap: 'anywhere' }}>{item.file.name}</strong>
               <div className="help-text">{item.inspection.pageCount} pages · {bytesLabel(item.file.size)}</div>
-              <div className="help-text">{item.inspection.formFieldCount} AcroForm field{item.inspection.formFieldCount === 1 ? '' : 's'} · {item.inspection.attachments.length} embedded file{item.inspection.attachments.length === 1 ? '' : 's'} · {item.inspection.metadataFields.length ? `metadata: ${item.inspection.metadataFields.join(', ')}` : 'no common Info metadata detected'}</div>
+              <div className="help-text" data-testid="pdf-inventory-summary">
+                {item.inspection.diagnostics.formsInspected ? `${item.inspection.formFieldCount} AcroForm field${item.inspection.formFieldCount === 1 ? '' : 's'}` : 'form inventory incomplete'} · {item.inspection.diagnostics.attachmentsInspected ? `${item.inspection.attachments.length} embedded file${item.inspection.attachments.length === 1 ? '' : 's'}` : 'attachment inventory incomplete'} · {item.inspection.diagnostics.metadataInspected ? (item.inspection.metadataFields.length ? `metadata: ${item.inspection.metadataFields.join(', ')}` : 'no common Info metadata detected') : 'metadata inventory incomplete'}
+              </div>
             </div>
             <div className="field">
               <label htmlFor={`pages-${index}`}>Pages</label>
@@ -751,7 +762,8 @@ export default function PdfWorkspace() {
             <div className="button-row" style={{ marginTop: 0 }}><button className="action-button secondary" type="button" disabled={index === 0} onClick={() => move(index, -1)}>Move up</button><button className="action-button secondary" type="button" disabled={index === items.length - 1} onClick={() => move(index, 1)}>Move down</button><button className="action-button secondary" type="button" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${item.file.name} from the queue`}>Remove</button></div>
           </div>
           <small>Choose an exact queue position or use Move up / Move down. These native controls work with touch, mouse, and keyboard without requiring a drag gesture.</small>
-          <PdfSourceFormInventory file={item.file} fieldCount={item.inspection.formFieldCount} />
+          <PdfDiagnosticsPanel filename={item.file.name} diagnostics={item.inspection.diagnostics} formFieldCount={item.inspection.formFieldCount} metadataFields={item.inspection.metadataFields} attachmentCount={item.inspection.attachments.length} pages={item.inspection.diagnostics.pageDimensions} />
+          <PdfSourceFormInventory file={item.file} fieldCount={item.inspection.diagnostics.complete ? item.inspection.formFieldCount : 0} />
         </div>;
       })}
 
@@ -868,7 +880,8 @@ export default function PdfWorkspace() {
             : `Processing is blocked because ${formFieldTotal} source form field${formFieldTotal === 1 ? '' : 's'} would not remain editable after cross-document page copying. Enable flattening to preserve their current appearances without silently discarding source form structure.`}</p>
       </div> : null}
 
-      <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked || Boolean(blankPlanError) || Boolean(geometryError) || Boolean(attachmentError) || Boolean(formAuthoringError) || Boolean(overlayError)} onClick={() => void process()}>Process and download</button></div>
+      {diagnosticsBlocked ? <p className="notice" role="alert">Export is blocked because a source has incomplete diagnostics. Review its document diagnostics or remove it to export the remaining files.</p> : null}
+      <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked || diagnosticsBlocked || Boolean(blankPlanError) || Boolean(geometryError) || Boolean(attachmentError) || Boolean(formAuthoringError) || Boolean(overlayError)} onClick={() => void process()}>Process and download</button></div>
       <div className="status-line" role="status">{busy ? 'Processing PDF bytes locally…' : status}</div>
       <div className="notice"><strong>Current sanitization boundary</strong><p className="help-text">Output is rebuilt into a new PDF, so source document-level Info/catalog metadata and embedded files are not intentionally carried forward. Replacement metadata, output attachments, newly authored editable fields, and export overlays are opt-in. Selected page content and page-level annotations are preserved; this stage is not yet the workstation's planned malware analysis, secure redaction, or active-content sanitization system.</p></div>
     </div>

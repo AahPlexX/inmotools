@@ -4,6 +4,7 @@ import {
   PDFDocument,
   PDFHexString,
   PDFName,
+  PDFNumber,
   StandardFonts,
   TextAlignment,
   type PDFFont,
@@ -15,6 +16,7 @@ import {
   type PdfAttachmentDefinition,
   type PdfAttachmentInventory,
 } from './pdf-attachments';
+import { diagnosticWarning, inspectDocumentDiagnostics, inspectFormFieldCount, type PdfDiagnostics } from './pdf-diagnostics';
 
 export { extractPdfAttachments } from './pdf-attachments';
 export type { PdfAttachmentDefinition, PdfAttachmentInventory, PdfExtractedAttachment } from './pdf-attachments';
@@ -45,6 +47,7 @@ export interface PdfPageInspection {
 }
 
 export interface PdfInspection {
+  diagnostics: PdfDiagnostics;
   pageCount: number;
   formFieldCount: number;
   metadataFields: string[];
@@ -540,24 +543,57 @@ export function pageSelectionPreset(kind: PageSelectionPreset, max: number): str
 
 export async function inspectPdf(bytes: Uint8Array): Promise<PdfInspection> {
   const document = await PDFDocument.load(bytes.slice(), { updateMetadata: false });
-  const form = document.getForm();
-  const info = infoDictionary(document);
-  const attachmentScan = inspectDocumentAttachments(document);
+  return inspectParsedPdf(document);
+}
+
+function inspectParsedPdf(document: PDFDocument): PdfInspection {
+  const diagnostics = inspectDocumentDiagnostics(document);
+  const formFieldCount = inspectFormFieldCount(document, diagnostics);
+  let info: PDFDict | undefined;
+  try { info = infoDictionary(document); }
+  catch { diagnostics.metadataInspected = false; diagnosticWarning(diagnostics, 'Info metadata could not be inspected.'); }
+  let attachmentScan: { attachments: PdfAttachmentInventory[]; warnings: string[] } = { attachments: [], warnings: [] };
+  try { attachmentScan = inspectDocumentAttachments(document); }
+  catch {
+    diagnostics.attachmentsInspected = false;
+    attachmentScan.warnings.push('Attachment information could not be inspected; optional Names or embedded-file structures may be malformed.');
+  }
+  for (const warning of attachmentScan.warnings) diagnosticWarning(diagnostics, warning);
+  const pages = document.getPages().map((page, index) => {
+    let mediaBox: PdfBox;
+    try { mediaBox = page.getMediaBox(); validateBox(mediaBox, 'MediaBox'); }
+    catch { throw new Error(`Page ${index + 1} has unreadable required page geometry; it cannot be inspected safely.`); }
+    const optionalBox = (label: string, read: () => PdfBox): PdfBox => {
+      try { const box = read(); validateBox(box, label); return box; }
+      catch { diagnosticWarning(diagnostics, `Page ${index + 1} ${label} could not be inspected; displayed dimensions use its MediaBox.`); return mediaBox; }
+    };
+    const cropBox = optionalBox('CropBox', () => page.getCropBox());
+    let rotation = 0;
+    try { rotation = page.getRotation().angle; if (!Number.isFinite(rotation) || rotation % 90 !== 0) throw new Error('Invalid rotation'); }
+    catch { diagnosticWarning(diagnostics, `Page ${index + 1} rotation could not be inspected; displayed dimensions use zero rotation.`); rotation = 0; }
+    const rawUnit = document.context.lookup(page.node.get(PDFName.of('UserUnit')));
+    let userUnit = rawUnit instanceof PDFNumber ? rawUnit.asNumber() : 1;
+    if ((rawUnit && !(rawUnit instanceof PDFNumber)) || !Number.isFinite(userUnit) || userUnit <= 0 || userUnit > 75_000) {
+      diagnosticWarning(diagnostics, `Page ${index + 1} has an invalid UserUnit; displayed dimensions use the default unit.`); userUnit = 1;
+    }
+    const width = Math.min(mediaBox.x + mediaBox.width, cropBox.x + cropBox.width) - Math.max(mediaBox.x, cropBox.x);
+    const height = Math.min(mediaBox.y + mediaBox.height, cropBox.y + cropBox.height) - Math.max(mediaBox.y, cropBox.y);
+    const visibleWidth = width > 0 && height > 0 ? width : mediaBox.width;
+    const visibleHeight = width > 0 && height > 0 ? height : mediaBox.height;
+    const quarterTurn = ((rotation % 360) + 360) % 180 === 90;
+    const displayWidth = (quarterTurn ? visibleHeight : visibleWidth) * userUnit;
+    const displayHeight = (quarterTurn ? visibleWidth : visibleHeight) * userUnit;
+    if (![displayWidth, displayHeight].every(Number.isFinite)) diagnosticWarning(diagnostics, `Page ${index + 1} displayed dimensions exceed numeric limits and are unknown.`);
+    diagnostics.pageDimensions.push({ page: index + 1, userUnit, displayWidth, displayHeight });
+    return { page: index + 1, width: mediaBox.width, height: mediaBox.height, rotation, mediaBox, cropBox, bleedBox: optionalBox('BleedBox', () => page.getBleedBox()), trimBox: optionalBox('TrimBox', () => page.getTrimBox()) };
+  });
   return {
+    diagnostics,
     pageCount: document.getPageCount(),
-    formFieldCount: form.getFields().length,
+    formFieldCount,
     metadataFields: info ? METADATA_FIELDS.filter(([, key]) => info.has(PDFName.of(key))).map(([label]) => label) : [],
     encrypted: document.isEncrypted,
-    pages: document.getPages().map((page, index) => ({
-      page: index + 1,
-      width: page.getWidth(),
-      height: page.getHeight(),
-      rotation: page.getRotation().angle,
-      mediaBox: page.getMediaBox(),
-      cropBox: page.getCropBox(),
-      bleedBox: page.getBleedBox(),
-      trimBox: page.getTrimBox(),
-    })),
+    pages,
     attachments: attachmentScan.attachments,
     attachmentWarnings: attachmentScan.warnings,
   };
@@ -577,6 +613,8 @@ export async function splicePdfs(selections: PdfSelection[], options: PdfOutputO
   for (const selection of selections) {
     const source = await PDFDocument.load(selection.bytes.slice(), { updateMetadata: false });
     if (source.isEncrypted) throw new Error('Encrypted PDFs are not supported and cannot be safely modified by this tool.');
+    const diagnostics = inspectParsedPdf(source).diagnostics;
+    if (!diagnostics.complete) throw new Error('Source diagnostics are incomplete or content preservation cannot be verified; remove this source before rebuilding output.');
 
     const form = source.getForm();
     const formFieldCount = form.getFields().length;

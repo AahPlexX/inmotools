@@ -1,0 +1,9 @@
+.pdf-diagnostics { margin-top: .75rem; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.pdf-diagnostics summary { cursor: pointer; padding-block: .5rem; font-weight: 600; }
+.pdf-diagnostics dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .75rem; margin: .75rem 0; }
+.pdf-diagnostics dl > div { min-width: 0; }
+.pdf-diagnostics dt { font-weight: 600; }
+.pdf-diagnostics dd { margin: .25rem 0 0; }
+.pdf-diagnostics ul { padding-inline-start: 1.25rem; }
+.pdf-diagnostics .field { max-width: 100%; min-width: 0; }
+.pdf-diagnostics input { width: 100%; min-width: 0; }

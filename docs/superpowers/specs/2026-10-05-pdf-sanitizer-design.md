@@ -298,3 +298,11 @@ None: no function was compared between an ML and a non-ML method.
 ## Change log
 
 - 2026-10-05 — Created per `docs/DOCUMENTATION_STANDARD.md`. 167 requirements.
+
+## PDF-R04 diagnostics contract — 2026-10-11
+
+Before implementation: inspect source structures before mutating form getters. List page count/file size, page-box and displayed dimensions (UserUnit/rotation), forms including XFA, common Info/XMP metadata presence, attachments, encryption state/security-handler information where actually available, active-content indicators and structural warnings. Detection never executes stored actions or establishes safety; protected sources remain read-only and unknown data is labeled uninspected.
+
+Readable optional-structure defects must produce stable human-readable warnings instead of minified library type errors. Preserve original bytes, readable peers, reader/password/cancellation ownership, and existing output verification. Incomplete required inspection blocks export until the affected source is removed; successful parsing alone is not a clean structural scan. Bound post-parse traversal and warning presentation, distinguish limits/unknowns, and do not claim bounds on the libraries' own parsing/enumeration allocations.
+
+Acceptance uses owned plain/form/XFA/UserUnit/action/recovered-object/malformed-Names/cycle/limit specimens, real encrypted fixtures already owned by the project, native reader/queue/remove/clear/export interaction and source-byte equality. Diagnostic controls/long names must wrap across320portrait,844landscape, tablet and desktop, Light/Dark/System, with accessible native disclosure/pagination and actual browser checks. Add meaningful focused unit/browser coverage; shared test edits are justified by this tool contract, using current dependency-selected validation rather than a duplicate full suite.

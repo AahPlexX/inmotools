@@ -121,7 +121,7 @@ function collectRawAttachments(document: PDFDocument): { attachments: RawAttachm
 
   while (stack.length) {
     const node = stack.pop()!;
-    if (visited.has(node)) continue;
+    if (visited.has(node)) { warnings.push('Repeated embedded-file name-tree node; attachment inspection is partial.'); continue; }
     visited.add(node);
     visitedNodes += 1;
     if (visitedNodes > NAME_TREE_NODE_LIMIT) {

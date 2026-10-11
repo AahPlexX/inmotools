@@ -8,6 +8,7 @@ import {
 } from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { canvasRenderPlan, normalizedPdfZoom, PdfRenderCoordinator, type PdfCancelableRender } from './pdf-renderer';
+import { inspectReaderDiagnostics, type PdfReaderDiagnostics } from './pdf-diagnostics';
 
 export const PDFJS_WORKER_URL = pdfWorkerUrl;
 
@@ -73,6 +74,11 @@ export class PdfJsDocumentSession {
 
   get pageCount(): number {
     return this.document.numPages;
+  }
+
+  async getDiagnostics(): Promise<PdfReaderDiagnostics> {
+    if (this.destroyed) throw new Error('Cannot inspect a destroyed PDF.js session.');
+    return inspectReaderDiagnostics(this.document);
   }
 
   cancelPage(pageNumber: number): void {
