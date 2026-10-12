@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf
 import { readExportMetadata, sampleExportTimes } from './export-engine';
 import { displayPitchOverlays } from './pitch-engine';
 import type { ExportMetadata } from './export-types';
+import type { MatchboardUnicodeFonts } from './pdf-unicode-font';
 import { sampleTacticalProjectAtTime } from './timeline-engine';
 import type { NormalizedPoint, TacticalProject } from './tactics-types';
 
@@ -12,15 +13,71 @@ export const PDF_PAGE_TEXT_FIELDS = ['club', 'ageGroup', 'sessionType', 'tactica
 const PAGE_WIDTH = 792;
 const PAGE_HEIGHT = 612;
 const MARGIN = 36;
+const PDF_PAGE_TEXT_FALLBACK = '?';
 
-function pdfText(value: string): string {
+interface PageFonts {
+  regular: PDFFont;
+  bold: PDFFont;
+  unicode: MatchboardUnicodeFonts | null;
+}
+
+interface PreparedPageText {
+  text: string;
+  unicode: boolean;
+}
+
+function normalizePageWhitespace(value: string): string {
   return Array.from(value).map((char) => {
     const code = char.codePointAt(0) ?? 0;
-    if (code === 9 || code === 10 || code === 13) return ' ';
-    if (code >= 32 && code <= 126) return char;
-    if (code >= 160 && code <= 255) return char;
-    return '?';
+    return code === 9 || code === 10 || code === 13 ? ' ' : char;
   }).join('').replace(/\s+/g, ' ').trim();
+}
+
+function leavesBasicLatin(value: string): boolean {
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0;
+    if (code < 32 || code > 126) return true;
+  }
+  return false;
+}
+
+function degradeToBasicLatin(value: string): string {
+  let text = '';
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0;
+    text += code >= 32 && code <= 126 ? char : PDF_PAGE_TEXT_FALLBACK;
+  }
+  return text;
+}
+
+function preparePageText(value: string, unicode: MatchboardUnicodeFonts | null): PreparedPageText {
+  const normalized = normalizePageWhitespace(value);
+  if (!leavesBasicLatin(normalized)) return { text: normalized, unicode: false };
+  if (!unicode) return { text: degradeToBasicLatin(normalized), unicode: false };
+  let text = '';
+  for (const char of normalized) {
+    const code = char.codePointAt(0) ?? 0;
+    text += unicode.covered(code) ? char : PDF_PAGE_TEXT_FALLBACK;
+  }
+  return { text, unicode: true };
+}
+
+function fontFor(fonts: PageFonts, prepared: PreparedPageText, bold: boolean): PDFFont {
+  if (prepared.unicode && fonts.unicode) return bold ? fonts.unicode.bold : fonts.unicode.regular;
+  return bold ? fonts.bold : fonts.regular;
+}
+
+function drawPageString(
+  page: PDFPage,
+  fonts: PageFonts,
+  value: string,
+  bold: boolean,
+  options: { x: number; y: number; size: number; color: ReturnType<typeof rgb> },
+): void {
+  const prepared = preparePageText(value, fonts.unicode);
+  const text = prepared.unicode ? prepared.text : degradeToBasicLatin(prepared.text);
+  if (!text) return;
+  page.drawText(text, { ...options, font: fontFor(fonts, prepared, bold) });
 }
 
 function requireScene(project: TacticalProject, sceneId: string): void {
@@ -40,8 +97,19 @@ function hexColor(value: string): { r: number; g: number; b: number } {
   };
 }
 
-function wrap(font: PDFFont, text: string, size: number, width: number): string[] {
-  const words = pdfText(text).split(' ').filter(Boolean);
+function teamRosterLine(project: TacticalProject): string {
+  return project.teams.map((team) => {
+    const names = team.roster.map((player) => player.displayName.trim()).filter(Boolean);
+    const teamName = team.name.trim();
+    if (!teamName && names.length === 0) return '';
+    return names.length ? `${teamName}: ${names.join(', ')}` : teamName;
+  }).filter(Boolean).join(' · ');
+}
+
+function wrap(fonts: PageFonts, text: string, size: number, width: number, bold = false): string[] {
+  const prepared = preparePageText(text, fonts.unicode);
+  const font = fontFor(fonts, prepared, bold);
+  const words = prepared.text.split(' ').filter(Boolean);
   const lines: string[] = [];
   let current = '';
   for (const word of words) {
@@ -75,7 +143,7 @@ function layerVisible(project: TacticalProject, sceneId: string, layerId: string
   return project.scenes.find((scene) => scene.id === sceneId)?.layers.find((layer) => layer.id === layerId)?.visible === true;
 }
 
-function drawDiagram(page: PDFPage, font: PDFFont, project: TacticalProject, sceneId: string, box: Box): void {
+function drawDiagram(page: PDFPage, fonts: PageFonts, project: TacticalProject, sceneId: string, box: Box): void {
   page.drawRectangle({
     x: box.x,
     y: box.y,
@@ -131,11 +199,10 @@ function drawDiagram(page: PDFPage, font: PDFFont, project: TacticalProject, sce
     const last = annotation.points[annotation.points.length - 1];
     if (label && last) {
       const point = mapPoint(last, box);
-      page.drawText(pdfText(label), {
+      drawPageString(page, fonts, label, false, {
         x: Math.min(box.x + box.width - 40, point.x + 6),
         y: point.y + 6,
         size: 8,
-        font,
         color: rgb(1, 1, 1),
       });
     }
@@ -157,11 +224,10 @@ function drawDiagram(page: PDFPage, font: PDFFont, project: TacticalProject, sce
     });
     const jersey = player?.jerseyNumber?.trim();
     if (jersey) {
-      page.drawText(pdfText(jersey), {
+      drawPageString(page, fonts, jersey, false, {
         x: point.x - 3,
         y: point.y - 3,
         size: 7,
-        font,
         color: rgb(1, 1, 1),
       });
     }
@@ -178,13 +244,15 @@ function drawDiagram(page: PDFPage, font: PDFFont, project: TacticalProject, sce
   });
 }
 
-function drawMetadata(page: PDFPage, font: PDFFont, bold: PDFFont, metadata: ExportMetadata): number {
+function drawMetadata(page: PDFPage, fonts: PageFonts, metadata: ExportMetadata, roster: string): number {
   let y = PAGE_HEIGHT - MARGIN;
-  page.drawText(pdfText(metadata.title) || 'Untitled tactical project', {
+  const title = preparePageText(metadata.title, fonts.unicode);
+  const titleText = (title.unicode ? title.text : degradeToBasicLatin(title.text)) || 'Untitled tactical project';
+  page.drawText(titleText, {
     x: MARGIN,
     y,
     size: 16,
-    font: bold,
+    font: fontFor(fonts, title.text ? title : { text: 'Untitled tactical project', unicode: false }, true),
     color: rgb(0.04, 0.07, 0.13),
   });
   y -= 18;
@@ -198,9 +266,12 @@ function drawMetadata(page: PDFPage, font: PDFFont, bold: PDFFont, metadata: Exp
     ['Language', metadata.language],
     ['Notes', metadata.notes],
   ];
+  if (leavesBasicLatin(normalizePageWhitespace(roster))) fields.push(['Teams', roster]);
   for (const [label, value] of fields) {
     if (!value.trim()) continue;
-    for (const line of wrap(font, `${label}: ${value}`, 9, PAGE_WIDTH - MARGIN * 2)) {
+    const prepared = preparePageText(`${label}: ${value}`, fonts.unicode);
+    const font = fontFor(fonts, prepared, false);
+    for (const line of wrap(fonts, `${label}: ${value}`, 9, PAGE_WIDTH - MARGIN * 2)) {
       y -= 12;
       page.drawText(line, { x: MARGIN, y, size: 9, font, color: rgb(0.12, 0.16, 0.22) });
     }
@@ -209,16 +280,42 @@ function drawMetadata(page: PDFPage, font: PDFFont, bold: PDFFont, metadata: Exp
 }
 
 function applyInfoDictionary(pdf: PDFDocument, metadata: ExportMetadata): void {
-  pdf.setTitle(pdfText(metadata.title) || 'Untitled tactical project');
-  if (metadata.creator) pdf.setAuthor(pdfText(metadata.creator));
-  if (metadata.description) pdf.setSubject(pdfText(metadata.description));
-  const keywords = metadata.tags.map((tag) => pdfText(tag)).filter(Boolean);
+  pdf.setTitle(normalizePageWhitespace(metadata.title) || 'Untitled tactical project');
+  if (metadata.creator) pdf.setAuthor(normalizePageWhitespace(metadata.creator));
+  if (metadata.description) pdf.setSubject(normalizePageWhitespace(metadata.description));
+  const keywords = metadata.tags.map((tag) => normalizePageWhitespace(tag)).filter(Boolean);
   if (keywords.length) pdf.setKeywords(keywords);
   pdf.setCreator('InMo Tools Tactical Matchboard Studio');
   const created = new Date(metadata.createdAt);
   if (!Number.isNaN(created.getTime())) pdf.setCreationDate(created);
   const modified = new Date(metadata.modifiedAt);
   if (!Number.isNaN(modified.getTime())) pdf.setModificationDate(modified);
+}
+
+function pageTextNeedsUnicode(project: TacticalProject, metadata: ExportMetadata, roster: string): boolean {
+  const values = [
+    metadata.title,
+    metadata.club,
+    metadata.ageGroup,
+    metadata.sessionType,
+    metadata.tacticalTheme,
+    metadata.rights,
+    metadata.license,
+    metadata.language,
+    metadata.notes,
+    roster,
+    ...metadata.tags,
+  ];
+  for (const annotation of project.annotations) {
+    if (annotation.label) values.push(annotation.label);
+  }
+  for (const token of project.playerTokens) {
+    const team = project.teams.find((candidate) => candidate.id === token.teamId);
+    const player = team?.roster.find((candidate) => candidate.id === token.playerId);
+    if (player?.jerseyNumber) values.push(player.jerseyNumber);
+    if (player?.displayName) values.push(player.displayName);
+  }
+  return values.some((value) => leavesBasicLatin(normalizePageWhitespace(value)));
 }
 
 export async function renderCoachingPdfPackage(
@@ -232,15 +329,27 @@ export async function renderCoachingPdfPackage(
     throw new RangeError('Contact-sheet frame count must be an integer from 1 to 12.');
   }
   const metadata = readExportMetadata(project);
+  const roster = teamRosterLine(project);
   const pdf = await PDFDocument.create();
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const fonts: PageFonts = {
+    regular: await pdf.embedFont(StandardFonts.Helvetica),
+    bold: await pdf.embedFont(StandardFonts.HelveticaBold),
+    unicode: null,
+  };
+  if (pageTextNeedsUnicode(project, metadata, roster)) {
+    try {
+      const { embedMatchboardUnicodeFonts } = await import('./pdf-unicode-font');
+      fonts.unicode = await embedMatchboardUnicodeFonts(pdf);
+    } catch {
+      fonts.unicode = null;
+    }
+  }
   applyInfoDictionary(pdf, metadata);
 
   const cover = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-  const contentTop = drawMetadata(cover, font, bold, metadata);
+  const contentTop = drawMetadata(cover, fonts, metadata, roster);
   const diagramHeight = Math.max(180, contentTop - MARGIN);
-  drawDiagram(cover, font, project, sceneId, {
+  drawDiagram(cover, fonts, project, sceneId, {
     x: MARGIN,
     y: MARGIN,
     width: PAGE_WIDTH - MARGIN * 2,
@@ -251,11 +360,10 @@ export async function renderCoachingPdfPackage(
   if (samples.length > 1) {
     for (let offset = 0; offset < samples.length; offset += 4) {
       const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-      page.drawText('Contact sheet', {
+      drawPageString(page, fonts, 'Contact sheet', true, {
         x: MARGIN,
         y: PAGE_HEIGHT - MARGIN,
         size: 14,
-        font: bold,
         color: rgb(0.04, 0.07, 0.13),
       });
       const group = samples.slice(offset, offset + 4);
@@ -270,14 +378,13 @@ export async function renderCoachingPdfPackage(
         const row = Math.floor(index / columns);
         const x = MARGIN + column * (cellWidth + gap);
         const y = top - (row + 1) * cellHeight - row * gap;
-        page.drawText(`${timeMs} ms`, {
+        drawPageString(page, fonts, `${timeMs} ms`, false, {
           x,
           y: y + cellHeight - 12,
           size: 9,
-          font,
           color: rgb(0.12, 0.16, 0.22),
         });
-        drawDiagram(page, font, sampleTacticalProjectAtTime(project, timeMs), sceneId, {
+        drawDiagram(page, fonts, sampleTacticalProjectAtTime(project, timeMs), sceneId, {
           x,
           y,
           width: cellWidth,

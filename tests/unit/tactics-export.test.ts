@@ -58,6 +58,21 @@ function decodePdfLiterals(source: string): string {
   });
 }
 
+function unicodeCmapCodePoints(source: string): number[] {
+  const points: number[] = [];
+  for (const block of source.split('beginbfchar').slice(1)) {
+    const body = block.split('endbfchar')[0] ?? '';
+    const pairs = body.matchAll(/<[0-9A-Fa-f]{4}>\s+<([0-9A-Fa-f]+)>/g);
+    for (const pair of pairs) {
+      const unicode = pair[1] ?? '';
+      for (let index = 0; index < unicode.length; index += 4) {
+        points.push(Number.parseInt(unicode.slice(index, index + 4), 16));
+      }
+    }
+  }
+  return points;
+}
+
 function inflatePdfStreams(bytes: Uint8Array): string {
   const source = Buffer.from(bytes);
   let decoded = '';
@@ -320,6 +335,98 @@ describe('Tactical PDF contact sheets and analytics reports', () => {
     expect(decoded).toContain('Press');
     expect(decoded).toContain('Harbor FC');
     expect(decoded).toContain('Contact sheet');
+    expect(decoded).not.toContain('Harbor: Player 9');
+  });
+
+  it('embeds accented Latin, Greek, and Cyrillic player and team names with the Unicode font', async () => {
+    let project = coachingProject();
+    project = applyExportMetadata(project, {
+      title: 'José',
+      description: 'Near-side press',
+      creator: 'Coach Rivera',
+      club: 'Αθήνα',
+      ageGroup: 'U14',
+      sessionType: 'Training',
+      tacticalTheme: 'Press',
+      tagsText: 'press',
+      rights: 'Club training use',
+      license: 'Internal',
+      language: 'en',
+      notes: 'é ß',
+    }, '2026-09-29T12:00:00.000Z');
+    project = {
+      ...project,
+      teams: project.teams.map((team) => team.id === 'home'
+        ? { ...team, name: 'Спартак', roster: team.roster.map((player) => player.id === 'p9' ? { ...player, displayName: 'André' } : player) }
+        : team),
+    };
+    project = addRosterPlayer(project, 'home', {
+      id: 'p10',
+      displayName: 'Иванов',
+      jerseyNumber: '10',
+      role: 'Forward',
+      status: 'active',
+    });
+    project = addAnnotation(project, {
+      id: 'arrow-name',
+      sceneId: 'scene-1',
+      layerId: 'layer-1',
+      kind: 'arrow',
+      label: 'Αθήνα',
+      points: [{ x: 0.3, y: 0.4 }, { x: 0.6, y: 0.4 }],
+      visible: true,
+    });
+
+    const bytes = await renderCoachingPdfPackage(project, 'scene-1', { contactFrames: 1 });
+    const zip = await JSZip.loadAsync(bytes);
+    const pdfBytes = await zip.file('coaching.pdf')?.async('uint8array');
+    const sidecar = JSON.parse(await zip.file('metadata.json')?.async('string') ?? '{}') as { metadata: { notes: string; club: string } };
+    expect(pdfBytes).toBeDefined();
+    const pdf = await PDFDocument.load(pdfBytes ?? new Uint8Array());
+    expect(pdf.getTitle()).toBe('José');
+    expect(sidecar.metadata.club).toBe('Αθήνα');
+    expect(sidecar.metadata.notes).toBe('é ß');
+    const inflated = inflatePdfStreams(pdfBytes ?? new Uint8Array());
+    expect(inflated).toContain('/Encoding /Identity-H');
+    expect(inflated).toContain('/FontFile2');
+    expect(inflated).toMatch(/\/BaseFont \/NotoSans-Regular/);
+    expect(inflated).toMatch(/\/BaseFont \/NotoSans-Bold/);
+    expect(inflated).not.toMatch(/\/BaseFont \/NotoSans\S*\n\/Encoding \/WinAnsiEncoding/);
+    const encoded = unicodeCmapCodePoints(inflated);
+    for (const sample of ['José', 'Αθήνα', 'André', 'Спартак', 'Иванов', 'é', 'ß']) {
+      for (const char of sample) expect(encoded).toContain(char.codePointAt(0));
+    }
+    expect(inflated).toContain('/WinAnsiEncoding');
+    expect(decodePdfLiterals(inflated)).toContain('Press');
+  });
+
+  it('draws an uncovered glyph as a question mark and still builds the PDF', async () => {
+    const project = applyExportMetadata(coachingProject(), {
+      title: 'Pressing shape',
+      description: 'Near-side press',
+      creator: 'Coach Rivera',
+      club: 'Harbor FC',
+      ageGroup: 'U14',
+      sessionType: 'Training',
+      tacticalTheme: 'Press',
+      tagsText: 'press',
+      rights: 'Club training use',
+      license: 'Internal',
+      language: 'en',
+      notes: 'Keep 字',
+    }, '2026-09-29T12:00:00.000Z');
+    const bytes = await renderCoachingPdfPackage(project, 'scene-1', { contactFrames: 1 });
+    const zip = await JSZip.loadAsync(bytes);
+    const pdfBytes = await zip.file('coaching.pdf')?.async('uint8array');
+    const sidecar = JSON.parse(await zip.file('metadata.json')?.async('string') ?? '{}') as { metadata: { notes: string } };
+    expect(sidecar.metadata.notes).toContain('字');
+    const pdf = await PDFDocument.load(pdfBytes ?? new Uint8Array());
+    expect(pdf.getPageCount()).toBe(1);
+    const inflated = inflatePdfStreams(pdfBytes ?? new Uint8Array());
+    const encoded = unicodeCmapCodePoints(inflated);
+    expect(encoded).not.toContain('字'.codePointAt(0));
+    expect(encoded).toContain('?'.codePointAt(0));
+    expect(inflated).toContain('/Encoding /Identity-H');
   });
 
   it('exports source-honest trajectory and team-geometry metrics', () => {

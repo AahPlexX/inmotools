@@ -1,5 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
+import JSZip from 'jszip';
 import path from 'node:path';
+import { inflateSync } from 'node:zlib';
 import { expect, test, type Page } from '@playwright/test';
 
 const localReviewVideo = path.join(process.cwd(), 'tests/fixtures/tactical-review-sample.webm');
@@ -1049,7 +1051,7 @@ test('exports metadata, analytics, playback, and a capability-checked video fall
   test.setTimeout(120_000);
   await page.getByText('Professional export', { exact: true }).click();
   await page.getByLabel('Export title').fill('Pressing shape');
-  await page.getByLabel('Export notes').fill('Keep the press.');
+  await page.getByLabel('Export notes').fill('Keep the press. José Αθήνα Иванов');
   await page.getByRole('button', { name: 'Save export metadata' }).click();
   await expect(page.locator('.status-line')).toContainText('Export metadata saved.');
 
@@ -1076,6 +1078,35 @@ test('exports metadata, analytics, playback, and a capability-checked video fall
   const pdf = await readDownload(page, 'Download PDF package');
   expect(pdf.filename).toBe('pressing-shape-coaching.zip');
   expect(Array.from(pdf.bytes.subarray(0, 2))).toEqual([0x50, 0x4b]);
+  const pdfZip = await JSZip.loadAsync(pdf.bytes);
+  const coachingPdf = await pdfZip.file('coaching.pdf')?.async('nodebuffer');
+  expect(coachingPdf?.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+  const sidecar = JSON.parse(await pdfZip.file('metadata.json')?.async('string') ?? '{}') as { metadata: { notes: string } };
+  expect(sidecar.metadata.notes).toContain('José Αθήνα Иванов');
+  let inflated = '';
+  const source = coachingPdf ?? Buffer.alloc(0);
+  let cursor = 0;
+  while (cursor < source.length) {
+    const start = source.indexOf('stream\n', cursor);
+    if (start < 0) break;
+    const dataStart = start + 'stream\n'.length;
+    const end = source.indexOf('\nendstream', dataStart);
+    if (end < 0) break;
+    const chunk = source.subarray(dataStart, end);
+    try {
+      inflated += inflateSync(chunk).toString('latin1');
+    } catch {
+      inflated += chunk.toString('latin1');
+    }
+    cursor = end + '\nendstream'.length;
+  }
+  expect(inflated).toContain('/Encoding /Identity-H');
+  expect(inflated).toMatch(/\/BaseFont \/NotoSans/);
+  expect(inflated).toContain('/FontFile2');
+  const cmap = inflated.split('beginbfchar').slice(1).join('\n');
+  expect(cmap).toContain('<00E9>');
+  expect(cmap).toContain('<0391>');
+  expect(cmap).toContain('<0418>');
 
   const frames = await readDownload(page, 'Download frame-sequence ZIP');
   expect(frames.filename).toBe('pressing-shape-frames.zip');

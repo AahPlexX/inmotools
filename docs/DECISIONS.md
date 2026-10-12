@@ -46,6 +46,7 @@ Current departures from the rules, recorded so they are not mistaken for accepte
 
 | Item | Fact |
 | --- | --- |
+| Matchboard PDF font | `@pdf-lib/fontkit` 1.1.1 is an exact pin (MIT; npm registry package metadata 2026-10-11; published 2020-11-28; installed tree 4,282,008 bytes). It embeds the Matchboard coaching PDF font and is imported only from that export. Noto Sans v2.015 subset, SIL OFL 1.1, no reserved font name, copyright 2022 The Noto Project Authors. Notices: [THIRD_PARTY_NOTICES.md](../src/tools/tactics/THIRD_PARTY_NOTICES.md). Production chunk `pdf-unicode-font-*.js` is 1,023.46 kB, gzip 493.18 kB, and loads only when that PDF contains a character outside basic Latin. |
 | MediaBunny release age | `minimumReleaseAgeExclude` in `pnpm-workspace.yaml` lists `mediabunny@1.60.0`; that release is now older than the release-age window, so the entry has no effect. |
 | OpenCV | `@techstark/opencv-js` 5.0.0-release.1 is a pre-release. |
 | SheetJS | `xlsx` is installed from `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`, not the npm registry. |

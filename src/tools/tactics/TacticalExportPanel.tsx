@@ -116,7 +116,7 @@ export default function TacticalExportPanel({ project, sceneId, onEdit, onStatus
     try {
       const bytes = await renderCoachingPdfPackage(project, sceneId);
       downloadBytes(bytes, `${exportFileStem(project.metadata.title)}-coaching.zip`, 'application/zip');
-      onStatus('PDF package exported locally with a metadata sidecar.');
+      onStatus('PDF package saved in this browser. coaching.pdf is the printable page. metadata.json keeps the export fields.');
     } catch (error) {
       onStatus(message(error));
     }
@@ -195,6 +195,9 @@ export default function TacticalExportPanel({ project, sceneId, onEdit, onStatus
             <button type="button" onClick={() => void downloadHtml()}>Download standalone HTML</button>
             <button type="button" onClick={() => void downloadPdf()}>Download PDF package</button>
           </div>
+          <p className="tactical-export-note">
+            Download PDF package saves one file in this browser. That file holds coaching.pdf, the printable page, and metadata.json, a text copy of the export fields. Accented letters (such as é), Greek letters (such as Α), and Cyrillic letters (such as И) stay on the page as you typed them in the title, the club, the notes, or a drawing label. A team name or player name that uses one of those letters is printed as Teams: followed by the names, and the pitch drawing uses the space that remains. A letter outside those sets is shown as ? on the page. metadata.json still has the letter you typed. Nothing is uploaded.
+          </p>
           <p className="tactical-export-note" data-testid="tactical-raster-capability">
             {rasterFormats === null
               ? 'Checking which still-image formats this browser can write.'
