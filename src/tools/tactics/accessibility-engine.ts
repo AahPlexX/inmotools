@@ -348,7 +348,8 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
     title: 'Download a coaching PDF',
     paragraphs: [
       'Open Professional export. Choose Download PDF package. This browser saves one file that holds two files: coaching.pdf, the printable page, and metadata.json, a text copy of the export fields. Nothing is uploaded.',
-      'On the page, accented letters (such as é), Greek letters (such as Α), and Cyrillic letters (such as И) stay as you typed them in the title, the club, the notes, or a drawing label. A team name or player name that uses one of those letters is printed as Teams: followed by the names, and the pitch drawing uses the space that remains. A letter outside those sets is shown as ? on the page. metadata.json still has the letter you typed.',
+      'On the page, accented letters (such as é), Greek letters (such as Α), and Cyrillic letters (such as И) stay as you typed them in the title, the club, the notes, or a drawing label. A team name or player name that uses one of those letters is printed as Teams: followed by the names, and the pitch drawing uses the space that remains. If the names need more than six lines, the line ends with (+N more in metadata.json), where N is how many names were left off the page. A letter outside those sets is shown as ? on the page. metadata.json still has the letter you typed, including every team and player name.',
+      'If the message after the download says the page font did not load, the accented, Greek, and Cyrillic letters are shown as ? in coaching.pdf and metadata.json keeps them. Reload the page and choose Download PDF package again.',
     ],
   },
 ];

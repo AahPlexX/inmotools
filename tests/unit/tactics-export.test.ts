@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
-import { PDFDocument } from 'pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, PDFRef, decodePDFRawStream } from 'pdf-lib';
 import JSZip from 'jszip';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { measureTrajectory, sampleAuthoredTrajectory } from '../../src/tools/tactics/analysis-engine';
@@ -71,6 +71,91 @@ function unicodeCmapCodePoints(source: string): number[] {
     }
   }
   return points;
+}
+
+function streamText(stream: unknown): string {
+  return stream instanceof PDFRawStream ? Buffer.from(decodePDFRawStream(stream).decode()).toString('latin1') : '';
+}
+
+/** Strings drawn on one page, decoded through each font's ToUnicode map (WinAnsi fonts read as Latin-1). */
+async function drawnPageText(pdfBytes: Uint8Array, pageIndex = 0): Promise<string[]> {
+  const pdf = await PDFDocument.load(pdfBytes);
+  const page = pdf.getPage(pageIndex);
+  const fontDict = page.node.Resources()?.lookup(PDFName.of('Font'), PDFDict);
+  const maps = new Map<string, Map<string, string> | null>();
+  for (const [name, ref] of fontDict?.entries() ?? []) {
+    const font = pdf.context.lookup(ref, PDFDict);
+    const cmap = streamText(font.lookup(PDFName.of('ToUnicode')));
+    if (!cmap) {
+      maps.set(name.asString(), null);
+      continue;
+    }
+    const glyphs = new Map<string, string>();
+    for (const pair of cmap.matchAll(/<([0-9A-Fa-f]{4})>\s+<([0-9A-Fa-f]+)>/g)) {
+      glyphs.set(pair[1]!.toUpperCase(), Buffer.from(pair[2]!, 'hex').swap16().toString('utf16le'));
+    }
+    maps.set(name.asString(), glyphs);
+  }
+  const contents = page.node.get(PDFName.of('Contents'));
+  const refs = contents instanceof PDFArray ? contents.asArray() : [contents];
+  const source = refs.map((ref) => streamText(ref instanceof PDFRef ? pdf.context.lookup(ref) : ref)).join('\n');
+  const strings: string[] = [];
+  let current: Map<string, string> | null = null;
+  for (const match of source.matchAll(/(\/\S+)\s+[\d.]+\s+Tf|<([0-9A-Fa-f]*)>\s*Tj/g)) {
+    if (match[1]) {
+      current = maps.get(match[1]) ?? null;
+      continue;
+    }
+    const hex = match[2] ?? '';
+    if (!current) {
+      strings.push(Buffer.from(hex, 'hex').toString('latin1'));
+      continue;
+    }
+    let text = '';
+    for (let index = 0; index < hex.length; index += 4) text += current.get(hex.slice(index, index + 4).toUpperCase()) ?? '\uFFFD';
+    strings.push(text);
+  }
+  return strings;
+}
+
+function namedProject(teams: Array<{ id: string; name: string; players: string[] }>): TacticalProject {
+  let project = { ...coachingProject(), teams: [] } as TacticalProject;
+  project = { ...project, playerTokens: [] };
+  for (const team of teams) {
+    project = addTeam(project, { id: team.id, name: team.name, primaryColor: '#154c79', secondaryColor: '#ffffff', roster: [] });
+    team.players.forEach((displayName, index) => {
+      project = addRosterPlayer(project, team.id, { id: `${team.id}-${index}`, displayName, jerseyNumber: String(index + 1), role: 'Midfielder', status: 'active' });
+    });
+  }
+  return project;
+}
+
+async function loadExportPdfWithFontSpy(fail = false) {
+  vi.resetModules();
+  const embed = vi.fn();
+  vi.doMock('../../src/tools/tactics/pdf-unicode-font', async () => {
+    const actual = await vi.importActual<typeof import('../../src/tools/tactics/pdf-unicode-font')>('../../src/tools/tactics/pdf-unicode-font');
+    return {
+      ...actual,
+      embedMatchboardUnicodeFonts: (...args: Parameters<typeof actual.embedMatchboardUnicodeFonts>) => {
+        embed(...args);
+        return fail ? Promise.reject(new Error('font chunk blocked')) : actual.embedMatchboardUnicodeFonts(...args);
+      },
+    };
+  });
+  const module = await import('../../src/tools/tactics/export-pdf');
+  return { render: module.renderCoachingPdfPackage, embed };
+}
+
+async function readPackage(bytes: Uint8Array) {
+  const zip = await JSZip.loadAsync(bytes);
+  const pdfBytes = await zip.file('coaching.pdf')?.async('uint8array') ?? new Uint8Array();
+  const sidecar = JSON.parse(await zip.file('metadata.json')?.async('string') ?? '{}') as {
+    metadata: { notes: string };
+    teams: Array<{ name: string; players: string[] }>;
+    placement: { drawnOnPageOutsideBasicLatin: string[] };
+  };
+  return { pdfBytes, sidecar, inflated: inflatePdfStreams(pdfBytes) };
 }
 
 function inflatePdfStreams(bytes: Uint8Array): string {
@@ -394,7 +479,7 @@ describe('Tactical PDF contact sheets and analytics reports', () => {
     expect(inflated).not.toMatch(/\/BaseFont \/NotoSans\S*\n\/Encoding \/WinAnsiEncoding/);
     const encoded = unicodeCmapCodePoints(inflated);
     for (const sample of ['José', 'Αθήνα', 'André', 'Спартак', 'Иванов', 'é', 'ß']) {
-      for (const char of sample) expect(encoded).toContain(char.codePointAt(0));
+      for (const char of sample) expect(encoded).toContain(char.codePointAt(0) ?? -1);
     }
     expect(inflated).toContain('/WinAnsiEncoding');
     expect(decodePdfLiterals(inflated)).toContain('Press');
@@ -424,9 +509,136 @@ describe('Tactical PDF contact sheets and analytics reports', () => {
     expect(pdf.getPageCount()).toBe(1);
     const inflated = inflatePdfStreams(pdfBytes ?? new Uint8Array());
     const encoded = unicodeCmapCodePoints(inflated);
-    expect(encoded).not.toContain('字'.codePointAt(0));
-    expect(encoded).toContain('?'.codePointAt(0));
+    expect(encoded).not.toContain('字'.codePointAt(0) ?? -1);
+    expect(encoded).toContain('?'.codePointAt(0) ?? -1);
     expect(inflated).toContain('/Encoding /Identity-H');
+  });
+
+  it('keeps an unsupported roster name in metadata.json while the page shows ?', async () => {
+    const project = namedProject([{ id: 'home', name: 'Harbor', players: ['字', 'José'] }]);
+    const { pdfBytes, sidecar } = await readPackage(await renderCoachingPdfPackage(project, 'scene-1', { contactFrames: 1 }));
+    expect(sidecar.teams).toEqual([{ name: 'Harbor', players: ['字', 'José'] }]);
+    expect(sidecar.placement.drawnOnPageOutsideBasicLatin).toEqual(['teams']);
+    const drawn = await drawnPageText(pdfBytes);
+    expect(drawn).toContain('Teams: Harbor: ?, José');
+    expect(drawn.join('\n')).not.toContain('字');
+  });
+
+  it('keeps two basic-Latin teams on Helvetica with no Teams line and no Unicode font load', async () => {
+    const { render, embed } = await loadExportPdfWithFontSpy();
+    try {
+      const project = namedProject([
+        { id: 'home', name: 'Harbor', players: ['Player 9', 'Player 10'] },
+        { id: 'away', name: 'Rivers', players: ['Player 4'] },
+      ]);
+      const { pdfBytes, sidecar, inflated } = await readPackage(await render(project, 'scene-1', { contactFrames: 1 }));
+      expect(embed).not.toHaveBeenCalled();
+      expect(inflated).not.toContain('/Identity-H');
+      expect(inflated).not.toMatch(/\/BaseFont \/NotoSans/);
+      expect((await drawnPageText(pdfBytes)).some((text) => text.startsWith('Teams:'))).toBe(false);
+      expect(sidecar.teams.map((team) => team.name)).toEqual(['Harbor', 'Rivers']);
+    } finally {
+      vi.doUnmock('../../src/tools/tactics/pdf-unicode-font');
+      vi.resetModules();
+    }
+  });
+
+  it('loads the Unicode font only for drawn text, not for tags or another scene', async () => {
+    const { render, embed } = await loadExportPdfWithFontSpy();
+    try {
+      let project = applyExportMetadata(coachingProject(), {
+        title: 'Pressing shape',
+        description: 'Αθήνα',
+        creator: 'Иванов',
+        club: 'Harbor FC',
+        ageGroup: 'U14',
+        sessionType: 'Training',
+        tacticalTheme: 'Press',
+        tagsText: 'Αθήνα',
+        rights: 'Club training use',
+        license: 'Internal',
+        language: 'en',
+        notes: 'Keep the press.',
+      }, '2026-09-29T12:00:00.000Z');
+      project = { ...project, scenes: [...project.scenes, { ...project.scenes[0]!, id: 'scene-other', name: 'Other scene' }] };
+      project = addAnnotation(project, {
+        id: 'elsewhere',
+        sceneId: 'scene-other',
+        layerId: 'layer-1',
+        kind: 'arrow',
+        label: 'Спартак',
+        points: [{ x: 0.1, y: 0.1 }, { x: 0.2, y: 0.2 }],
+        visible: true,
+      });
+      const { pdfBytes } = await readPackage(await render(project, 'scene-1', { contactFrames: 1 }));
+      expect(embed).not.toHaveBeenCalled();
+      const pdf = await PDFDocument.load(pdfBytes);
+      expect(pdf.getSubject()).toBe('Αθήνα');
+      expect(pdf.getAuthor()).toBe('Иванов');
+    } finally {
+      vi.doUnmock('../../src/tools/tactics/pdf-unicode-font');
+      vi.resetModules();
+    }
+  });
+
+  it('ends a roster longer than six lines with a visible +N more marker', async () => {
+    const players = Array.from({ length: 64 }, (_, index) => `Игрок номер ${index + 1}`);
+    const project = namedProject([{ id: 'home', name: 'Спартак', players }]);
+    const { pdfBytes, sidecar } = await readPackage(await renderCoachingPdfPackage(project, 'scene-1', { contactFrames: 1 }));
+    expect(sidecar.teams[0]?.players).toHaveLength(64);
+    const drawn = await drawnPageText(pdfBytes);
+    const teamsStart = drawn.findIndex((text) => text.startsWith('Teams: Спартак: Игрок номер 1,'));
+    expect(teamsStart).toBeGreaterThanOrEqual(0);
+    const teamLines = drawn.slice(teamsStart, teamsStart + 6);
+    const marker = /\(\+(\d+) more in metadata\.json\)$/.exec(teamLines[5] ?? '');
+    expect(marker).not.toBeNull();
+    const shown = teamLines.join(' ').match(/Игрок номер \d+/g) ?? [];
+    expect(shown.length + Number(marker?.[1])).toBe(64);
+    expect(drawn[teamsStart + 6] ?? '').not.toMatch(/Игрок номер/);
+  });
+
+  it('prints a team with no name without a leading colon', async () => {
+    const project = namedProject([{ id: 'home', name: '', players: ['André', 'Иванов'] }]);
+    const { pdfBytes } = await readPackage(await renderCoachingPdfPackage(project, 'scene-1', { contactFrames: 1 }));
+    expect(await drawnPageText(pdfBytes)).toContain('Teams: André, Иванов');
+  });
+
+  it('composes a decomposed accent before drawing it', async () => {
+    const project = applyExportMetadata(coachingProject(), {
+      title: 'Jose\u0301',
+      description: 'Near-side press',
+      creator: 'Coach Rivera',
+      club: 'Harbor FC',
+      ageGroup: 'U14',
+      sessionType: 'Training',
+      tacticalTheme: 'Press',
+      tagsText: 'press',
+      rights: 'Club training use',
+      license: 'Internal',
+      language: 'en',
+      notes: 'Keep the press.',
+    }, '2026-09-29T12:00:00.000Z');
+    const { pdfBytes, inflated } = await readPackage(await renderCoachingPdfPackage(project, 'scene-1', { contactFrames: 1 }));
+    expect(await drawnPageText(pdfBytes)).toContain('José');
+    const encoded = unicodeCmapCodePoints(inflated);
+    expect(encoded).toContain(0x00e9);
+    expect(encoded).not.toContain(0x0301);
+  });
+
+  it('reports a Unicode font load failure and still builds the PDF with ?', async () => {
+    const { render, embed } = await loadExportPdfWithFontSpy(true);
+    try {
+      const project = namedProject([{ id: 'home', name: 'Αθήνα', players: ['José'] }]);
+      const unavailable = vi.fn();
+      const { pdfBytes, sidecar } = await readPackage(await render(project, 'scene-1', { contactFrames: 1, onUnicodeFontUnavailable: unavailable }));
+      expect(embed).toHaveBeenCalledTimes(1);
+      expect(unavailable).toHaveBeenCalledTimes(1);
+      expect(sidecar.teams).toEqual([{ name: 'Αθήνα', players: ['José'] }]);
+      expect(await drawnPageText(pdfBytes)).toContain('Teams: ?????: Jos?');
+    } finally {
+      vi.doUnmock('../../src/tools/tactics/pdf-unicode-font');
+      vi.resetModules();
+    }
   });
 
   it('exports source-honest trajectory and team-geometry metrics', () => {
