@@ -7,7 +7,7 @@
 - Branch: `cursor/matchboard-pdf-unicode-review-fixes`
 - Base: `origin/main` `248af883` (squash of #121, tip `74555385`)
 - Implementation: `d36406ead39061d7817857a67041c75dbc80c577`
-- Tip: the docs-only commit that records this implementation SHA
+- Tip: the notice and copy correction commit after `6755136204e5654eefeb14acb146c1cb3914e2c7`; it changes no export logic
 - Draft pull request against main. It awaits the Chief of Staff's squash-merge. After that merge, nothing for PDF Unicode remains in flight; resume from main.
 - metadata.json lists every team and player name under `teams`. A basic-Latin roster prints no Teams line and loads no Unicode font. A Teams line past six lines ends with (+N more in metadata.json). A failed font load shows a status message. Page text is composed to NFC.
 

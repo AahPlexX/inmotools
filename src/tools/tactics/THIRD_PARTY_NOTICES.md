@@ -28,28 +28,33 @@ Authors named by that package: Andrew Dillon (author) and Devon Govett (contribu
 
 Copyright line: none is published. Checked 2026-10-12. The npm 1.1.1 tarball has no license file and its `package.json` says `"license": "MIT"`. The source repository https://github.com/Hopding/fontkit (a fork of https://github.com/foliojs/fontkit) has no license file and its README says MIT. https://github.com/foliojs/fontkit also has no license file and its README says MIT. The MIT permission notice below applies to `@pdf-lib/fontkit`, by the authors named above.
 
-The Vite production build removes comments, so the notices below are the copy that ships with the coaching PDF chunk.
+This file is the repository's record of these notices. The Vite production build removes the license comments from the shipped chunks, and the site does not serve this file.
 
 ## Code bundled inside the fontkit browser build
 
-`node_modules/@pdf-lib/fontkit/dist/fontkit.es.js` carries these modules inside its own file. Matchboard ships them in `pdf-unicode-font-*.js`. Versions come from the `yarn.lock` of https://github.com/Hopding/fontkit at `72b8e42bd6a398d496a63a6d483eabeed43861fb` (package version 1.1.0 there; the npm 1.1.1 tarball has no lockfile). Licenses and copyright lines were read from each version's npm tarball on 2026-10-12, except where the row names the fontkit build as the source.
+`node_modules/@pdf-lib/fontkit/dist/fontkit.es.js` carries these modules inside its own file. Matchboard ships them in `pdf-unicode-font-*.js`. Versions come from the `yarn.lock` of https://github.com/Hopding/fontkit at `72b8e42bd6a398d496a63a6d483eabeed43861fb` (package version 1.1.0 there; the npm 1.1.1 tarball has no lockfile). Licenses and copyright lines were read from each version's npm tarball on 2026-10-12, except where the row names another source. The fontkit build holds two copies each of `base64-js` (lines 31 and 34376 of `fontkit.es.js`) and `tiny-inflate` (lines 23190 and 33714). The lockfile resolves two versions of each, and both are listed. The bundled code cannot show which copy is which version: `tiny-inflate` 1.0.2 and 1.0.3 have the same `index.js`, and `base64-js` 1.3.0 and 1.3.1 differ only in one variable declaration that the fontkit build rewrote.
 
 | Module | Version | License | Copyright notice as published |
 | --- | --- | --- | --- |
-| `base64-js` | 1.3.1 | MIT | Copyright (c) 2014 Jameson Little |
+| `base64-js` (required by `buffer`) | 1.3.1 | MIT | Copyright (c) 2014 Jameson Little |
+| `base64-js` (required by `@pdf-lib/brotli`) | 1.3.0 | MIT | "Copyright (c) 2014" with no holder named; `package.json` author T. Jameson Little |
 | `ieee754` | 1.1.13 | BSD-3-Clause | Copyright 2008 Fair Oaks Labs, Inc. (full text below) |
 | `buffer` | 5.6.0 | MIT | Copyright (c) Feross Aboukhadijeh, and other contributors. |
 | Node.js `string_decoder` (from the fontkit build's own header) | — | MIT | Copyright Joyent, Inc. and other Node contributors. |
+| `EventEmitter` and stream sections (`BufferList`, `Readable`, `Writable`, `Duplex`) from `rollup-plugin-node-builtins` | 2.1.2 | ISC (`package.json`); readme: "MIT except ES6 ports of browserify modules which are whatever the original library was" | No copyright holder is named. See below |
 | `iconv-lite` | 0.4.24 | MIT | Copyright (c) 2011 Alexander Shtuchkin |
 | `@pdf-lib/restructure` | 0.0.1 | MIT | No license file; `package.json` author Andrew Dillon |
 | `@pdf-lib/unicode-properties` | 0.0.1 | MIT | "Copyright 2018" with no holder named; `package.json` author Andrew Dillon |
 | `unicode-trie` | 0.3.1 | MIT | No license file; `package.json` author Devon Govett |
-| `tiny-inflate` | 1.0.3 | MIT | Copyright (c) 2015-present Devon Govett |
+| `tiny-inflate` (required by `unicode-trie`) | 1.0.2 | MIT | No license file; `package.json` author Devon Govett |
+| `tiny-inflate` (fontkit's own devDependency) | 1.0.3 | MIT | Copyright (c) 2015-present Devon Govett |
 | `base64-arraybuffer` | 0.1.5 | MIT | Copyright (c) 2012 Niklas von Hertzen |
 | `clone` | 1.0.4 | MIT | Copyright © 2011-2015 Paul Vorbach <paul@vorba.ch> |
 | `dfa` | 1.2.0 | MIT | No license file; `package.json` author Devon Govett |
 | `@pdf-lib/brotli` | 0.0.0 | MIT (package) | No license file; `package.json` author Andrew Dillon |
 | Brotli decoder inside `@pdf-lib/brotli` (from the fontkit build's own header) | — | Apache-2.0 | Copyright 2013 Google Inc. All Rights Reserved. Full license: [Apache-2.0.txt](licenses/Apache-2.0.txt) |
+
+The `EventEmitter` and stream sections have no license header in `fontkit.es.js`. The Joyent line appears only on the `string_decoder` section, so it is not applied to them. fontkit's `rollup.config.js` runs `rollup-plugin-node-builtins`, and the lockfile resolves version 2.1.2. Its files `src/es6/events.js`, `src/es6/readable-stream/buffer-list.js`, `readable.js`, `writable.js`, and `duplex.js` hold the same `EventEmitter`, `BufferList`, `ReadableState`, `WritableState`, and `Duplex` code. None of those files names a copyright holder. The 2.1.2 `package.json` names no author. https://github.com/calvinmetcalf/rollup-plugin-node-builtins has no license file. Its readme does not say which files are ports or who owns them. No owner is named here, because no checked source names one.
 
 [Apache-2.0.txt](licenses/Apache-2.0.txt) is the text from https://www.apache.org/licenses/LICENSE-2.0.txt retrieved 2026-10-12, SHA-256 `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`.
 
@@ -93,7 +98,7 @@ zlib license from the `pako` 1.0.11 source headers, verbatim:
 
 ## MIT License
 
-Every row above marked MIT, and `@pdf-lib/fontkit`, is distributed under this permission notice together with the copyright notice listed for it:
+`@pdf-lib/fontkit` and every row above whose license is MIT alone are distributed under this permission notice together with the copyright notice listed for it:
 
 > Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 >

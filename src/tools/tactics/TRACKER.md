@@ -127,7 +127,7 @@ updated: 2026-10-12
 
 ## Known limitations
 
-- Coaching PDF page text outside the bundled Noto Sans subset (Latin, Latin Extended, Greek, Cyrillic, and the punctuation listed in THIRD_PARTY_NOTICES.md) is shown as ? (TMS-R73). Basic Latin page text still uses the standard Helvetica font. A team or player name outside basic Latin adds a Teams line of up to six lines, and the pitch drawing uses the space that remains. Names past six lines are replaced by (+N more in metadata.json). A letter and combining accent with no single composed character print as the letter followed by an accent that may not sit exactly over it.
+- Coaching PDF page text outside the bundled Noto Sans subset (Latin, Latin Extended, Greek, Cyrillic, and the punctuation listed in THIRD_PARTY_NOTICES.md) is shown as ? (TMS-R73). Basic Latin page text still uses the standard Helvetica font. A team or player name outside basic Latin adds a Teams line of up to six lines, and the pitch drawing uses the space that remains. When the line needs more than six lines, it ends with (+N more in metadata.json). N is the number of players left off, plus 1 for each left-off team that has no players. A letter and combining accent with no single composed character print as the letter followed by an accent that may not sit exactly over it.
 - Video export depends on the browser's WebCodecs encoders; seek precision is limited by the media element.
 - Analysis and tracking use authored or imported samples only.
 
