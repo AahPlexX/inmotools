@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
-updated: 2026-10-11
+updated: 2026-10-12
 ---
 
 # Tactical Matchboard Studio — spec
@@ -174,7 +174,7 @@ Out of scope:
 | TMS-R70 | Analytics CSV/JSON with per-track distance and speed and team geometry, each row stating it is a geometric measurement (formerly 50) | Download analytics JSON; rows carry the claim boundary |
 | TMS-R71 | Client-side video export through WebCodecs and MediaBunny, offered only for encoder-confirmed MP4/WebM combinations, with frame-sequence ZIP fallback (formerly 57) | The first offered format downloads with MP4 or WebM magic bytes |
 | TMS-R72 | Vector coaching PDF with contact sheet, packaged with a metadata sidecar (formerly 58) | Download the PDF ZIP; `coaching.pdf` contains vector pitch operators |
-| TMS-R73 | Coaching PDF page text keeps accented Latin, Greek, and Cyrillic letters. A letter the embedded Noto Sans subset does not include is shown as ? and the ZIP still downloads. metadata.json keeps the original letter (formerly part of 58) | A page with José, Αθήνα, Иванов, é, and ß shows those letters from the embedded Unicode font. A note with 字 shows ? on the page and 字 in metadata.json |
+| TMS-R73 | Coaching PDF page text keeps accented Latin, Greek, and Cyrillic letters. A letter the embedded Noto Sans subset does not include is shown as ? and the ZIP still downloads. metadata.json keeps the original letter, including every team and player name. A Teams line is printed only when a team or player name leaves basic Latin; past six lines it ends with (+N more in metadata.json), where N is the number of players left off plus 1 for each left-off team that has no players. If the font cannot load, the download still completes and the status says so (formerly part of 58) | A page with José, Αθήνα, Иванов, é, and ß shows those letters from the embedded Unicode font. A note with 字 shows ? on the page and 字 in metadata.json. A player named 字 shows ? on the page and 字 in metadata.json. Two basic-Latin teams print no Teams line and load no Unicode font |
 | TMS-R74 | Still export (SVG, PNG, JPEG, WebP after a write probe), social cards (square, portrait, story, landscape) and standalone HTML playback (formerly 59) | Download the board as SVG and PNG; the HTML plays without a remote script |
 | TMS-R75 | OpenGraph social card export at 1200×630 for link previews | Export the OpenGraph card; the image is 1200×630 |
 
@@ -211,5 +211,6 @@ None: no function was compared between an ML and a non-ML method.
 
 ## Change log
 
+- 2026-10-12 — TMS-R73: metadata.json keeps every team and player name. Basic-Latin rosters print no Teams line and load no Unicode font. A long Teams line ends with (+N more in metadata.json). A font load failure is reported in the status. Page text is composed to NFC.
 - 2026-10-11 — TMS-R73: coaching PDF page text uses the bundled Noto Sans subset through `@pdf-lib/fontkit` 1.1.1. Letters outside that subset are shown as ?. The owner authorized the pin.
 - 2026-10-05 — Created per `docs/DOCUMENTATION_STANDARD.md`. 85 requirements.

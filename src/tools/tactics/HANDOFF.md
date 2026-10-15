@@ -2,15 +2,23 @@
 
 > **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
 
+## Unicode PDF page text review fixes
+
+- Branch: `cursor/matchboard-pdf-unicode-review-fixes`
+- Base: `origin/main` `248af883` (squash of #121, tip `74555385`)
+- Implementation: `d36406ead39061d7817857a67041c75dbc80c577`
+- Tip: the notice and copy correction commit after `6755136204e5654eefeb14acb146c1cb3914e2c7`; it changes no export logic
+- Draft pull request against main. It awaits the Chief of Staff's squash-merge. After that merge, nothing for PDF Unicode remains in flight; resume from main.
+- metadata.json lists every team and player name under `teams`. A basic-Latin roster prints no Teams line and loads no Unicode font. A Teams line past six lines ends with (+N more in metadata.json). A failed font load shows a status message. Page text is composed to NFC.
+
 ## Unicode PDF page text
 
-- Branch: `cursor/matchboard-pdf-unicode`
+- Branch: `cursor/matchboard-pdf-unicode`, merged to main as `248af883` (#121)
 - Base: `origin/main` `e134af68a6d8670f545a7bc1a4d568deb3d0b3bf`
 - Implementation: `9a298eeebdf2981f5babfe0512b6c7f2da33a287`
-- Tip: this docs-only commit
-- The implementation is complete and verified. Draft pull request #121 awaits the Chief of Staff's squash-merge. After that merge, nothing for PDF Unicode remains in flight; resume from main.
+- Tip: `74555385959fcb5d979e20ee995100b4a8059d96`
 - Page text outside basic Latin uses bundled Noto Sans through `@pdf-lib/fontkit` 1.1.1. A letter outside that subset is shown as ?. metadata.json keeps the original letter.
-- Lazy chunk: `pdf-unicode-font-*.js`, 1,023.46 kB, gzip 493.18 kB, from the 2026-10-11 production build. It loads only when the coaching PDF contains a character outside basic Latin.
+- Lazy chunk: `pdf-unicode-font-*.js`, 1,023.46 kB, gzip 493.18 kB, from the 2026-10-11 production build. It loads only when the coaching PDF draws a character outside basic Latin.
 
 ## Workstream identity
 
@@ -34,7 +42,7 @@ Historical SHAs below describe the pre-squash branch. They are not the branch to
 
 ## Exact next sequential action
 
-**Stop.** PDF Unicode page text is complete and verified (implementation `9a298eeebdf2981f5babfe0512b6c7f2da33a287`). Draft pull request #121 awaits the Chief of Staff's squash-merge. After that merge, nothing for PDF Unicode remains in flight; resume from main. Rows 1–67 stay closed. Basic Latin page text still uses Helvetica. A letter outside the bundled Noto Sans subset is shown as ? on the page. metadata.json keeps the original letter.
+**Stop.** PDF Unicode page text is on main from #121. The review fixes on `cursor/matchboard-pdf-unicode-review-fixes` are complete and verified. Their draft pull request awaits the Chief of Staff's squash-merge. After that merge, nothing for PDF Unicode remains in flight; resume from main. Rows 1–67 stay closed. Basic Latin page text still uses Helvetica. A letter outside the bundled Noto Sans subset is shown as ? on the page. metadata.json keeps the original letter.
 
 Help copy changed: YES. The workspace header sentence, help section `match-setup`, command-bar tooltips, the Build board tip, and the squad-growth note were rewritten. The catalog entry was not changed in this wave. Stage 2 instructional writing applies because help copy changed.
 

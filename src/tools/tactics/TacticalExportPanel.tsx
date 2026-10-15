@@ -114,9 +114,16 @@ export default function TacticalExportPanel({ project, sceneId, onEdit, onStatus
 
   async function downloadPdf() {
     try {
-      const bytes = await renderCoachingPdfPackage(project, sceneId);
+      let fontUnavailable = false;
+      const bytes = await renderCoachingPdfPackage(project, sceneId, {
+        onUnicodeFontUnavailable: () => {
+          fontUnavailable = true;
+        },
+      });
       downloadBytes(bytes, `${exportFileStem(project.metadata.title)}-coaching.zip`, 'application/zip');
-      onStatus('PDF package saved in this browser. coaching.pdf is the printable page. metadata.json keeps the export fields.');
+      onStatus(fontUnavailable
+        ? 'PDF package saved in this browser, but the page font for accented, Greek, and Cyrillic letters did not load. Those letters are shown as ? in coaching.pdf. metadata.json keeps them. Reload the page and download again.'
+        : 'PDF package saved in this browser. coaching.pdf is the printable page. metadata.json keeps the export fields.');
     } catch (error) {
       onStatus(message(error));
     }
@@ -196,7 +203,7 @@ export default function TacticalExportPanel({ project, sceneId, onEdit, onStatus
             <button type="button" onClick={() => void downloadPdf()}>Download PDF package</button>
           </div>
           <p className="tactical-export-note">
-            Download PDF package saves one file in this browser. That file holds coaching.pdf, the printable page, and metadata.json, a text copy of the export fields. Accented letters (such as é), Greek letters (such as Α), and Cyrillic letters (such as И) stay on the page as you typed them in the title, the club, the notes, or a drawing label. A team name or player name that uses one of those letters is printed as Teams: followed by the names, and the pitch drawing uses the space that remains. A letter outside those sets is shown as ? on the page. metadata.json still has the letter you typed. Nothing is uploaded.
+            Download PDF package saves one file in this browser. That file holds coaching.pdf, the printable page, and metadata.json, a text copy of the export fields. Accented letters (such as é), Greek letters (such as Α), and Cyrillic letters (such as И) stay on the page as you typed them in the title, the club, the notes, or a drawing label. A team name or player name that uses one of those letters is printed as Teams: followed by the names, and the pitch drawing uses the space that remains. If the names need more than six lines, the line ends with (+N more in metadata.json). N is the number of players left off the page, plus 1 for each left-off team that has no players. A team whose players are all left off is not shown, and only its players count in N. A letter outside those sets is shown as ? on the page. metadata.json still has the letter you typed, including every team and player name. Nothing is uploaded.
           </p>
           <p className="tactical-export-note" data-testid="tactical-raster-capability">
             {rasterFormats === null

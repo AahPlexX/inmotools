@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
-updated: 2026-10-11
+updated: 2026-10-12
 ---
 
 # Tactical Matchboard Studio — tracker
@@ -103,7 +103,7 @@ updated: 2026-10-11
 | TMS-R70 | verified | unit "exports source-honest trajectory and team-geometry metrics" | |
 | TMS-R71 | verified | unit "exposes a video combination only when the container and encoder both accept it", "does not call the encoder for an unconfirmed format and writes a vector frame ZIP"; e2e "exports metadata, analytics, playback, and a capability-checked video fallback" | |
 | TMS-R72 | verified | unit "writes a vector PDF package with info-dictionary fields and a metadata sidecar" | |
-| TMS-R73 | verified | unit "embeds accented Latin, Greek, and Cyrillic player and team names with the Unicode font"; unit "draws an uncovered glyph as a question mark and still builds the PDF" | Page text outside basic Latin uses the bundled Noto Sans subset. A letter that subset does not include is shown as ?. metadata.json keeps the original letter |
+| TMS-R73 | verified | unit "embeds accented Latin, Greek, and Cyrillic player and team names with the Unicode font"; unit "draws an uncovered glyph as a question mark and still builds the PDF"; unit "keeps an unsupported roster name in metadata.json while the page shows ?"; unit "keeps two basic-Latin teams on Helvetica with no Teams line and no Unicode font load"; unit "loads the Unicode font only for drawn text, not for tags or another scene"; unit "ends a roster longer than six lines with a visible +N more marker"; unit "prints a team with no name without a leading colon"; unit "composes a decomposed accent before drawing it"; unit "reports a Unicode font load failure and still builds the PDF with ?" | Page text outside basic Latin uses the bundled Noto Sans subset. A letter that subset does not include is shown as ?. metadata.json keeps the original letter and every team and player name |
 | TMS-R74 | verified | unit "composes even social-card sizes and escapes active text", "builds a local playback document that cannot execute notes as HTML", "offers a raster format only after the browser write probe succeeds and checks the file signature"; e2e "downloads the current board as SVG" | |
 | TMS-R75 | partial | unit "composes even social-card sizes and escapes active text" | Social cards are square, portrait, story and landscape 1920×1080; no 1200×630 card |
 | TMS-R76 | verified | e2e "reflows and preserves 44px essential targets across phone, tablet, laptop, and desktop widths", "narrow sheets keep the pitch first and return focus" | |
@@ -127,7 +127,7 @@ updated: 2026-10-11
 
 ## Known limitations
 
-- Coaching PDF page text outside the bundled Noto Sans subset (Latin, Latin Extended, Greek, Cyrillic, and the punctuation listed in THIRD_PARTY_NOTICES.md) is shown as ? (TMS-R73). Basic Latin page text still uses the standard Helvetica font. A team or player name outside basic Latin adds one Teams line, and the pitch drawing uses the space that remains.
+- Coaching PDF page text outside the bundled Noto Sans subset (Latin, Latin Extended, Greek, Cyrillic, and the punctuation listed in THIRD_PARTY_NOTICES.md) is shown as ? (TMS-R73). Basic Latin page text still uses the standard Helvetica font. A team or player name outside basic Latin adds a Teams line of up to six lines, and the pitch drawing uses the space that remains. When the line needs more than six lines, it ends with (+N more in metadata.json). N is the number of players left off, plus 1 for each left-off team that has no players. A letter and combining accent with no single composed character print as the letter followed by an accent that may not sit exactly over it.
 - Video export depends on the browser's WebCodecs encoders; seek precision is limited by the media element.
 - Analysis and tracking use authored or imported samples only.
 
@@ -137,5 +137,6 @@ updated: 2026-10-11
 
 ## Change log
 
+- 2026-10-12 — TMS-R73 review fixes: metadata.json keeps team and player names; basic-Latin rosters load no Unicode font; long Teams lines end with (+N more in metadata.json); a font load failure is reported; page text is composed to NFC; notices carry the MIT, BSD-3-Clause, Apache-2.0, and zlib texts for code in the PDF chunks.
 - 2026-10-11 — TMS-R73 verified. Coaching PDF page text embeds Noto Sans through `@pdf-lib/fontkit` 1.1.1 when the text leaves basic Latin. The production chunk is `pdf-unicode-font-*.js`, 1,023.46 kB, gzip 493.18 kB.
 - 2026-10-05 — Created per `docs/DOCUMENTATION_STANDARD.md`.

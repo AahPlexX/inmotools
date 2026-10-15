@@ -10,10 +10,23 @@ import type { NormalizedPoint, TacticalProject } from './tactics-types';
 export const PDF_INFO_FIELDS = ['title', 'creator', 'description', 'tags', 'createdAt', 'modifiedAt'] as const;
 export const PDF_PAGE_TEXT_FIELDS = ['club', 'ageGroup', 'sessionType', 'tacticalTheme', 'rights', 'license', 'language', 'notes'] as const;
 
+export const PDF_PAGE_TEXT_FALLBACK = '?';
+export const PDF_FIELD_MAX_LINES = 6;
+
 const PAGE_WIDTH = 792;
 const PAGE_HEIGHT = 612;
 const MARGIN = 36;
-const PDF_PAGE_TEXT_FALLBACK = '?';
+
+export interface CoachingPdfOptions {
+  contactFrames?: number;
+  /** Called when page text needed the bundled Unicode font and it could not be loaded or embedded. */
+  onUnicodeFontUnavailable?: () => void;
+}
+
+interface RosterTeam {
+  name: string;
+  players: string[];
+}
 
 interface PageFonts {
   regular: PDFFont;
@@ -26,8 +39,10 @@ interface PreparedPageText {
   unicode: boolean;
 }
 
-function normalizePageWhitespace(value: string): string {
-  return Array.from(value).map((char) => {
+// The subset carries no mark-positioning features, so a decomposed accent would draw unanchored.
+// NFC turns letter + mark into the precomposed letter wherever Unicode defines one.
+function normalizePageText(value: string): string {
+  return Array.from(value.normalize('NFC')).map((char) => {
     const code = char.codePointAt(0) ?? 0;
     return code === 9 || code === 10 || code === 13 ? ' ' : char;
   }).join('').replace(/\s+/g, ' ').trim();
@@ -51,7 +66,7 @@ function degradeToBasicLatin(value: string): string {
 }
 
 function preparePageText(value: string, unicode: MatchboardUnicodeFonts | null): PreparedPageText {
-  const normalized = normalizePageWhitespace(value);
+  const normalized = normalizePageText(value);
   if (!leavesBasicLatin(normalized)) return { text: normalized, unicode: false };
   if (!unicode) return { text: degradeToBasicLatin(normalized), unicode: false };
   let text = '';
@@ -97,13 +112,49 @@ function hexColor(value: string): { r: number; g: number; b: number } {
   };
 }
 
-function teamRosterLine(project: TacticalProject): string {
-  return project.teams.map((team) => {
-    const names = team.roster.map((player) => player.displayName.trim()).filter(Boolean);
-    const teamName = team.name.trim();
-    if (!teamName && names.length === 0) return '';
-    return names.length ? `${teamName}: ${names.join(', ')}` : teamName;
-  }).filter(Boolean).join(' · ');
+function rosterTeams(project: TacticalProject): RosterTeam[] {
+  return project.teams.map((team) => ({
+    name: team.name.trim(),
+    players: team.roster.map((player) => player.displayName.trim()).filter(Boolean),
+  })).filter((team) => team.name || team.players.length);
+}
+
+function rosterLeavesBasicLatin(teams: readonly RosterTeam[]): boolean {
+  return teams.some((team) => [team.name, ...team.players].some((name) => leavesBasicLatin(normalizePageText(name))));
+}
+
+/** A team with players counts one entry per player; a team with no players counts as one entry. */
+function rosterEntryCount(teams: readonly RosterTeam[]): number {
+  return teams.reduce((total, team) => total + Math.max(1, team.players.length), 0);
+}
+
+function formatRoster(teams: readonly RosterTeam[], keep: number): string {
+  const parts: string[] = [];
+  let remaining = keep;
+  for (const team of teams) {
+    if (remaining <= 0) break;
+    if (!team.players.length) {
+      parts.push(team.name);
+      remaining -= 1;
+      continue;
+    }
+    const players = team.players.slice(0, remaining);
+    remaining -= players.length;
+    parts.push(team.name ? `${team.name}: ${players.join(', ')}` : players.join(', '));
+  }
+  return parts.join('; ');
+}
+
+function rosterFieldLines(fonts: PageFonts, teams: readonly RosterTeam[], size: number, width: number): string[] {
+  const total = rosterEntryCount(teams);
+  for (let keep = total; keep >= 0; keep -= 1) {
+    const omitted = total - keep;
+    const shown = formatRoster(teams, keep);
+    const suffix = omitted ? `(+${omitted} more in metadata.json)` : '';
+    const lines = wrap(fonts, ['Teams:', shown, suffix].filter(Boolean).join(' '), size, width);
+    if (lines.length <= PDF_FIELD_MAX_LINES) return lines;
+  }
+  return [];
 }
 
 function wrap(fonts: PageFonts, text: string, size: number, width: number, bold = false): string[] {
@@ -122,7 +173,7 @@ function wrap(fonts: PageFonts, text: string, size: number, width: number, bold 
     }
   }
   if (current) lines.push(current);
-  return lines.slice(0, 6);
+  return lines;
 }
 
 interface Box {
@@ -244,7 +295,7 @@ function drawDiagram(page: PDFPage, fonts: PageFonts, project: TacticalProject, 
   });
 }
 
-function drawMetadata(page: PDFPage, fonts: PageFonts, metadata: ExportMetadata, roster: string): number {
+function drawMetadata(page: PDFPage, fonts: PageFonts, metadata: ExportMetadata, roster: readonly RosterTeam[]): number {
   let y = PAGE_HEIGHT - MARGIN;
   const title = preparePageText(metadata.title, fonts.unicode);
   const titleText = (title.unicode ? title.text : degradeToBasicLatin(title.text)) || 'Untitled tactical project';
@@ -266,24 +317,31 @@ function drawMetadata(page: PDFPage, fonts: PageFonts, metadata: ExportMetadata,
     ['Language', metadata.language],
     ['Notes', metadata.notes],
   ];
-  if (leavesBasicLatin(normalizePageWhitespace(roster))) fields.push(['Teams', roster]);
-  for (const [label, value] of fields) {
-    if (!value.trim()) continue;
-    const prepared = preparePageText(`${label}: ${value}`, fonts.unicode);
-    const font = fontFor(fonts, prepared, false);
-    for (const line of wrap(fonts, `${label}: ${value}`, 9, PAGE_WIDTH - MARGIN * 2)) {
+  const width = PAGE_WIDTH - MARGIN * 2;
+  const drawField = (text: string, lines: readonly string[]) => {
+    const font = fontFor(fonts, preparePageText(text, fonts.unicode), false);
+    for (const line of lines) {
       y -= 12;
       page.drawText(line, { x: MARGIN, y, size: 9, font, color: rgb(0.12, 0.16, 0.22) });
     }
+  };
+  for (const [label, value] of fields) {
+    if (!value.trim()) continue;
+    const text = `${label}: ${value}`;
+    drawField(text, wrap(fonts, text, 9, width).slice(0, PDF_FIELD_MAX_LINES));
+  }
+  if (rosterLeavesBasicLatin(roster)) {
+    const lines = rosterFieldLines(fonts, roster, 9, width);
+    drawField(lines.join(' '), lines);
   }
   return y - 16;
 }
 
 function applyInfoDictionary(pdf: PDFDocument, metadata: ExportMetadata): void {
-  pdf.setTitle(normalizePageWhitespace(metadata.title) || 'Untitled tactical project');
-  if (metadata.creator) pdf.setAuthor(normalizePageWhitespace(metadata.creator));
-  if (metadata.description) pdf.setSubject(normalizePageWhitespace(metadata.description));
-  const keywords = metadata.tags.map((tag) => normalizePageWhitespace(tag)).filter(Boolean);
+  pdf.setTitle(normalizePageText(metadata.title) || 'Untitled tactical project');
+  if (metadata.creator) pdf.setAuthor(normalizePageText(metadata.creator));
+  if (metadata.description) pdf.setSubject(normalizePageText(metadata.description));
+  const keywords = metadata.tags.map((tag) => normalizePageText(tag)).filter(Boolean);
   if (keywords.length) pdf.setKeywords(keywords);
   pdf.setCreator('InMo Tools Tactical Matchboard Studio');
   const created = new Date(metadata.createdAt);
@@ -292,7 +350,13 @@ function applyInfoDictionary(pdf: PDFDocument, metadata: ExportMetadata): void {
   if (!Number.isNaN(modified.getTime())) pdf.setModificationDate(modified);
 }
 
-function pageTextNeedsUnicode(project: TacticalProject, metadata: ExportMetadata, roster: string): boolean {
+/**
+ * Only text that can be drawn decides whether the Unicode font loads. Tags, creator, and description go
+ * to the UTF-16 info dictionary instead. Labels and jersey numbers in the exported scene are checked
+ * whatever their visibility, because contact-sheet samples can show items hidden at 0 ms.
+ */
+function pageTextNeedsUnicode(project: TacticalProject, sceneId: string, metadata: ExportMetadata, roster: readonly RosterTeam[]): boolean {
+  if (rosterLeavesBasicLatin(roster)) return true;
   const values = [
     metadata.title,
     metadata.club,
@@ -303,25 +367,26 @@ function pageTextNeedsUnicode(project: TacticalProject, metadata: ExportMetadata
     metadata.license,
     metadata.language,
     metadata.notes,
-    roster,
-    ...metadata.tags,
   ];
   for (const annotation of project.annotations) {
-    if (annotation.label) values.push(annotation.label);
+    if (annotation.sceneId === sceneId && annotation.label) values.push(annotation.label);
+  }
+  const jerseys = new Map<string, string>();
+  for (const team of project.teams) {
+    for (const player of team.roster) jerseys.set(`${team.id}\u0000${player.id}`, player.jerseyNumber ?? '');
   }
   for (const token of project.playerTokens) {
-    const team = project.teams.find((candidate) => candidate.id === token.teamId);
-    const player = team?.roster.find((candidate) => candidate.id === token.playerId);
-    if (player?.jerseyNumber) values.push(player.jerseyNumber);
-    if (player?.displayName) values.push(player.displayName);
+    if (token.sceneId !== sceneId) continue;
+    const jersey = jerseys.get(`${token.teamId}\u0000${token.playerId}`);
+    if (jersey) values.push(jersey);
   }
-  return values.some((value) => leavesBasicLatin(normalizePageWhitespace(value)));
+  return values.some((value) => leavesBasicLatin(normalizePageText(value)));
 }
 
 export async function renderCoachingPdfPackage(
   project: TacticalProject,
   sceneId: string,
-  options?: { contactFrames?: number },
+  options?: CoachingPdfOptions,
 ): Promise<Uint8Array> {
   requireScene(project, sceneId);
   const contactFrames = options?.contactFrames ?? 4;
@@ -329,19 +394,20 @@ export async function renderCoachingPdfPackage(
     throw new RangeError('Contact-sheet frame count must be an integer from 1 to 12.');
   }
   const metadata = readExportMetadata(project);
-  const roster = teamRosterLine(project);
+  const roster = rosterTeams(project);
   const pdf = await PDFDocument.create();
   const fonts: PageFonts = {
     regular: await pdf.embedFont(StandardFonts.Helvetica),
     bold: await pdf.embedFont(StandardFonts.HelveticaBold),
     unicode: null,
   };
-  if (pageTextNeedsUnicode(project, metadata, roster)) {
+  if (pageTextNeedsUnicode(project, sceneId, metadata, roster)) {
     try {
       const { embedMatchboardUnicodeFonts } = await import('./pdf-unicode-font');
       fonts.unicode = await embedMatchboardUnicodeFonts(pdf);
     } catch {
       fonts.unicode = null;
+      options?.onUnicodeFontUnavailable?.();
     }
   }
   applyInfoDictionary(pdf, metadata);
@@ -403,9 +469,14 @@ export async function renderCoachingPdfPackage(
     kind: 'coaching-pdf-package',
     schemaVersion: 1,
     metadata,
+    teams: project.teams.map((team) => ({
+      name: team.name,
+      players: team.roster.map((player) => player.displayName),
+    })),
     placement: {
       pdfInfoDictionary: [...PDF_INFO_FIELDS],
       drawnOnPage: [...PDF_PAGE_TEXT_FIELDS],
+      drawnOnPageOutsideBasicLatin: ['teams'],
     },
     samplesMs: samples,
   }, null, 2), { date: zipDate });

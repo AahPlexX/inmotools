@@ -1081,8 +1081,9 @@ test('exports metadata, analytics, playback, and a capability-checked video fall
   const pdfZip = await JSZip.loadAsync(pdf.bytes);
   const coachingPdf = await pdfZip.file('coaching.pdf')?.async('nodebuffer');
   expect(coachingPdf?.subarray(0, 5).toString('ascii')).toBe('%PDF-');
-  const sidecar = JSON.parse(await pdfZip.file('metadata.json')?.async('string') ?? '{}') as { metadata: { notes: string } };
+  const sidecar = JSON.parse(await pdfZip.file('metadata.json')?.async('string') ?? '{}') as { metadata: { notes: string }; teams: Array<{ name: string; players: string[] }> };
   expect(sidecar.metadata.notes).toContain('José Αθήνα Иванов');
+  expect(Array.isArray(sidecar.teams)).toBe(true);
   let inflated = '';
   const source = coachingPdf ?? Buffer.alloc(0);
   let cursor = 0;

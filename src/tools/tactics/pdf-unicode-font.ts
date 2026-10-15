@@ -5,7 +5,6 @@ import boldInline from './fonts/NotoSans-Bold.subset.ttf?inline';
 
 export const MATCHBOARD_UNICODE_FONT_FAMILY = 'Noto Sans';
 export const MATCHBOARD_UNICODE_FONT_POSTSCRIPT = 'NotoSans';
-export const PDF_PAGE_TEXT_FALLBACK = '?';
 
 export interface MatchboardUnicodeFonts {
   regular: PDFFont;
