@@ -28,8 +28,8 @@ describe('focused E2E spec selection', () => {
     expect(select(['src/tools/pdf/PdfWorkspace.tsx'])).toContain('tests/e2e/pdf-renderer.spec.ts');
   });
 
-  it('routes Tactical Matchboard source changes to its focused browser contract', () => {
-    expect(select(['src/tools/tactics/TacticalBoard.tsx'])).toEqual(e2e('tactical-matchboard-studio'));
+  it('routes Tactical Matchboard source changes to all focused browser contracts', () => {
+    expect(select(['src/tools/tactics/TacticalBoard.tsx'])).toEqual(e2e('tactical-matchboard-studio', 'tactical-matchboard-theme'));
   });
 
   it('matches legacy alias routes as well as #/tools/<slug>', () => {

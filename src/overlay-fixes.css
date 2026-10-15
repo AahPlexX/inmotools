@@ -1,8 +1,35 @@
-/* Cross-workspace overlay stacking rules.
-   Keep interactive popovers above earlier result controls so visual and pointer
-   stacking agree; nested z-index values cannot escape a lower parent stacking
-   context. */
+/* Cross-workspace correction rules.
+   Keep these selectors narrowly scoped and more specific than lazy workspace
+   styles when a site-level contract must win regardless of chunk load order. */
 .regex-exportbar {
   position: relative;
   z-index: 20;
+}
+
+/* Tactical Matchboard follows the resolved site theme on <html>. The workspace
+   still contains legacy prefers-color-scheme fallbacks, so these selectors bind
+   the affected surfaces to the app's Light/Dark/System resolution instead of
+   allowing the operating-system preference to override an explicit site choice. */
+:root[data-theme] .tactical-export-note {
+  color: var(--muted);
+}
+
+:root[data-theme="light"] .tactical-video-error {
+  color: #7f1d1d;
+  background: #f8e8e6;
+  border-color: #e2aaa6;
+}
+
+:root[data-theme="dark"] .tactical-video-error {
+  color: #ffd7d3;
+  background: #4a1d1d;
+  border-color: #e2aaa6;
+}
+
+:root[data-theme] .tactical-dialog,
+:root[data-theme] .tactical-tooltip,
+:root[data-theme] .tactical-command-bar,
+:root[data-theme] .tactical-timeline-panel.tactical-sheet-active > .tactical-authoring-grid {
+  background: var(--surface, #ffffff);
+  color: var(--ink, #101820);
 }
