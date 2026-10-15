@@ -5,8 +5,11 @@ import {
 } from '../../src/tools/tactics/action-engine';
 import { addSquadParticipant } from '../../src/tools/tactics/squad-engine';
 import {
-  addTimelineMarker,
   addTimelineSubstitutionEvent,
+  substitutionEventTag,
+} from '../../src/tools/tactics/substitution-engine';
+import {
+  addTimelineMarker,
   addTimelineVisibilityChange,
   layerTimelineTarget,
   sampleTacticalProjectAtTime,
@@ -91,13 +94,12 @@ describe('Tactical Task 5 closure contracts', () => {
     });
     const incoming = project.playerTokens.find((token) => token.playerId === 'substitute-5')!;
 
-    const timeline = addTimelineSubstitutionEvent(project.timeline, {
+    const authored = addTimelineSubstitutionEvent(project, {
       id: 'substitution-2000',
       timeMs: 2000,
       outgoingTargetId: outgoing.id,
       incomingTargetId: incoming.id,
     });
-    const authored = { ...project, timeline };
     const before = sampleTacticalProjectAtTime(authored, 1999);
     const atEvent = sampleTacticalProjectAtTime(authored, 2000);
 
@@ -105,12 +107,18 @@ describe('Tactical Task 5 closure contracts', () => {
     expect(before.playerTokens.find((token) => token.id === incoming.id)?.visible).toBe(false);
     expect(atEvent.playerTokens.find((token) => token.id === outgoing.id)?.visible).toBe(false);
     expect(atEvent.playerTokens.find((token) => token.id === incoming.id)?.visible).toBe(true);
-    expect(timeline.substitutionEvents).toEqual([{
+    expect(authored.timeline.tracks.find((track) => track.targetId === outgoing.id)?.keyframes
+      .find((keyframe) => keyframe.timeMs === 2000)?.event)
+      .toContain(substitutionEventTag('substitution-2000', 'outgoing'));
+    expect(authored.timeline.tracks.find((track) => track.targetId === incoming.id)?.keyframes
+      .find((keyframe) => keyframe.timeMs === 2000)?.event)
+      .toContain(substitutionEventTag('substitution-2000', 'incoming'));
+    expect(() => addTimelineSubstitutionEvent(authored, {
       id: 'substitution-2000',
-      timeMs: 2000,
-      outgoingTargetId: outgoing.id,
-      incomingTargetId: incoming.id,
-    }]);
+      timeMs: 2500,
+      outgoingTargetId: incoming.id,
+      incomingTargetId: outgoing.id,
+    })).toThrow(/already exists/i);
   });
 
   it('supports the accepted marker and coaching-trigger vocabulary and rejects unknown kinds', () => {

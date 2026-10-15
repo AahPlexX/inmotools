@@ -7,6 +7,10 @@ import {
   splitTacticalScene,
 } from './scene-engine';
 import {
+  addTimelineSubstitutionEvent,
+  nextTimelineSubstitutionId,
+} from './substitution-engine';
+import {
   addTimelineVisibilityChange,
   offsetTimelineGroup,
   offsetTimelineTrack,
@@ -65,6 +69,21 @@ export default function TacticalTimingControls({
     visibilityTargets.map((target) => [target.id, target] as const),
   ).values()];
   const firstVisibilityTarget = uniqueVisibilityTargets[0]?.id ?? '';
+  const substitutionCandidates = activeScene ? project.playerTokens
+    .filter((token) => token.sceneId === activeScene.id)
+    .flatMap((token) => {
+      const team = project.teams.find((candidate) => candidate.id === token.teamId);
+      const player = team?.roster.find((candidate) => candidate.id === token.playerId);
+      if (!team || !player || player.status === 'neutral' || player.status === 'coach') return [];
+      return [{
+        id: token.id,
+        teamId: team.id,
+        status: player.status,
+        label: `${player.displayName.trim() || player.jerseyNumber?.trim() || token.id} — ${player.status}`,
+      }];
+    }) : [];
+  const firstOutgoingTarget = substitutionCandidates.find((candidate) => candidate.status === 'active')?.id ?? '';
+  const firstIncomingTarget = substitutionCandidates.find((candidate) => candidate.status === 'substitute')?.id ?? '';
   const chronologicalScenes = [...project.scenes].sort(
     (left, right) => left.startMs - right.startMs || left.id.localeCompare(right.id),
   );
@@ -160,6 +179,25 @@ export default function TacticalTimingControls({
     );
   }
 
+  function submitSubstitution(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const outgoingTargetId = String(data.get('substitutionOutgoing') ?? '');
+    const incomingTargetId = String(data.get('substitutionIncoming') ?? '');
+    const timeMs = Number(data.get('substitutionTimeMs'));
+
+    onEdit(
+      'Author timed substitution',
+      (current) => addTimelineSubstitutionEvent(current, {
+        id: nextTimelineSubstitutionId(current.timeline),
+        timeMs,
+        outgoingTargetId,
+        incomingTargetId,
+      }),
+      `Timed substitution authored at ${timeMs} ms.`,
+    );
+  }
+
   function submitOffset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -186,6 +224,7 @@ export default function TacticalTimingControls({
       'Timeline track offset applied.',
     );
   }
+
   function submitGroupTiming(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -289,6 +328,35 @@ export default function TacticalTimingControls({
           </select>
         </label>
         <button type="submit" disabled={!firstVisibilityTarget}>Add visibility change</button>
+      </form>
+
+      <form onSubmit={submitSubstitution} aria-label="Timed substitution">
+        <h3>Substitution</h3>
+        <p>Swap one on-field player for one off-field roster player at an exact timeline time.</p>
+        <label>
+          Outgoing player
+          <select name="substitutionOutgoing" defaultValue={firstOutgoingTarget}>
+            {substitutionCandidates.map((candidate) => (
+              <option key={`out-${candidate.id}`} value={candidate.id}>{candidate.label}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Incoming player
+          <select name="substitutionIncoming" defaultValue={firstIncomingTarget}>
+            {substitutionCandidates.map((candidate) => (
+              <option key={`in-${candidate.id}`} value={candidate.id}>{candidate.label}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Substitution time (ms)
+          <input name="substitutionTimeMs" type="number" min="0" step="1" defaultValue="2000" required />
+        </label>
+        <button type="submit" disabled={!firstOutgoingTarget || !firstIncomingTarget}>Add timed substitution</button>
+        <small>
+          Active and substitute roster players stay selectable because earlier timed swaps can change who is on the field. At the chosen time, the outgoing player must be visible, the incoming player must be hidden, and both must belong to the same team and scene.
+        </small>
       </form>
 
       <form onSubmit={submitOffset} aria-label="Track timing offset">
