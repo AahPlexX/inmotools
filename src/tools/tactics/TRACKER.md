@@ -98,7 +98,7 @@ updated: 2026-10-15
 | TMS-R64 | verified | unit "synchronizes comparison angles from a manual anchor only" | |
 | TMS-R65 | verified | unit "round-trips authored trajectories through the documented rich CSV and JSON format"; e2e "round-trips authored trajectory CSV through the browser interchange controls" | |
 | TMS-R66 | verified | unit "migrates the actual historical schema-v1 ownership and marker model before validation", "round-trips deterministic ZIP bundles with Blob assets and rejects unsafe archive paths"; e2e "round-trips a project ZIP and preserves the open project after corrupt JSON import", "lists, loads, and removes browser-local saved projects" | |
-| TMS-R67 | verified | unit "rejects a ZIP whose declared entry count or uncompressed size is hostile before expanding it", "rejects imported projects whose track, keyframe or marker counts exceed the session bound" | |
+| TMS-R67 | verified | unit "rejects a ZIP whose declared entry count or uncompressed size is hostile before expanding it", "rejects imported projects whose track, keyframe, or marker counts exceed the session bound" | |
 | TMS-R68 | verified | unit "neutralizes spreadsheet formulas in trajectory CSV text without changing the imported event" | |
 | TMS-R69 | verified | unit "stores the coaching fields and preserves the original creation date"; e2e "exports metadata, analytics, playback, and a capability-checked video fallback" | |
 | TMS-R70 | verified | unit "exports source-honest trajectory and team-geometry metrics" | |
