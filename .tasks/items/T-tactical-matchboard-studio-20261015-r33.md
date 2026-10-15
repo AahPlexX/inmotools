@@ -25,7 +25,7 @@ Owner, 2026-10-14: continue `AahPlexX/inmotools` from the previous agent's stopp
 
 ## Resume here
 
-RED is established. Workflow `38670429054`, job `116212029288`, reached the full unit gate: 377 files (`1 failed | 374 passed | 2 skipped`) and 4,198 tests (`1 failed | 4,179 passed | 18 skipped`). The only failure is the new TMS-R33 contract because `addTimelineSubstitutionEvent` did not exist. Runtime implementation is now being added as one atomic project edit that writes paired visibility keyframes at the same millisecond and appends structured substitution tags to the existing keyframe `event` strings without replacing prior event text. Next: run the governed GREEN gate, then close TMS-R33 only if focused desktop/mobile browser acceptance also passes.
+RED is established and the runtime implementation is present at `0e60a3aecca4eef01327d31d950cbcffcabe8ecc`. The first GREEN attempt, workflow `38671314945` / job `116214857092`, failed only in the new Playwright substitution contract before substitution behavior was exercised: `getByLabel('Status')` matched the token editor `Status` select plus the page's `Local processing status` and `Privacy status` regions, so strict mode rejected the locator on desktop and mobile. The uploaded failure artifact is `11944378830`. The corrective work unit changes only that locator to the exact interactive role/name (`getByRole('combobox', { name: 'Status', exact: true })`) and records the evidence here. Runtime implementation remains unchanged. Next: rerun the same governed integration gate; close TMS-R33 only if focused desktop/mobile substitution acceptance and all repository gates pass.
 
 ## Design notes
 
@@ -35,6 +35,7 @@ RED is established. Workflow `38670429054`, job `116212029288`, reached the full
 - `addSquadParticipant` and status editing already make initial substitutes hidden, so no duplicate player/token model is required.
 - Scene reordering/joining and persistence already move/merge/round-trip timeline keyframes and their event text; using the same keyframes therefore preserves those semantics without special-case migration code.
 - The Timing panel lists only active/substitute roster players (not coaches or neutral participants) and explains that actual on/off-field eligibility is checked at the chosen time.
+- The browser correction follows current official Playwright locator guidance: use role locators for interactive controls; `getByLabel` text matching is non-exact by default unless `exact: true` is supplied. The failure was test ambiguity, not a product accessibility defect.
 
 ## Log
 
@@ -42,3 +43,6 @@ RED is established. Workflow `38670429054`, job `116212029288`, reached the full
 - 2026-10-15: reviewed current W3C WAI form labeling/instruction guidance plus MDN `<label>`/`<select>` references before changing the client-side Timing panel. Visible associated labels remain the required pattern; no custom widget is justified.
 - 2026-10-15: RED commit `1056fb6ffb53a1764d4c58be01607e6a75b145a4`; workflow `38670429054`, job `116212029288`. All prior unit coverage passed; only the newly introduced timed-substitution contract failed with `TypeError: addTimelineSubstitutionEvent is not a function`.
 - 2026-10-15: implementation design was narrowed after checking `TacticalKeyframe.event` persistence/export behavior. The helper appends a structured substitution tag instead of overwriting existing event text and does not introduce a new timeline schema or clock.
+- 2026-10-15: implementation commit `0e60a3aecca4eef01327d31d950cbcffcabe8ecc` added the atomic substitution engine, labeled Timing-panel authoring controls, unit contract, focused desktop/mobile browser contract, and E2E selector mapping.
+- 2026-10-15: first GREEN workflow `38671314945`, job `116214857092`, failed in the new browser test only. Artifact `11944378830` shows Playwright strict mode: `getByLabel('Status')` resolved to three elements (`Local processing status`, `Privacy status`, and the intended `select[name="status"]`). Both desktop and mobile failed at that same locator before Save token or substitution authoring. No runtime defect was demonstrated by this run.
+- 2026-10-15: verified current official Playwright docs after the failure. Role locators are recommended for interactive controls, and label matching defaults to non-exact. The correction scopes the test to the exact combobox named `Status`; production code is not changed.

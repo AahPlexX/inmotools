@@ -17,7 +17,7 @@ test('authors a timed substitution and swaps the two player tokens at the author
 
   await page.locator('.tactical-player-list button').nth(3).click();
   await page.getByText('Squad, props and presentation', { exact: true }).click();
-  await page.getByLabel('Status').selectOption('substitute');
+  await page.getByRole('combobox', { name: 'Status', exact: true }).selectOption('substitute');
   await page.getByRole('button', { name: 'Save token' }).click();
   await expect(page.locator('.status-line').last()).toContainText('Roster token updated');
   await expect(page.locator('#token-1')).toHaveCount(1);
