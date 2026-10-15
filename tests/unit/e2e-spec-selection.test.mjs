@@ -29,7 +29,11 @@ describe('focused E2E spec selection', () => {
   });
 
   it('routes Tactical Matchboard source changes to all focused browser contracts', () => {
-    expect(select(['src/tools/tactics/TacticalBoard.tsx'])).toEqual(e2e('tactical-matchboard-studio', 'tactical-matchboard-theme'));
+    expect(select(['src/tools/tactics/TacticalBoard.tsx'])).toEqual(e2e(
+      'tactical-matchboard-studio',
+      'tactical-matchboard-substitution',
+      'tactical-matchboard-theme',
+    ));
   });
 
   it('matches legacy alias routes as well as #/tools/<slug>', () => {

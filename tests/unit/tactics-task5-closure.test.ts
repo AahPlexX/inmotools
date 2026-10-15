@@ -3,6 +3,11 @@ import {
   COORDINATED_ACTION_PRESETS,
   createCoordinatedActionTemplate,
 } from '../../src/tools/tactics/action-engine';
+import { addSquadParticipant } from '../../src/tools/tactics/squad-engine';
+import {
+  addTimelineSubstitutionEvent,
+  substitutionEventTag,
+} from '../../src/tools/tactics/substitution-engine';
 import {
   addTimelineMarker,
   addTimelineVisibilityChange,
@@ -60,6 +65,60 @@ describe('Tactical Task 5 closure contracts', () => {
     expect(hidden.playerTokens.find((item) => item.id === token.id)?.visible).toBe(false);
     expect(before.scenes[0]?.layers.find((item) => item.id === layer.id)?.visible).toBe(true);
     expect(hidden.scenes[0]?.layers.find((item) => item.id === layer.id)?.visible).toBe(false);
+  });
+
+  it('authors one timed substitution event that swaps outgoing and incoming player visibility', () => {
+    let project = buildBeginnerTacticalProject({
+      title: 'Substitution',
+      teamName: 'Blue',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      formationId: 'ussf-4v4-1-2-1',
+      pitchDimensions: { lengthMeters: 40, widthMeters: 30 },
+      direction: 'left-to-right',
+    });
+    const team = project.teams[0]!;
+    const scene = project.scenes[0]!;
+    const layer = scene.layers[0]!;
+    const outgoing = project.playerTokens[1]!;
+
+    project = addSquadParticipant(project, team.id, {
+      id: 'substitute-5',
+      displayName: 'Substitute 5',
+      jerseyNumber: '5',
+      status: 'substitute',
+    }, {
+      sceneId: scene.id,
+      layerId: layer.id,
+      position: { x: 0.5, y: 0.5 },
+    });
+    const incoming = project.playerTokens.find((token) => token.playerId === 'substitute-5')!;
+
+    const authored = addTimelineSubstitutionEvent(project, {
+      id: 'substitution-2000',
+      timeMs: 2000,
+      outgoingTargetId: outgoing.id,
+      incomingTargetId: incoming.id,
+    });
+    const before = sampleTacticalProjectAtTime(authored, 1999);
+    const atEvent = sampleTacticalProjectAtTime(authored, 2000);
+
+    expect(before.playerTokens.find((token) => token.id === outgoing.id)?.visible).toBe(true);
+    expect(before.playerTokens.find((token) => token.id === incoming.id)?.visible).toBe(false);
+    expect(atEvent.playerTokens.find((token) => token.id === outgoing.id)?.visible).toBe(false);
+    expect(atEvent.playerTokens.find((token) => token.id === incoming.id)?.visible).toBe(true);
+    expect(authored.timeline.tracks.find((track) => track.targetId === outgoing.id)?.keyframes
+      .find((keyframe) => keyframe.timeMs === 2000)?.event)
+      .toContain(substitutionEventTag('substitution-2000', 'outgoing'));
+    expect(authored.timeline.tracks.find((track) => track.targetId === incoming.id)?.keyframes
+      .find((keyframe) => keyframe.timeMs === 2000)?.event)
+      .toContain(substitutionEventTag('substitution-2000', 'incoming'));
+    expect(() => addTimelineSubstitutionEvent(authored, {
+      id: 'substitution-2000',
+      timeMs: 2500,
+      outgoingTargetId: incoming.id,
+      incomingTargetId: outgoing.id,
+    })).toThrow(/already exists/i);
   });
 
   it('supports the accepted marker and coaching-trigger vocabulary and rejects unknown kinds', () => {
