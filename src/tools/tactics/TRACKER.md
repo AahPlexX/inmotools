@@ -6,14 +6,14 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
-updated: 2026-10-12
+updated: 2026-10-15
 ---
 
 # Tactical Matchboard Studio — tracker
 
 ## Resume here
 
-85 requirements: 76 verified, 1 implemented, 3 partial, 5 missing. Next action: build TMS-R82 (site theme in dark), then TMS-R07, R31, R44, R52, R78. TMS-R73 is verified. No font-embedder blocker remains.
+85 requirements: 77 verified, 1 implemented, 2 partial, 5 missing. TMS-R82 is verified on `main` through integration `f5b22c8f6f78b589a458e28d25be96c1dfe119c1`; the current work unit is TMS-R33 (timed substitutions). After TMS-R33, continue TMS-R07, R31, R44, R52, R78, then R75 and R83.
 
 ## Documents
 
@@ -23,11 +23,11 @@ updated: 2026-10-12
 - Older tracking: [FEATURE_MATRIX.md](FEATURE_MATRIX.md), [HANDOFF.md](HANDOFF.md), [TODO_SEQUENCE.md](TODO_SEQUENCE.md)
 - Font license: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - Index row: [TOOL_INDEX.md](../../../docs/TOOL_INDEX.md)
-- Unit tests: `tests/unit/tactics-*.test.ts`; browser tests: `tests/e2e/tactical-matchboard-studio.spec.ts`
+- Unit tests: `tests/unit/tactics-*.test.ts`; browser tests: `tests/e2e/tactical-matchboard-studio.spec.ts`, `tests/e2e/tactical-matchboard-theme.spec.ts`
 
 ## Requirement status
 
-`unit` = `tests/unit/tactics-*.test.ts`; `e2e` = `tests/e2e/tactical-matchboard-studio.spec.ts`.
+`unit` = `tests/unit/tactics-*.test.ts`; `e2e` = Tactical Matchboard Playwright specs.
 
 | ID | Status | Evidence | Notes |
 | --- | --- | --- | --- |
@@ -63,7 +63,7 @@ updated: 2026-10-12
 | TMS-R30 | verified | e2e "splits, renames, and reorders non-overlapping tactical scenes"; unit "joins contiguous scenes without losing scene-owned players or authored motion" | |
 | TMS-R31 | missing | — | Scenes play back to back; no transition between them |
 | TMS-R32 | verified | unit "samples temporal visibility for layers and annotations without deleting canonical content"; e2e "temporally hides a scene layer without deleting its players" | |
-| TMS-R33 | partial | unit "authors visibility for objects and scene layers without making them hidden before the authored time" | Players can be shown and hidden at a time and given substitute status; no substitution event that swaps an outgoing and incoming player |
+| TMS-R33 | partial | unit "authors visibility for objects and scene layers without making them hidden before the authored time" | Timed substitution RED is claimed; outgoing/incoming atomic swap is not implemented yet |
 | TMS-R34 | verified | unit "offsets a selected group with deterministic ordered stagger"; e2e "authors scene sequencing, visibility, offsets, and grouped stagger timing" | |
 | TMS-R35 | verified | unit "supports the accepted marker and coaching-trigger vocabulary and rejects unknown kinds"; e2e "authors timeline markers and a curved player motion segment" | |
 | TMS-R36 | verified | unit "virtualizes timeline rows inside the Pages-safe track cap"; e2e "shows a virtualized timeline track window and the session limit" | |
@@ -112,18 +112,17 @@ updated: 2026-10-12
 | TMS-R79 | verified | unit "keeps a tooltip inside the viewport and flips it above a low anchor"; e2e "help, shortcuts, and tooltips stay available without taking over text fields" | |
 | TMS-R80 | verified | unit "keeps shortcut chords unique and described", "ignores authoring shortcuts while typing, on controls, or under an open overlay"; e2e "reduced motion steps playback instead of animating it" | |
 | TMS-R81 | verified | e2e "has no serious or critical accessibility violations in the tactical workspace" | |
-| TMS-R82 | partial | — | Surfaces use the site tokens (`--surface`, `--border-color`); dialogs, tooltips, export notes and video errors switch on `prefers-color-scheme`, not the site choice; no dark contrast test |
+| TMS-R82 | verified | e2e "TMS-R82 stored dark theme wins over a light operating-system preference and passes contrast", "TMS-R82 stored light theme wins over a dark operating-system preference" | Resolved site theme now wins over OS preference for the affected Matchboard surfaces; Dark has focused axe color-contrast evidence |
 | TMS-R83 | implemented | — | Site PWA precache (`vite.config.ts`) covers the tool's chunks; no offline test for this route |
 | TMS-R84 | verified | unit "pauses standalone playback and local video review while the document is hidden", "deduplicates pending frames, pauses while hidden, resumes once, and cancels on disposal" | |
 | TMS-R85 | verified | unit "keeps a realistic 11v11 session responsive to sample, draw, and analyze" | |
 
 ## Open work
 
-1. TMS-R82: key the dark rules in `tactical-matchboard.css` on the site theme and add a dark contrast test.
-2. TMS-R33: substitution event on the timeline.
-3. TMS-R07, R31, R44, R52, R78: build.
-4. TMS-R75: 1200×630 card.
-5. TMS-R83: offline test.
+1. TMS-R33: timed substitution event on the canonical timeline.
+2. TMS-R07, R31, R44, R52, R78: build.
+3. TMS-R75: 1200×630 card.
+4. TMS-R83: offline test.
 
 ## Known limitations
 
@@ -133,10 +132,12 @@ updated: 2026-10-12
 
 ## Verification evidence
 
+- 2026-10-15, TMS-R82: workflow `38664068636`, job `116191941882`, completed successfully for runtime `901eaf0ea6a7852ba821067de871b035cc3015fe`; branch integrated to `main` as `f5b22c8f6f78b589a458e28d25be96c1dfe119c1`, then generated task/index sync advanced `main` to `539bf012171ecc9caeaddbffe0fd1579d5854c00`.
 - 2026-10-05, `expand/tactical-matchboard-studio` from `main` @ `6c991e75`: `pnpm tool:check tactical-matchboard-studio --base origin/main` 75/85, no errors.
 
 ## Change log
 
+- 2026-10-15 — TMS-R82 verified. Matchboard's affected dark/light surfaces follow the resolved site `data-theme` rather than independently following the OS media preference; focused browser evidence covers both preference inversions and Dark color contrast.
 - 2026-10-12 — TMS-R73 review fixes: metadata.json keeps team and player names; basic-Latin rosters load no Unicode font; long Teams lines end with (+N more in metadata.json); a font load failure is reported; page text is composed to NFC; notices carry the MIT, BSD-3-Clause, Apache-2.0, and zlib texts for code in the PDF chunks.
 - 2026-10-11 — TMS-R73 verified. Coaching PDF page text embeds Noto Sans through `@pdf-lib/fontkit` 1.1.1 when the text leaves basic Latin. The production chunk is `pdf-unicode-font-*.js`, 1,023.46 kB, gzip 493.18 kB.
 - 2026-10-05 — Created per `docs/DOCUMENTATION_STANDARD.md`.
