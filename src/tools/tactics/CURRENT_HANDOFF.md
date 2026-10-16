@@ -16,6 +16,7 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 - Last verified product requirement: **TMS-R07 ball flight presets**.
 - R07 runtime: `4e05ed2d731de2cfd38b0359bb85942967294ea3`; browser-selector expectation correction: `3b7b53d44e77d0ca9cd70e556da238cba72da126`.
 - R07 GREEN workflow/job: `38934899167` / `117087815510`, conclusion `success`; product integration merge: `336643b4`.
+- Closure/scope-classifier workflow `38935859420` / job `117091052612` passed and integrated as `40c5ace3`: 4,187 units passed / 18 skipped, build/TypeScript passed, actual browser plan `[]`. Completed task: `.tasks/items/T-tactical-matchboard-studio-20261016-4cc0.md`.
 - R07 gate: 4,186 unit passes / 18 skips; TypeScript/production build passed (8.28 s); all four Tactical browser specs passed, 88 passes / 2 existing duplicate mobile skips / no failures or reported retries (3.7 min).
 - R33 remains verified: runtime `0e60a3aecca4eef01327d31d950cbcffcabe8ecc`, test-only locator correction `7313bf00bbb4ca3642da859d42935fb0c2495ced`, GREEN workflow/job `38672289731` / `116217961540`, integration merge `ef68da5206c1fe6b9ef627caf4ed141bf7babcb4`.
 - R82 site-theme correction remains verified: runtime `901eaf0ea6a7852ba821067de871b035cc3015fe`, GREEN workflow `38664068636`, integration merge `f5b22c8f6f78b589a458e28d25be96c1dfe119c1`.
