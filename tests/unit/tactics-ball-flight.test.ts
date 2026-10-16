@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { authorBallElevationKeyframe, authorBallFlight, BALL_FLIGHT_PRESETS } from '../../src/tools/tactics/elevation-engine';
 import { createStarterTacticalProject, validateTacticalProject } from '../../src/tools/tactics/tactics-engine';
 import { sampleTacticalProjectAtTime } from '../../src/tools/tactics/timeline-engine';
+import { exportTacticalProjectJson, importTacticalProjectJson } from '../../src/tools/tactics/project-io';
 
 const flight = {
   preset: 'lofted' as const,
@@ -79,6 +80,7 @@ describe('Ball flight presets', () => {
     const snapshot = structuredClone(project);
     for (const input of [
       { ...flight, startMs: 0.5 }, { ...flight, startMs: -1 },
+      { ...flight, endMs: flight.startMs + 1 },
       { ...flight, endMs: flight.startMs }, { ...flight, endMs: project.timeline.durationMs + 1 },
       { ...flight, launchAngleDeg: 0 }, { ...flight, launchAngleDeg: 90 }, { ...flight, launchAngleDeg: NaN },
       { ...flight, end: flight.start }, { ...flight, end: { x: 1.01, y: 0 } },
@@ -89,5 +91,24 @@ describe('Ball flight presets', () => {
     expect(project).toEqual(snapshot);
     const short = authorBallFlight(project, { ...flight, startMs: 0, endMs: 2 });
     expect(short.timeline.tracks.find(track => track.targetId === 'ball')!.keyframes.map(frame => frame.timeMs)).toEqual([0, 1, 2]);
+  });
+
+  it('refuses possession that would override the flight and allows a released ball', () => {
+    const project = createStarterTacticalProject();
+    project.timeline.possessionEvents = [{ id: 'hold', timeMs: 0, holderTargetId: 'token-1' }];
+    expect(() => authorBallFlight(project, flight)).toThrow(/possession/i);
+    project.timeline.possessionEvents.push({ id: 'release', timeMs: 1000, holderTargetId: null });
+    expect(() => authorBallFlight(project, flight)).not.toThrow();
+    project.timeline.possessionEvents.push({ id: 'catch', timeMs: 2000, holderTargetId: 'token-1' });
+    expect(() => authorBallFlight(project, flight)).toThrow(/possession/i);
+  });
+
+  it('round-trips generated flights through project JSON and keeps sampled playback unchanged', () => {
+    const project = authorBallFlight(createStarterTacticalProject(), flight);
+    const imported = importTacticalProjectJson(exportTacticalProjectJson(project), 'flight.tactical.json');
+    for (const timeMs of [1000, 1427, 2000, 2873, 3000]) {
+      expect(sampleTacticalProjectAtTime(imported, timeMs).ball).toEqual(sampleTacticalProjectAtTime(project, timeMs).ball);
+    }
+    expect(validateTacticalProject(imported)).toEqual([]);
   });
 });
