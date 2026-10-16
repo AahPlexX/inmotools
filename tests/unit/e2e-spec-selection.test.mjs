@@ -30,6 +30,7 @@ describe('focused E2E spec selection', () => {
 
   it('routes Tactical Matchboard source changes to all focused browser contracts', () => {
     expect(select(['src/tools/tactics/TacticalBoard.tsx'])).toEqual(e2e(
+      'tactical-matchboard-ball-flight',
       'tactical-matchboard-studio',
       'tactical-matchboard-substitution',
       'tactical-matchboard-theme',

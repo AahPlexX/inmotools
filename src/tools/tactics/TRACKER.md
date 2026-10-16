@@ -6,14 +6,14 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
-updated: 2026-10-15
+updated: 2026-10-16
 ---
 
 # Tactical Matchboard Studio — tracker
 
 ## Resume here
 
-85 requirements: 78 verified, 1 implemented, 1 partial, 5 missing. TMS-R33 timed substitutions are verified and integrated through `ef68da5206c1fe6b9ef627caf4ed141bf7babcb4`; generated docs/index sync advanced `main` to `af4fed70446dccc2ff4b1ab25188f5f845af6570`. Next: TMS-R07, then R31, R44, R52, R78, then R75 and R83. Read `CURRENT_HANDOFF.md` for the exact continuation record; `HANDOFF.md` is archival.
+85 requirements: 78 verified, 2 implemented, 1 partial, 4 missing. TMS-R33 timed substitutions are verified and integrated through `ef68da5206c1fe6b9ef627caf4ed141bf7babcb4`; generated docs/index sync advanced `main` to `af4fed70446dccc2ff4b1ab25188f5f845af6570`. TMS-R07 is active on `fix/tactical-matchboard-studio` (task `T-tactical-matchboard-studio-20261016-4cc0`); six focused units and desktop/mobile browser acceptance pass; governed integration is pending. Next: finish TMS-R07, then R31, R44, R52, R78, then R75 and R83. Read `CURRENT_HANDOFF.md` for the exact continuation record; `HANDOFF.md` is archival.
 
 ## Documents
 
@@ -38,7 +38,7 @@ updated: 2026-10-15
 | TMS-R04 | verified | unit "authors canonical positions from normalized units or pitch metres and rejects pixels", "writes ball, equipment, and official positions through the same normalized surface" | |
 | TMS-R05 | verified | unit "edits jersey, role, kit, developmental tag, and avatar without changing the session plan" | |
 | TMS-R06 | verified | unit "stores elevation keyframes on the ball track and samples them independently of the resting ball elevation" | |
-| TMS-R07 | missing | — | Elevation keyframes are entered by hand (TMS-R06); no loft preset or computed arc |
+| TMS-R07 | implemented | unit "authors a metre-based parabolic arc on the canonical ball track without mutating the project", "round-trips generated flights through project JSON and keeps sampled playback unchanged"; e2e "authors ball flight presets with metre-based elevation, undo, manual editing and responsive controls" | Local checks pass; governed integration pending. Presets reuse the ball track; manual elevation remains editable. |
 | TMS-R08 | verified | unit "places a sourced non-authoritative prop and transforms it inside normalized bounds" | |
 | TMS-R09 | verified | unit "snaps to pitch guides, teammates, and equal spacing without moving a point outside range" | |
 | TMS-R10 | verified | unit "fits full-size training markings on a 105 by 68 pitch and shrinks them on a small pitch", "draws fitted markings on a bare pitch and leaves sourced penalty diagrams unchanged" | |

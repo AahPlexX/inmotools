@@ -1,6 +1,8 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
 import { authorCanonicalCoordinate, authorEntityCoordinate, readCanonicalCoordinate } from './coordinate-engine';
-import { authorBallElevationKeyframe } from './elevation-engine';
+import { authorBallElevationKeyframe, authorBallFlight, BALL_FLIGHT_PRESETS } from './elevation-engine';
+import type { BallFlightPreset } from './elevation-engine';
 import type { TacticalGuide } from './guide-engine';
 import {
   addPresentationMark,
@@ -72,6 +74,8 @@ export default function TacticalStageOnePanel({
   const [equipmentId, setEquipmentId] = useState(project.equipment[0]?.id ?? '');
   const [leftScenarioId, setLeftScenarioId] = useState(project.scenarios[0]?.id ?? '');
   const [rightScenarioId, setRightScenarioId] = useState(project.scenarios[1]?.id ?? '');
+  const [flightPreset, setFlightPreset] = useState<BallFlightPreset>('lofted');
+  const [launchAngleDeg, setLaunchAngleDeg] = useState('35');
   const selectedToken = project.playerTokens.find((token) => token.id === selectedTokenId);
   const team = project.teams.find((candidate) => candidate.id === selectedToken?.teamId) ?? project.teams[0];
   const player = team?.roster.find((candidate) => candidate.id === selectedToken?.playerId);
@@ -179,6 +183,23 @@ export default function TacticalStageOnePanel({
       'Author ball elevation',
       (current) => authorBallElevationKeyframe(current, timeMs, elevationMeters),
       `Ball elevation ${elevationMeters} m authored at ${timeMs} ms.`,
+    );
+  }
+
+  function authorFlight(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    onEdit(
+      'Author ball flight',
+      (current) => authorBallFlight(current, {
+        preset: flightPreset,
+        start: { x: Number(data.get('flightStartX')) / 100, y: Number(data.get('flightStartY')) / 100 },
+        end: { x: Number(data.get('flightEndX')) / 100, y: Number(data.get('flightEndY')) / 100 },
+        startMs: Number(data.get('flightStartMs')),
+        endMs: Number(data.get('flightEndMs')),
+        launchAngleDeg: Number(launchAngleDeg),
+      }),
+      `${BALL_FLIGHT_PRESETS.find(preset => preset.id === flightPreset)!.label} ball flight authored.`,
     );
   }
 
@@ -362,6 +383,48 @@ export default function TacticalStageOnePanel({
 
         <section aria-labelledby="elevation-heading">
           <h3 id="elevation-heading">Ball elevation trajectory</h3>
+          <form onSubmit={authorFlight} aria-describedby="ball-flight-note">
+            <label>
+              Ball flight preset
+              <select value={flightPreset} onChange={(event) => {
+                const preset = BALL_FLIGHT_PRESETS.find(candidate => candidate.id === event.target.value)!;
+                setFlightPreset(preset.id);
+                setLaunchAngleDeg(String(preset.launchAngleDeg));
+              }}>
+                {BALL_FLIGHT_PRESETS.map(preset => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
+              </select>
+            </label>
+            <label>
+              Launch angle (degrees)
+              <input type="number" min="0.1" max="89.9" step="0.1" value={launchAngleDeg} disabled={flightPreset === 'ground'} onChange={(event) => setLaunchAngleDeg(event.currentTarget.value)} required />
+            </label>
+            <label>
+              Flight start X %
+              <input name="flightStartX" type="number" min="0" max="100" step="any" defaultValue={project.ball.position.x * 100} required />
+            </label>
+            <label>
+              Flight start Y %
+              <input name="flightStartY" type="number" min="0" max="100" step="any" defaultValue={project.ball.position.y * 100} required />
+            </label>
+            <label>
+              Flight end X %
+              <input name="flightEndX" type="number" min="0" max="100" step="any" defaultValue={(project.ball.position.x <= 0.5 ? project.ball.position.x + 0.25 : project.ball.position.x - 0.25) * 100} required />
+            </label>
+            <label>
+              Flight end Y %
+              <input name="flightEndY" type="number" min="0" max="100" step="any" defaultValue={project.ball.position.y * 100} required />
+            </label>
+            <label>
+              Flight start (ms)
+              <input name="flightStartMs" type="number" min="0" max={project.timeline.durationMs} step="1" defaultValue={previewTimeMs} required />
+            </label>
+            <label>
+              Flight end (ms)
+              <input name="flightEndMs" type="number" min="1" max={project.timeline.durationMs} step="1" defaultValue={Math.min(project.timeline.durationMs, previewTimeMs + 1000)} required />
+            </label>
+            <button type="submit">Author ball flight</button>
+          </form>
+          <small id="ball-flight-note">Local authoring aids, not measured ball physics. Airborne presets use pitch distance and launch angle for a no-drag parabola; you choose the duration. Applying a preset replaces ball motion within that interval. Release any ball possession in the Timing panel first. Edit individual elevation keyframes below.</small>
           <form onSubmit={authorElevation}>
             <label>
               Elevation time (ms)

@@ -2,7 +2,7 @@
 tool: tactical-matchboard-studio
 doc: handoff
 status: active
-updated: 2026-10-15
+updated: 2026-10-16
 tracker: src/tools/tactics/TRACKER.md
 ---
 
@@ -25,18 +25,9 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 
 ## Exact next action
 
-Start **TMS-R07** from the exact current `main` head after this handoff/tracker closure integrates. Do not revive the old Unicode branches and do not follow the archival `HANDOFF.md` instruction that says to stop.
+TMS-R07 is implemented on `fix/tactical-matchboard-studio`, task `.tasks/items/T-tactical-matchboard-studio-20261016-4cc0.md`. Six new flight units and focused desktop/mobile browser acceptance pass locally. First integration `38934606163` failed only on the stale three-spec selector expectation; the fourth flight spec was correctly selected. That expected list is corrected. Next: complete governed integration, record its exact workflow and merge, then mark R07 verified and start TMS-R31 from current main. Do not revive archived PDF branches.
 
-TMS-R07 acceptance from the approved spec: Ball trajectories offer ground, driven, lofted and chipped presets plus a manual elevation profile; lofted/chipped paths derive elevation from launch angle and physical pitch distance; choosing lofted must produce elevation keyframes forming a parabolic arc.
-
-Implementation constraints already audited:
-
-- Reuse the existing canonical ball timeline and `elevation-engine.ts`; do not add a second playback/elevation state model.
-- Compute pitch distance in physical metres from normalized start/end points and the project's pitch dimensions.
-- Treat the no-drag parabola as deterministic authoring geometry, not a claim of real football aerodynamics; keep the launch angle editable and label presets as local authoring aids rather than governing/physical truth.
-- Preserve the existing manual elevation-keyframe path from TMS-R06.
-- Use lean TDD: establish a focused RED contract first, then implement and run the governed integration gate before marking R07 verified.
-- No dependency is currently justified.
+R07 reuses `elevation-engine.ts` and the canonical ball track: ground/driven/lofted/chipped presets write normalized positions and metre-based elevation keyframes from pitch distance and editable launch angle. Flight duration is authored; the piecewise-linear keyframes approximate equal-height no-drag geometry. Existing event/visibility fields and frames outside the interval are preserved; manual elevation remains editable. Overlapping ball possession must be released first. No dependency or schema changed.
 
 ## Remaining ordered work
 
