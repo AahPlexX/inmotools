@@ -37,6 +37,17 @@ describe('focused E2E spec selection', () => {
     ));
   });
 
+  it('skips current handoff records while retaining changed runtime browser coverage', () => {
+    const record = 'src/tools/tactics/CURRENT_HANDOFF.md';
+    expect(select([record])).toEqual([]);
+    expect(select([record, 'src/tools/tactics/elevation-engine.ts'])).toEqual(e2e(
+      'tactical-matchboard-ball-flight',
+      'tactical-matchboard-studio',
+      'tactical-matchboard-substitution',
+      'tactical-matchboard-theme',
+    ));
+  });
+
   it('matches legacy alias routes as well as #/tools/<slug>', () => {
     expect(select(['src/tools/regex/RegexWorkspace.tsx'])).toEqual(e2e('regex-matrix', 'regex-matrix-audit'));
   });

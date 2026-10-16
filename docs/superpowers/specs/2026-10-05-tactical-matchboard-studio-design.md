@@ -207,6 +207,8 @@ None: no function was compared between an ML and a non-ML method.
 
 ## Intent not recorded
 
+- TMS-R07: preset angles are local authoring defaults (ground 0°, driven 10°, lofted 35°, chipped 55°), not measured football characteristics; owner may override. Airborne angles remain editable and flight duration is authored.
+
 - TMS-R31: which transition kinds count as "chapter transitions" (cut, fade, morph) is not recorded; owner may override.
 
 ## Change log
