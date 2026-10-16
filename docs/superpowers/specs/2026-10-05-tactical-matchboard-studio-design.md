@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
-updated: 2026-10-12
+updated: 2026-10-16
 ---
 
 # Tactical Matchboard Studio — spec
@@ -58,7 +58,7 @@ Out of scope:
 | TMS-R04 | Every player, ball, equipment and official position is stored in normalized `[0,1]` coordinates and shown with derived metres (formerly 4) | Enter 30 m by 20 m on a 60 m by 40 m pitch; the inspector shows 0.5, 0.5 |
 | TMS-R05 | Token editor for jersey, role, kit colours, status, developmental (age) tag and local avatar (formerly 5) | Edit each field; invalid colours and missing avatars are refused |
 | TMS-R06 | Authored ball elevation keyframes on the ball track draw a trajectory independent of the resting elevation (formerly 6) | Author 0 m to 8 m; the board draws the elevated path |
-| TMS-R07 | A ball loft preset (ground, driven, lofted, chipped) computes the flight arc between two points from launch angle and distance | Choose "lofted" between two points; elevation keyframes follow a parabolic arc |
+| TMS-R07 | Ground, driven, lofted and chipped local authoring presets compute ball position/elevation keyframes between normalized endpoints over an authored integer-millisecond interval; airborne arcs use editable launch angle and physical pitch distance, without air resistance; manual elevation remains editable | Choose lofted between two points; metre-based elevation keyframes form a parabolic arc with grounded endpoints; all presets, undo/redo and manual editing use the canonical ball track |
 | TMS-R08 | Training equipment library: cones, flat markers, poles, hurdles, agility ladders, mannequins, mini goals and rings, with rotation, scale and position transforms (formerly 7) | Place a cone and transform it; it stays inside the pitch |
 | TMS-R09 | Optional snapping to grid, halfway and channel guides, teammate alignment and equal spacing (formerly 8) | Enable snapping; a move lands on the nearest guide; off by default |
 | TMS-R10 | Fitted training pitch markings (penalty and goal areas, marks, goals, centre circle, corner arcs) scaled to the pitch size (formerly 62) | A 105 m by 68 m pitch keeps a 16.5 m box; a small pitch scales it inside the pitch |

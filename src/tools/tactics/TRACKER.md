@@ -6,14 +6,14 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
-updated: 2026-10-15
+updated: 2026-10-16
 ---
 
 # Tactical Matchboard Studio — tracker
 
 ## Resume here
 
-85 requirements: 78 verified, 1 implemented, 1 partial, 5 missing. TMS-R33 timed substitutions are verified and integrated through `ef68da5206c1fe6b9ef627caf4ed141bf7babcb4`; generated docs/index sync advanced `main` to `af4fed70446dccc2ff4b1ab25188f5f845af6570`. Next: TMS-R07, then R31, R44, R52, R78, then R75 and R83. Read `CURRENT_HANDOFF.md` for the exact continuation record; `HANDOFF.md` is archival.
+85 requirements: 78 verified, 1 implemented, 1 partial, 5 missing. TMS-R33 timed substitutions are verified and integrated through `ef68da5206c1fe6b9ef627caf4ed141bf7babcb4`; generated docs/index sync advanced `main` to `af4fed70446dccc2ff4b1ab25188f5f845af6570`. TMS-R07 is active on `fix/tactical-matchboard-studio` (task `T-tactical-matchboard-studio-20261016-4cc0`); focused RED contracts precede implementation. Next: finish TMS-R07, then R31, R44, R52, R78, then R75 and R83. Read `CURRENT_HANDOFF.md` for the exact continuation record; `HANDOFF.md` is archival.
 
 ## Documents
 
