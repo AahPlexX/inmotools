@@ -13,7 +13,7 @@ updated: 2026-10-16
 
 ## Resume here
 
-85 requirements: 78 verified, 2 implemented, 1 partial, 4 missing. TMS-R33 timed substitutions are verified and integrated through `ef68da5206c1fe6b9ef627caf4ed141bf7babcb4`; generated docs/index sync advanced `main` to `af4fed70446dccc2ff4b1ab25188f5f845af6570`. TMS-R07 is active on `fix/tactical-matchboard-studio` (task `T-tactical-matchboard-studio-20261016-4cc0`); six focused units and desktop/mobile browser acceptance pass; governed integration is pending. Next: finish TMS-R07, then R31, R44, R52, R78, then R75 and R83. Read `CURRENT_HANDOFF.md` for the exact continuation record; `HANDOFF.md` is archival.
+85 requirements: 79 verified, 1 implemented, 1 partial, 4 missing. TMS-R07 ball flight presets are verified on runtime `4e05ed2d731de2cfd38b0359bb85942967294ea3`, selector correction `3b7b53d44e77d0ca9cd70e556da238cba72da126`, GREEN workflow `38934899167` / job `117087815510`, and integration merge `336643b4`. Next: TMS-R31, then R44, R52, R78, R75 and R83. Read `CURRENT_HANDOFF.md` for continuation; `HANDOFF.md` is archival.
 
 ## Documents
 
@@ -24,7 +24,7 @@ updated: 2026-10-16
 - Older tracking/archive: [FEATURE_MATRIX.md](FEATURE_MATRIX.md), [HANDOFF.md](HANDOFF.md), [TODO_SEQUENCE.md](TODO_SEQUENCE.md)
 - Font license: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - Index row: [TOOL_INDEX.md](../../../docs/TOOL_INDEX.md)
-- Unit tests: `tests/unit/tactics-*.test.ts`; browser tests: `tests/e2e/tactical-matchboard-studio.spec.ts`, `tests/e2e/tactical-matchboard-substitution.spec.ts`, `tests/e2e/tactical-matchboard-theme.spec.ts`
+- Unit tests: `tests/unit/tactics-*.test.ts`; browser tests: `tests/e2e/tactical-matchboard-ball-flight.spec.ts`, `tests/e2e/tactical-matchboard-studio.spec.ts`, `tests/e2e/tactical-matchboard-substitution.spec.ts`, `tests/e2e/tactical-matchboard-theme.spec.ts`
 
 ## Requirement status
 
@@ -38,7 +38,7 @@ updated: 2026-10-16
 | TMS-R04 | verified | unit "authors canonical positions from normalized units or pitch metres and rejects pixels", "writes ball, equipment, and official positions through the same normalized surface" | |
 | TMS-R05 | verified | unit "edits jersey, role, kit, developmental tag, and avatar without changing the session plan" | |
 | TMS-R06 | verified | unit "stores elevation keyframes on the ball track and samples them independently of the resting ball elevation" | |
-| TMS-R07 | implemented | unit "authors a metre-based parabolic arc on the canonical ball track without mutating the project", "round-trips generated flights through project JSON and keeps sampled playback unchanged"; e2e "authors ball flight presets with metre-based elevation, undo, manual editing and responsive controls" | Local checks pass; governed integration pending. Presets reuse the ball track; manual elevation remains editable. |
+| TMS-R07 | verified | unit "authors a metre-based parabolic arc on the canonical ball track without mutating the project", "round-trips generated flights through project JSON and keeps sampled playback unchanged"; e2e "authors ball flight presets with metre-based elevation, undo, manual editing and responsive controls" | GREEN workflow 38934899167: all four Tactical browser specs pass. Presets reuse the ball track; manual elevation remains editable. |
 | TMS-R08 | verified | unit "places a sourced non-authoritative prop and transforms it inside normalized bounds" | |
 | TMS-R09 | verified | unit "snaps to pitch guides, teammates, and equal spacing without moving a point outside range" | |
 | TMS-R10 | verified | unit "fits full-size training markings on a 105 by 68 pitch and shrinks them on a small pitch", "draws fitted markings on a bare pitch and leaves sourced penalty diagrams unchanged" | |
@@ -120,8 +120,8 @@ updated: 2026-10-16
 
 ## Open work
 
-1. TMS-R07: ground/driven/lofted/chipped trajectory presets and computed elevation arc.
-2. TMS-R31, R44, R52, R78: build.
+1. TMS-R31: scene transitions in preview and export.
+2. TMS-R44, R52, R78: build in that order.
 3. TMS-R75: 1200×630 card.
 4. TMS-R83: offline test.
 
@@ -133,11 +133,15 @@ updated: 2026-10-16
 
 ## Verification evidence
 
+- 2026-10-16, TMS-R07: runtime `4e05ed2d`, selector expectation correction `3b7b53d4`; GREEN workflow `38934899167`, job `117087815510`, integration merge `336643b4`. Repository units: 4,186 passed / 18 skipped; build including TypeScript passed (8.28 s); four selected Tactical Playwright specs: 88 passed / 2 existing duplicate mobile skips / 0 failures / no reported retries (3.7 min). Local lint exited 0 with existing warning debt; scoped Axe, reflow, 44px controls, undo/redo, manual edits and JSON round-trip are covered.
+
 - 2026-10-15, TMS-R33: GREEN workflow `38672289731`, job `116217961540`, completed successfully for runtime `0e60a3aecca4eef01327d31d950cbcffcabe8ecc` plus test-only locator correction `7313bf00bbb4ca3642da859d42935fb0c2495ced`; branch integrated to `main` as `ef68da5206c1fe6b9ef627caf4ed141bf7babcb4`, then generated docs/index sync advanced `main` to `af4fed70446dccc2ff4b1ab25188f5f845af6570`.
 - 2026-10-15, TMS-R82: workflow `38664068636`, job `116191941882`, completed successfully for runtime `901eaf0ea6a7852ba821067de871b035cc3015fe`; branch integrated to `main` as `f5b22c8f6f78b589a458e28d25be96c1dfe119c1`, then generated task/index sync advanced `main` to `539bf012171ecc9caeaddbffe0fd1579d5854c00`.
 - 2026-10-05, `expand/tactical-matchboard-studio` from `main` @ `6c991e75`: `pnpm tool:check tactical-matchboard-studio --base origin/main` 75/85, no errors.
 
 ## Change log
+
+- 2026-10-16 — TMS-R07 verified. Ground/driven/lofted/chipped local authoring presets generate position and metre-based elevation keyframes on the existing ball track, preserve unrelated fields and manual editing, reject invalid intervals and overlapping possession, and round-trip through project JSON.
 
 - 2026-10-15 — TMS-R33 verified. Timed substitution authoring atomically swaps outgoing/incoming player visibility at an exact timeline millisecond, preserves existing keyframe event text, validates same-team/scene and pre-event visibility, and has focused desktop/mobile browser acceptance.
 - 2026-10-15 — TMS-R82 verified. Matchboard's affected dark/light surfaces follow the resolved site `data-theme` rather than independently following the OS media preference; focused browser evidence covers both preference inversions and Dark color contrast.

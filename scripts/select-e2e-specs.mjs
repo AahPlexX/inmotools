@@ -88,7 +88,7 @@ export function selectE2eSpecs(paths, root = process.cwd()) {
     const folder = path.match(/^src\/tools\/([^/]+)\//)?.[1];
     // Records do not execute in the client; fixtures/public assets are handled
     // above and unknown source files below cannot silently select zero tests.
-    if (path.endsWith('.md') && (!path.startsWith('src/') || /\/(?:README|TRACKER|[A-Z_]+_TRACKER|VERIFICATION|HANDOFF|STATUS|WORK_LOG)\.md$/.test(path))) continue;
+    if (path.endsWith('.md') && (!path.startsWith('src/') || /\/(?:README|TRACKER|[A-Z_]+_TRACKER|VERIFICATION|(?:CURRENT_)?HANDOFF|STATUS|WORK_LOG)\.md$/.test(path))) continue;
     if (!folder && !path.startsWith('src/lib/') && !path.startsWith('tests/e2e/')) {
       if (path.startsWith('tests/unit/') || path.startsWith('docs/') || path.startsWith('.tasks/') || POLICY_SCRIPTS.has(path) || /^\.github\/workflows\/[^/]+\.yml$/.test(path)) continue;
       return [FULL_SUITE];
