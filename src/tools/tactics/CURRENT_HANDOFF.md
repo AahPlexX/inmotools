@@ -25,7 +25,7 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 
 ## Exact next action
 
-TMS-R07 is implemented on `fix/tactical-matchboard-studio`, task `.tasks/items/T-tactical-matchboard-studio-20261016-4cc0.md`. Six new flight units and focused desktop/mobile browser acceptance pass locally. Next: complete governed integration, record its exact workflow and merge, then mark R07 verified and start TMS-R31 from current main. Do not revive archived PDF branches.
+TMS-R07 is implemented on `fix/tactical-matchboard-studio`, task `.tasks/items/T-tactical-matchboard-studio-20261016-4cc0.md`. Six new flight units and focused desktop/mobile browser acceptance pass locally. First integration `38934606163` failed only on the stale three-spec selector expectation; the fourth flight spec was correctly selected. That expected list is corrected. Next: complete governed integration, record its exact workflow and merge, then mark R07 verified and start TMS-R31 from current main. Do not revive archived PDF branches.
 
 R07 reuses `elevation-engine.ts` and the canonical ball track: ground/driven/lofted/chipped presets write normalized positions and metre-based elevation keyframes from pitch distance and editable launch angle. Flight duration is authored; the piecewise-linear keyframes approximate equal-height no-drag geometry. Existing event/visibility fields and frames outside the interval are preserved; manual elevation remains editable. Overlapping ball possession must be released first. No dependency or schema changed.
 

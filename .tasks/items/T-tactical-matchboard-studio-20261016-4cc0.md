@@ -37,3 +37,8 @@ TMS-R07 is implemented from baseline main `6a6bef39`. Local unit/build/lint and 
 - Focused flight browser contract: 2 passed on desktop/mobile Chromium, 0 failures, 0 skips, 0 retries (25.7 s). It covers presets, physical-metre midpoint elevation, undo/redo, manual edits, ground/driven re-authoring, invalid-interval preservation, 44px controls, page reflow and scoped Axe. Receipt `/tmp/inmotools-r07-browser.log`.
 - `pnpm lint`: exit 0; existing warning debt remains. New inline type import warning was corrected; no unrelated lint cleanup.
 - Governed integration and selected dependency/consumer browser gate: pending.
+
+## Integration correction
+
+- Workflow `38934606163`, job `117086813623`, failed before build/browser execution: all 4,185 other units passed (18 skipped), but `tests/unit/e2e-spec-selection.test.mjs` still expected three Tactical specs. The route-based selector correctly returned the new fourth flight spec. Its expected list now includes the new spec; no selector/runtime behavior changed.
+- Shared-file reason: `tests/unit/e2e-spec-selection.test.mjs` must assert the complete Tactical owned browser scope after adding the flight acceptance spec. This is a test-list update on the required `fix/<slug>` branch; no shell or unrelated tool source is changed.

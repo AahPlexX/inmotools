@@ -11,7 +11,7 @@ updated: 2026-10-16
 
 # Tactical Matchboard Studio — spec
 
-As built at `d89700d1` (last code change under `src/tools/tactics/`). Requirement prefix: `TMS`. Status of each requirement: [TRACKER.md](../../../src/tools/tactics/TRACKER.md). History: [2026-09-21 design](2026-09-21-tactical-matchboard-studio-design.md), [2026-09-02 ethical support addendum](2026-09-02-tactical-ethical-support-addendum.md), [FEATURE_MATRIX.md](../../../src/tools/tactics/FEATURE_MATRIX.md) (rows 1–67, cited below as "formerly <n>"), [HANDOFF.md](../../../src/tools/tactics/HANDOFF.md), [TODO_SEQUENCE.md](../../../src/tools/tactics/TODO_SEQUENCE.md), [plan](../plans/2026-09-21-tactical-matchboard-studio.md). Owner input: [owner feature notes 2026-10-05](../../research/owner-feature-notes-2026-10-05.md#tactical-matchboard-studio-tactical-animation--matchboard-studio).
+As built through ball-flight runtime `4e05ed2d731de2cfd38b0359bb85942967294ea3` (TMS-R07); prior verified requirements and evidence remain in the tracker. Requirement prefix: `TMS`. Status of each requirement: [TRACKER.md](../../../src/tools/tactics/TRACKER.md). History: [2026-09-21 design](2026-09-21-tactical-matchboard-studio-design.md), [2026-09-02 ethical support addendum](2026-09-02-tactical-ethical-support-addendum.md), [FEATURE_MATRIX.md](../../../src/tools/tactics/FEATURE_MATRIX.md) (rows 1–67, cited below as "formerly <n>"), [HANDOFF.md](../../../src/tools/tactics/HANDOFF.md), [TODO_SEQUENCE.md](../../../src/tools/tactics/TODO_SEQUENCE.md), [plan](../plans/2026-09-21-tactical-matchboard-studio.md). Owner input: [owner feature notes 2026-10-05](../../research/owner-feature-notes-2026-10-05.md#tactical-matchboard-studio-tactical-animation--matchboard-studio).
 
 ## Purpose
 
@@ -210,6 +210,8 @@ None: no function was compared between an ML and a non-ML method.
 - TMS-R31: which transition kinds count as "chapter transitions" (cut, fade, morph) is not recorded; owner may override.
 
 ## Change log
+
+- **2026-10-16:** TMS-R07 specifies the canonical ball-track presets, editable launch angle, physical pitch distance, authored timing and retained manual elevation editing. Runtime `4e05ed2d` adds these controls without a dependency or schema change.
 
 - 2026-10-12 — TMS-R73: metadata.json keeps every team and player name. Basic-Latin rosters print no Teams line and load no Unicode font. A long Teams line ends with (+N more in metadata.json). A font load failure is reported in the status. Page text is composed to NFC.
 - 2026-10-11 — TMS-R73: coaching PDF page text uses the bundled Noto Sans subset through `@pdf-lib/fontkit` 1.1.1. Letters outside that subset are shown as ?. The owner authorized the pin.
