@@ -19,6 +19,8 @@ DONE. TMS-R07 runtime `4e05ed2d731de2cfd38b0359bb85942967294ea3` and selector ex
 
 ## Log
 - 2026-10-16: claimed `fix/tactical-matchboard-studio`.
+- 2026-10-16: product integrated as `336643b4` after GREEN workflow `38934899167`; `pnpm tool:check tactical-matchboard-studio --base origin/main` reports 79/85 with no errors (79 verified, 1 implemented, 1 partial, 4 missing).
+- 2026-10-16: closure/scope-classifier workflow `38935859420`, job `117091052612`, succeeded and integrated as `40c5ace3b49ee4138a1e1b0f5da903b5fecc14ef`: 4,187 unit passes / 18 skips; build/TypeScript passed in 5.28 s; actual browser plan `[]`, browser install/run skipped. Product browser evidence remains the matching GREEN run above.
 
 ## Scope and design
 
@@ -48,3 +50,5 @@ DONE. TMS-R07 runtime `4e05ed2d731de2cfd38b0359bb85942967294ea3` and selector ex
 - `CURRENT_HANDOFF.md` has no client imports, but the selector recognized only ordinary `HANDOFF.md`, so a handoff-only update selected all Tactical browser specs. The record-name pattern now also recognizes `CURRENT_HANDOFF.md`; runtime changes still select all four owned specs. This follows the existing documentation-only validation policy and adds no runtime behavior.
 - Shared-file reason: the one-pattern change in `scripts/select-e2e-specs.mjs` and its regression in `tests/unit/e2e-spec-selection.test.mjs` keep current handoff updates from rerunning unchanged browser coverage. `pnpm exec vitest run tests/unit/e2e-spec-selection.test.mjs tests/unit/validation-runner.test.mjs`: 23 passed, receipt `/tmp/inmotools-r07-handoff-scope.log`.
 - Product evidence above remains valid: closure changes only current records and the tested scope classifier. The final closure workflow independently checks units/docs; its selected browser plan must be empty, with no runtime/dependency/browser-test changes.
+
+- Tool index maintenance: its preserved Spec, Other docs and Task columns still linked the archival spec/handoff and legacy DONE record. Updated only the Tactical row's hand-kept links to the current 2026-10-05 spec, current handoff and completed R07 task, retaining the historical links under Other docs. `docs:sync` owns the generated columns and validates this row without discarding these hand-kept links (`scripts/docs-sync.mjs`, index documentation in `docs/DOCUMENTATION_STANDARD.md`). Shared-file reason: portable continuation must reach the current requirement source and handoff from the canonical index.
