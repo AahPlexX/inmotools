@@ -1068,6 +1068,7 @@ test('authors chapter fades and morphs with matching preview and standalone expo
   await page.getByRole('button', { name: 'Save chapter transition', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('.status-line').last()).toContainText('Chapter transition saved.');
+  await expect(page.getByRole('button', { name: 'Save chapter transition', exact: true })).toBeFocused();
   const svg = page.locator('.tactical-board-svg > svg');
   const seek = async (time: string) => {
     await page.getByLabel('Playhead (ms)').fill(time);

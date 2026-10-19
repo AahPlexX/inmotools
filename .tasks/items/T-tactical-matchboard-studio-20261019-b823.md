@@ -46,3 +46,11 @@ TMS-R31 is implemented from main `160a3c39`. Local unit/build/type/lint and focu
 - Split transfers the exit setting to the right part and clamps duration; join inherits the right part’s exit; reorder clears settings with no valid next boundary; cloning cannot create overlaps while chapter playback is configured.
 - Presentation annotation visibility is frozen with the same snapshots for preview and all timed exports. PDF opacity is applied to vector fill/stroke/text; Unicode font detection includes scenes actually drawn in chapter contact sheets.
 - Timed exports reserve visible fade/morph samples and explicit/implicit cut boundaries; they report an insufficient frame cap rather than omitting a chapter.
+
+## Keyboard focus correction
+
+- Candidate runtime `640213fd9282f0145e522231a2cb34ff64d1ead2` entered integration `39194465660`. A follow-up keyboard-cycle assertion reproduced focus loss after saving: the form key changed with the stored transition kind and remounted the focused Save button. RED receipt `/tmp/inmotools-r31-focus-red.log`.
+- The form now keeps its DOM identity; controlled kind/duration drafts synchronize with canonical scene settings for undo/redo and scene selection. The same browser contract asserts Save retains focus. Final acceptance must use the corrected successor, not the initial candidate.
+
+- Corrected focus-preserving source passes the same desktop/mobile browser contract: 2 passed / 0 skips / 0 failures / 0 retries, 30.2 s (`/tmp/inmotools-r31-focus-green.log`); build/TypeScript pass (`/tmp/inmotools-r31-focus-build.log`). Draft values are derived from canonical settings plus event-local edits, without an effect-driven state reset.
+- Final focused transition suite: 8 passed (`/tmp/inmotools-r31-final-eight.log`), including a PDF regression proving later drawn chapters with Unicode labels embed the page font. Focused lint passes; the draft implementation adds no effect-driven-render warning.

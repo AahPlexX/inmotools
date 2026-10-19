@@ -1,4 +1,5 @@
-import { type FormEvent, type MouseEvent } from 'react';
+import { useState } from 'react';
+import type { FormEvent, MouseEvent } from 'react';
 import {
   cloneTacticalScene,
   joinTacticalScenes,
@@ -25,7 +26,7 @@ export interface TacticalTimingControlsProps {
     label: string,
     updater: (current: TacticalProject) => TacticalProject,
     message: string,
-  ) => void;
+  ) => boolean | void;
 }
 
 function nextId(prefix: string, existing: string[]): string {
@@ -93,6 +94,15 @@ export default function TacticalTimingControls({
   const defaultSplitMs = activeScene
     ? activeScene.startMs + Math.max(1, Math.floor(activeScene.durationMs / 2))
     : 1;
+  const [transitionDraft, setTransitionDraft] = useState<{
+    sceneId: string; source?: SceneTransition; kind: SceneTransition['kind'] | 'none'; duration: string;
+  } | null>(null);
+  const draft = transitionDraft?.sceneId === activeSceneId && transitionDraft.source === activeScene?.transition ? transitionDraft : null;
+  const transitionKind = draft?.kind ?? activeScene?.transition?.kind ?? 'none';
+  const transitionDuration = draft?.duration ?? String(activeScene?.transition?.durationMs ?? Math.min(500, activeScene?.durationMs ?? 500));
+  function editTransition(kind: typeof transitionKind, duration: string) {
+    setTransitionDraft({ sceneId: activeSceneId, source: activeScene?.transition, kind, duration });
+  }
 
   function submitScene(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -134,7 +144,8 @@ export default function TacticalTimingControls({
       kind: kind as SceneTransition['kind'],
       durationMs: kind === 'cut' ? 0 : Number(data.get('transitionDurationMs')),
     };
-    onEdit('Set chapter transition', current => setSceneTransition(current, activeSceneId, transition), 'Chapter transition saved.');
+    const saved = onEdit('Set chapter transition', current => setSceneTransition(current, activeSceneId, transition), 'Chapter transition saved.');
+    if (saved !== false) setTransitionDraft(null);
   }
 
   function moveScene(event: MouseEvent<HTMLButtonElement>, direction: -1 | 1) {
@@ -322,11 +333,11 @@ export default function TacticalTimingControls({
           Splitting is blocked when authored scene motion continues past the split point. Joining is available only for the next contiguous phase and preserves authored scene data.
         </small>
       </form>
-      <form key={`transition-${activeSceneId}-${activeScene?.transition?.kind}`} onSubmit={submitTransition} aria-label="Chapter transition" aria-describedby="chapter-transition-help">
+      <form onSubmit={submitTransition} aria-label="Chapter transition" aria-describedby="chapter-transition-help">
         <h3>Chapter transition</h3>
         <label>
           Exit transition
-          <select name="transitionKind" defaultValue={activeScene?.transition?.kind ?? 'none'}>
+          <select name="transitionKind" value={transitionKind} onChange={event => editTransition(event.target.value as typeof transitionKind, transitionDuration)}>
             <option value="none">No exit transition</option>
             <option value="cut">Cut</option>
             <option value="fade">Fade through background</option>
@@ -335,7 +346,7 @@ export default function TacticalTimingControls({
         </label>
         <label>
           Transition duration (ms)
-          <input name="transitionDurationMs" type="number" step="1" defaultValue={activeScene?.transition?.durationMs || Math.min(500, activeScene?.durationMs || 500)} />
+          <input name="transitionDurationMs" type="number" step="1" value={transitionDuration} onChange={event => editTransition(transitionKind, event.target.value)} />
         </label>
         <button type="submit">Save chapter transition</button>
         <small>Fade and morph duration: 1 to {activeScene?.durationMs ?? 0} ms.</small>

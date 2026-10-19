@@ -123,4 +123,17 @@ describe('Chapter transitions', () => {
     expect(times.length).toBeLessThanOrEqual(options.maxFrames);
     expect(sampleChapterFrame(authored, 2000, 'arrival').sceneId).toBe('third');
   });
+
+  it('embeds the PDF page font when a later drawn chapter contains Unicode labels', async () => {
+    const project = chapters(); const arrival = project.scenes.find(scene => scene.id === 'arrival')!;
+    project.annotations.push({ id: 'arrival-label', kind: 'label', sceneId: arrival.id, layerId: arrival.layers[0]!.id, label: 'Αφιξη', points: [{ x: 0.5, y: 0.5 }], visible: true });
+    const authored = setSceneTransition(project, project.scenes[0]!.id, { kind: 'cut', durationMs: 0 });
+    const zip = await JSZip.loadAsync(await renderCoachingPdfPackage(authored, project.scenes[0]!.id, { contactFrames: 3 }));
+    const pdf = await PDFDocument.load(await zip.file('coaching.pdf')!.async('uint8array'));
+    const names = pdf.getPages().flatMap(page => {
+      const fonts = page.node.Resources()?.lookup(PDFName.of('Font'), PDFDict);
+      return fonts ? fonts.entries().map(([, reference]) => pdf.context.lookup(reference, PDFDict).lookupMaybe(PDFName.of('BaseFont'), PDFName)?.asString() ?? '') : [];
+    });
+    expect(names.join(' ')).toContain('NotoSans');
+  });
 });
