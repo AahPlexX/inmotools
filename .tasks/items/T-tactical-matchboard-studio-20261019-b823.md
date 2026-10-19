@@ -3,7 +3,7 @@ task: T-tactical-matchboard-studio-20261019-b823
 tool: tactical-matchboard-studio
 doc: task
 kind: fix
-state: active
+state: done
 branch: fix/tactical-matchboard-studio
 created: 2026-10-19
 updated: 2026-10-19
@@ -17,7 +17,7 @@ Continue
 Continuation of the owner’s standing request to resume inmotools, preserve full implementation/verification quality, use Snip for command output, and keep internal documentation portable and current.
 
 ## Resume here
-TMS-R31 is implemented from main `160a3c39`. Local unit/build/type/lint and focused desktop/mobile acceptance pass; next push for the governed repository/owned-browser gate, record its exact result, and mark verified only after acceptance. Remaining order after R31: R44, R52, R78, R75, R83.
+TMS-R31 is verified and integrated. Runtime and exact governed acceptance are recorded below. No R31 work remains; start a fresh task for R44 from current main, then R52, R78, R75 and R83.
 
 ## Log
 - 2026-10-19: claimed `fix/tactical-matchboard-studio`.
@@ -38,7 +38,7 @@ TMS-R31 is implemented from main `160a3c39`. Local unit/build/type/lint and focu
 - TypeScript passed on final source (`/tmp/inmotools-r31-tsc-final.log`); production/PWA build passed (`/tmp/inmotools-r31-build-final.log`). Local lint exited 0 with existing warning debt; no transition-engine or transition-test diagnostics.
 - Focused desktop/mobile Chromium: 2 passed / 0 skipped / 0 failures / 0 retries, 33.0 s (`/tmp/inmotools-r31-browser-final.log`). This covers keyboard authoring, 500 ms fade samples, undo/redo, 3D opacity, standalone HTML samples, morph geometry, invalid duration, 44px controls, reflow and scoped Axe.
 - First browser trial failed because the test sought the playhead before undo, so Undo correctly reverted the separately authored Set playhead operation. The test now checks transition undo/redo immediately after authoring. Runtime history behavior and original assertions/timeouts are unchanged.
-- Governed integration: pending. Final implicit-cut sampling and input-copy refinements are covered by fresh unit/type checks and will receive the governed browser gate on the exact pushed source.
+- Final governed integration: success; see Final acceptance below. Earlier receipts above are local checkpoints, not substitutes for this final gate.
 
 ## Implementation notes
 
@@ -63,3 +63,11 @@ TMS-R31 is implemented from main `160a3c39`. Local unit/build/type/lint and focu
 - Local corrected timing gate: 4 passed on desktop/mobile Chromium (45.2 s), including chapter/HTML timing and existing capability-checked video export. Focused export/transition units: 30 passed; type/build and focused lint pass. Receipts `/tmp/inmotools-r31-timing-proof.log`, `/tmp/inmotools-r31-timing-units.log`, `/tmp/inmotools-r31-timing-build.log`.
 - Source facts checked 2026-10-19: MDN SVG opacity reference, https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/opacity ; pinned MediaBunny 1.60.0 `CanvasSource.add(timestamp, duration)` typings in `dist/modules/src/media-source.d.ts` specify both arguments in seconds. No dependency change.
 - This correction also strengthens existing TMS-R71 video and TMS-R74 standalone-playback acceptance; neither requirement’s verified status is reduced.
+
+## Final acceptance
+
+- 2026-10-19: runtime `a528848db0c030c9010aa6fbb76061627077a084`, GREEN workflow `39195675178` / job `117877804494`, integration merge `15e3133a228a67e0913d8c01ea6b8e727896dc8a`. 4,195 units passed / 18 skipped; TypeScript and production/PWA build passed (5.68 s); four owned Tactical browser specs: 90 passed / 2 existing duplicate mobile skips / 0 failures / no reported retries (3.5 min). No failure-evidence upload or retry markers.
+- Actual browser scope: ball-flight, studio, substitution and theme specs; no unrelated browser suites selected.
+- Real desktop encoder proof: `/tmp/inmotools-r31-video-proof.json` records 5.033333 seconds against 5 authored seconds, 1 passed / 0 skips / 0 retries. CI also runs the capability-checked native duration assertion.
+- Tracker: 80/85 verified, 1 implemented, 1 partial, 3 missing. Closure updates current spec, tracker, handoff, task/index and generated task view. No application/test/dependency change follows the accepted runtime; matching browser evidence is reused for records.
+- Requested OMGSkills lookup found Caveman and its immutable SKILL.md blob `2d31b3dba78c68d9b58994c4bc03d65b4acfcae5` was read from `JuliusBrussee/caveman`; concise chat style applies, persisted documentation remains normal prose. Catalog status is discovery-only, so no mutable install was performed. `engineersuite` returned no catalog match.
