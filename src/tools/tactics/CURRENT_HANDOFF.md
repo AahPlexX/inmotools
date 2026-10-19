@@ -13,20 +13,21 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 ## Current state
 
 - Repository: `AahPlexX/inmotools`; canonical branch: `main`.
-- Last verified product requirement: **TMS-R07 ball flight presets**.
-- R07 runtime: `4e05ed2d731de2cfd38b0359bb85942967294ea3`; browser-selector expectation correction: `3b7b53d44e77d0ca9cd70e556da238cba72da126`.
-- R07 GREEN workflow/job: `38934899167` / `117087815510`, conclusion `success`; product integration merge: `336643b4`.
-- Closure/scope-classifier workflow `38935859420` / job `117091052612` passed and integrated as `40c5ace3`: 4,187 units passed / 18 skipped, build/TypeScript passed, actual browser plan `[]`. Completed task: `.tasks/items/T-tactical-matchboard-studio-20261016-4cc0.md`.
-- R07 gate: 4,186 unit passes / 18 skips; TypeScript/production build passed (8.28 s); all four Tactical browser specs passed, 88 passes / 2 existing duplicate mobile skips / no failures or reported retries (3.7 min).
+- Last verified product requirement: **TMS-R31 scene transitions**.
+- R31 runtime `a528848db0c030c9010aa6fbb76061627077a084`, GREEN workflow `39195675178` / job `117877804494`, integration merge `15e3133a228a67e0913d8c01ea6b8e727896dc8a`.
+- R31 gate: 4,195 units passed / 18 skipped; TypeScript and production/PWA build passed (5.68 s); four owned Tactical browser specs: 90 passed / 2 existing duplicate mobile skips / 0 failures / no reported retries (3.5 min). Completed task: `.tasks/items/T-tactical-matchboard-studio-20261019-b823.md`.
+- Prior R07 remains verified: runtime `4e05ed2d731de2cfd38b0359bb85942967294ea3`, selector correction `3b7b53d44e77d0ca9cd70e556da238cba72da126`, GREEN workflow `38934899167`; closure `40c5ace3`. Its completed task retains full evidence.
 - R33 remains verified: runtime `0e60a3aecca4eef01327d31d950cbcffcabe8ecc`, test-only locator correction `7313bf00bbb4ca3642da859d42935fb0c2495ced`, GREEN workflow/job `38672289731` / `116217961540`, integration merge `ef68da5206c1fe6b9ef627caf4ed141bf7babcb4`.
 - R82 site-theme correction remains verified: runtime `901eaf0ea6a7852ba821067de871b035cc3015fe`, GREEN workflow `38664068636`, integration merge `f5b22c8f6f78b589a458e28d25be96c1dfe119c1`.
 - Unicode PDF review-fix PR #122 is merged as `2eb5bec8bf112057cafd51f63705b843825bd554`; no PDF review work is in flight.
 
 ## Exact next action
 
-TMS-R31 is active in `.tasks/items/T-tactical-matchboard-studio-20261019-b823.md` on `fix/tactical-matchboard-studio`, based on main `160a3c39`. Cut/fade-through/morph authoring and shared chapter sampling are implemented; focused units, TypeScript/build, local lint and desktop/mobile acceptance pass. Next: finish governed integration, record its exact evidence, then mark R31 verified. Continue with R44 after R31 integrates; do not reopen the completed R07 task or archived PDF branches.
+Start TMS-R44 defender interception cones from current main under a fresh task on `fix/tactical-matchboard-studio`. R31 is verified and its task is complete. Read the spec and tracker before implementing; do not reopen completed R07 or archived PDF branches.
 
 R31 stores optional exit-transition metadata on scenes. It uses the outgoing scene’s final interval and the next contiguous scene’s arrival; cut is instantaneous, fade passes through the background, and morph pairs visible roster identities plus the ball. Unpaired actors/props/drawings switch halfway. Existing projects without settings retain their selected-scene behavior. Setting a transition enables chapter playback at the existing playhead. Preview, 3D, animated SVG/HTML/video/frame exports and PDF contact sheets share the sampled chapter. Animated exports retain boundary/transition samples within the existing cap or report an insufficient cap. Clone/split/reorder/join and JSON import have transition-specific regression coverage; no dependency or schema bump was added.
+
+Standalone HTML advances at retained frame timestamps and encoded video uses authored seconds, preserving duration when frame counts are capped. A local real-encoder receipt measured 5.033333 s for 5 authored seconds. Later drawn chapter Unicode labels select the PDF page font.
 
 ## Verified R07 behavior
 
@@ -39,12 +40,11 @@ R31 stores optional exit-transition metadata on scenes. It uses the outgoing sce
 
 ## Remaining ordered work
 
-1. TMS-R31 — scene transitions.
-2. TMS-R44 — defender interception cones.
-3. TMS-R52 — first-person player camera.
-4. TMS-R78 — touch long-press/radial actions.
-5. TMS-R75 — missing 1200×630 social card.
-6. TMS-R83 — focused offline route proof.
+1. TMS-R44 — defender interception cones.
+2. TMS-R52 — first-person player camera.
+3. TMS-R78 — touch long-press/radial actions.
+4. TMS-R75 — missing 1200×630 social card.
+5. TMS-R83 — focused offline route proof.
 
 ## Verified R33 behavior
 

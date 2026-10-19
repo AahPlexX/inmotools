@@ -13,7 +13,7 @@ updated: 2026-10-19
 
 ## Resume here
 
-85 requirements: 79 verified, 2 implemented, 1 partial, 3 missing. TMS-R07 ball flight presets are verified on runtime `4e05ed2d731de2cfd38b0359bb85942967294ea3`, selector correction `3b7b53d44e77d0ca9cd70e556da238cba72da126`, GREEN workflow `38934899167` / job `117087815510`, and integration merge `336643b4`. TMS-R31 is active in task `T-tactical-matchboard-studio-20261019-b823`; cut/fade/morph sampling and authoring are implemented; local acceptance passes and governed integration is pending. Next: finish TMS-R31, then R44, R52, R78, R75 and R83. Read `CURRENT_HANDOFF.md` for continuation; `HANDOFF.md` is archival.
+85 requirements: 80 verified, 1 implemented, 1 partial, 3 missing. TMS-R31 chapter transitions are verified on runtime `a528848db0c030c9010aa6fbb76061627077a084`, GREEN workflow `39195675178` / job `117877804494`, integration merge `15e3133a228a67e0913d8c01ea6b8e727896dc8a`. Completed task: `T-tactical-matchboard-studio-20261019-b823`. Next: R44, R52, R78, R75 and R83. Read `CURRENT_HANDOFF.md` for continuation; `HANDOFF.md` is archival.
 
 ## Documents
 
@@ -62,7 +62,7 @@ updated: 2026-10-19
 | TMS-R28 | verified | e2e "edits curved trajectory handles with keyboard and pointer input"; unit "samples quadratic and cubic Bézier geometry independently of timing easing" | |
 | TMS-R29 | verified | unit "supports cubic-bezier interpolation with bounded deterministic output"; e2e "authors custom cubic-bezier timing easing for a motion segment" | |
 | TMS-R30 | verified | e2e "splits, renames, and reorders non-overlapping tactical scenes"; unit "joins contiguous scenes without losing scene-owned players or authored motion" | |
-| TMS-R31 | implemented | unit "samples a 500 ms fade identically for chapter preview and exported frames", "renders chapter fade opacity in vector PDF contact sheets"; e2e "authors chapter fades and morphs with matching preview and standalone export" | Local checks pass; governed integration pending. Exit transitions share deterministic preview/export sampling; existing projects with no settings keep selected-scene behavior. |
+| TMS-R31 | verified | unit "samples a 500 ms fade identically for chapter preview and exported frames", "renders chapter fade opacity in vector PDF contact sheets"; e2e "authors chapter fades and morphs with matching preview and standalone export" | GREEN workflow `39195675178`, merge `15e3133a`. Exit transitions share deterministic preview/export sampling; existing projects with no settings keep selected-scene behavior. |
 | TMS-R32 | verified | unit "samples temporal visibility for layers and annotations without deleting canonical content"; e2e "temporally hides a scene layer without deleting its players" | |
 | TMS-R33 | verified | unit "authors one timed substitution event that swaps outgoing and incoming player visibility"; e2e "authors a timed substitution and swaps the two player tokens at the authored millisecond" | One atomic edit writes paired timeline visibility keyframes with additive substitution tags; authoring validates player tokens, same team/scene and immediate-before visibility |
 | TMS-R34 | verified | unit "offsets a selected group with deterministic ordered stagger"; e2e "authors scene sequencing, visibility, offsets, and grouped stagger timing" | |
@@ -120,10 +120,9 @@ updated: 2026-10-19
 
 ## Open work
 
-1. TMS-R31: scene transitions in preview and export.
-2. TMS-R44, R52, R78: build in that order.
-3. TMS-R75: 1200×630 card.
-4. TMS-R83: offline test.
+1. TMS-R44, R52, R78: build in that order.
+2. TMS-R75: 1200×630 card.
+3. TMS-R83: offline test.
 
 ## Known limitations
 
@@ -133,6 +132,8 @@ updated: 2026-10-19
 
 ## Verification evidence
 
+- 2026-10-19, TMS-R31: runtime `a528848db0c030c9010aa6fbb76061627077a084`, GREEN workflow `39195675178` / job `117877804494`, integration merge `15e3133a228a67e0913d8c01ea6b8e727896dc8a`. 4,195 units passed / 18 skipped; TypeScript and production/PWA build passed (5.68 s); four owned Tactical browser specs: 90 passed / 2 existing duplicate mobile skips / 0 failures / no reported retries (3.5 min). Local encoded-video receipt: 5.033333 s for 5 authored seconds. Standalone HTML and encoded video retain authored timestamps under frame caps.
+
 - 2026-10-16, TMS-R07: runtime `4e05ed2d`, selector expectation correction `3b7b53d4`; GREEN workflow `38934899167`, job `117087815510`, integration merge `336643b4`. Repository units: 4,186 passed / 18 skipped; build including TypeScript passed (8.28 s); four selected Tactical Playwright specs: 88 passed / 2 existing duplicate mobile skips / 0 failures / no reported retries (3.7 min). Local lint exited 0 with existing warning debt; scoped Axe, reflow, 44px controls, undo/redo, manual edits and JSON round-trip are covered.
 
 - 2026-10-15, TMS-R33: GREEN workflow `38672289731`, job `116217961540`, completed successfully for runtime `0e60a3aecca4eef01327d31d950cbcffcabe8ecc` plus test-only locator correction `7313bf00bbb4ca3642da859d42935fb0c2495ced`; branch integrated to `main` as `ef68da5206c1fe6b9ef627caf4ed141bf7babcb4`, then generated docs/index sync advanced `main` to `af4fed70446dccc2ff4b1ab25188f5f845af6570`.
@@ -140,6 +141,8 @@ updated: 2026-10-19
 - 2026-10-05, `expand/tactical-matchboard-studio` from `main` @ `6c991e75`: `pnpm tool:check tactical-matchboard-studio --base origin/main` 75/85, no errors.
 
 ## Change log
+
+- 2026-10-19 — TMS-R31 verified. Optional cut/fade-through/morph exits share preview/export sampling, preserve legacy projects, validate imports and scene edits, and retain authored playback duration. Timed exports reserve chapter boundaries and report an insufficient frame cap rather than silently omitting chapters.
 
 - 2026-10-16 — TMS-R07 verified. Ground/driven/lofted/chipped local authoring presets generate position and metre-based elevation keyframes on the existing ball track, preserve unrelated fields and manual editing, reject invalid intervals and overlapping possession, and round-trip through project JSON.
 
