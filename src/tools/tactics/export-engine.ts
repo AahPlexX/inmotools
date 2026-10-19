@@ -271,7 +271,7 @@ button.addEventListener('click', () => {
   button.textContent = playing ? 'Pause' : 'Play';
   button.setAttribute('aria-pressed', playing ? 'true' : 'false');
   if (playing) {
-    elapsed = 0;
+    if (index >= frames.length - 1) { show(0); elapsed = 0; }
     last = 0;
     requestAnimationFrame(tick);
   }
@@ -281,15 +281,13 @@ function tick(now) {
   if (!last) last = now;
   elapsed += now - last;
   last = now;
-  const frameDuration = 1000 / Math.max(1, Number(payload.frameRate) || 1);
-  while (elapsed >= frameDuration) {
+  while (index < frames.length - 1) {
+    const frameDuration = Math.max(1, Number(frames[index + 1].timeMs) - Number(frames[index].timeMs));
+    if (elapsed < frameDuration) break;
     elapsed -= frameDuration;
-    if (index >= frames.length - 1) {
-      stop();
-      return;
-    }
     show(index + 1);
   }
+  if (index >= frames.length - 1) { stop(); return; }
   requestAnimationFrame(tick);
 }
 document.addEventListener('visibilitychange', () => {

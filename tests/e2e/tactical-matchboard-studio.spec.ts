@@ -1097,6 +1097,21 @@ test('authors chapter fades and morphs with matching preview and standalone expo
   const payload = JSON.parse(data![1]!) as { frames: Array<{ timeMs: number; svg: string }> };
   expect(payload.frames.find(frame => frame.timeMs === 625)?.svg).toContain('opacity="0.5"');
   expect(payload.frames.find(frame => frame.timeMs === 875)?.svg).toContain('opacity="0.5"');
+  const playback = await page.context().newPage();
+  const stepFrame = await playback.evaluateHandle(() => {
+    const pending: FrameRequestCallback[] = [];
+    window.requestAnimationFrame = callback => { pending.push(callback); return pending.length; };
+    return (timeMs: number) => pending.splice(0).forEach(callback => callback(timeMs));
+  });
+  await playback.setContent(html.bytes.toString('utf8'));
+  await playback.getByRole('button', { name: 'Play', exact: true }).dispatchEvent('click');
+  await stepFrame.evaluate(step => step(1));
+  await stepFrame.evaluate(step => step(651));
+  await expect(playback.locator('#tactical-playback-clock')).toHaveText('625 ms');
+  await stepFrame.evaluate(step => step(901));
+  await expect(playback.locator('#tactical-playback-clock')).toHaveText('875 ms');
+  await stepFrame.dispose();
+  await playback.close();
   await scenePicker.selectOption(firstScene);
   await page.getByLabel('Exit transition').selectOption('morph');
   await page.getByRole('button', { name: 'Save chapter transition', exact: true }).click();
@@ -1205,6 +1220,30 @@ test('exports metadata, analytics, playback, and a capability-checked video fall
     const isMp4 = bytes.subarray(4, 8).toString('ascii') === 'ftyp';
     const isWebm = bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3;
     expect(isMp4 || isWebm).toBe(true);
+    const duration = await page.evaluate(async ({ encoded, mime }) => {
+      const bytes = Uint8Array.from(atob(encoded), char => char.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      const video = document.createElement('video');
+      try {
+        return await new Promise<number>((resolve, reject) => {
+          video.onloadedmetadata = () => resolve(video.duration);
+          video.onerror = () => reject(new Error('Encoded video metadata could not be read.'));
+          video.preload = 'metadata';
+          video.src = url;
+        });
+      } finally {
+        video.removeAttribute('src'); video.load(); URL.revokeObjectURL(url);
+      }
+    }, { encoded: bytes.toString('base64'), mime: isMp4 ? 'video/mp4' : 'video/webm' });
+    const data = /id="tactical-playback-data">([\s\S]*?)<\/script>/.exec(html.bytes.toString('utf8'));
+    const payload = JSON.parse(data![1]!) as { frames: Array<{ timeMs: number }> };
+    const expectedDuration = payload.frames.at(-1)!.timeMs / 1000;
+    expect(duration).toBeGreaterThanOrEqual(expectedDuration);
+    expect(duration).toBeLessThan(expectedDuration + 1);
+    await test.info().attach('encoded-video-duration', {
+      body: JSON.stringify({ durationSeconds: duration, authoredDurationSeconds: expectedDuration }),
+      contentType: 'application/json',
+    });
   }
 
   await page.getByRole('button', { name: 'Undo' }).click();
