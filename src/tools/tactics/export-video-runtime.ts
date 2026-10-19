@@ -79,11 +79,12 @@ export async function encodeTacticalVideo(
   output.addVideoTrack(source, { frameRate: confirmed.frameRate });
   output.setMetadataTags(videoContainerTags(readExportMetadata(project)));
   await output.start();
-  const frameDuration = 1 / confirmed.frameRate;
   try {
     for (let index = 0; index < frames.length; index += 1) {
-      await paintSvg(canvas, frames[index]!.svg);
-      await source.add(index * frameDuration, frameDuration);
+      const frame = frames[index]!;
+      const next = frames[index + 1];
+      await paintSvg(canvas, frame.svg);
+      await source.add(frame.timeMs / 1000, next ? (next.timeMs - frame.timeMs) / 1000 : 1 / confirmed.frameRate);
     }
     source.close();
     await output.finalize();
