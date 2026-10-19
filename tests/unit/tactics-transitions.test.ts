@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { setSceneTransition, sampleChapterFrame } from '../../src/tools/tactics/transition-engine';
-import { splitTacticalScene, joinTacticalScenes, reorderTacticalScene } from '../../src/tools/tactics/scene-engine';
+import { splitTacticalScene, joinTacticalScenes, reorderTacticalScene, cloneTacticalScene } from '../../src/tools/tactics/scene-engine';
+import { PDFDict, PDFDocument, PDFName, PDFNumber } from 'pdf-lib';
+import JSZip from 'jszip';
+import { renderCoachingPdfPackage } from '../../src/tools/tactics/export-pdf';
 import { buildBeginnerTacticalProject } from '../../src/tools/tactics/workspace-engine';
 import { buildExportFrames } from '../../src/tools/tactics/export-engine';
 import { exportTacticalProjectJson, importTacticalProjectJson } from '../../src/tools/tactics/project-io';
@@ -84,5 +87,40 @@ describe('Chapter transitions', () => {
     expect(validateTacticalProject(split)).toEqual([]);
     expect(validateTacticalProject(reorderTacticalScene(authored, sceneId, 1))).toEqual([]);
     expect(joinTacticalScenes(authored, sceneId, 'arrival').scenes[0]!.transition).toBeUndefined();
+    expect(() => cloneTacticalScene(authored, sceneId, { id: 'overlap', name: 'Overlap', startMs: 500, durationMs: 500 })).toThrow(/transition/i);
+  });
+
+  it('renders chapter fade opacity in vector PDF contact sheets', async () => {
+    const project = chapters();
+    const authored = setSceneTransition(project, project.scenes[0]!.id, { kind: 'fade', durationMs: 500 });
+    const zip = await JSZip.loadAsync(await renderCoachingPdfPackage(authored, project.scenes[0]!.id, { contactFrames: 9 }));
+    const pdf = await PDFDocument.load(await zip.file('coaching.pdf')!.async('uint8array'));
+    const opacities = pdf.getPages().flatMap(page => {
+      const states = page.node.Resources()?.lookup(PDFName.of('ExtGState'), PDFDict);
+      return states ? states.entries().flatMap(([, reference]) => {
+        const value = pdf.context.lookup(reference, PDFDict).lookupMaybe(PDFName.of('ca'), PDFNumber);
+        return value ? [value.asNumber()] : [];
+      }) : [];
+    });
+    expect(opacities).toContain(0);
+    expect(opacities).toContain(1);
+  });
+
+  it('freezes temporal presentation marks consistently in chapter preview and export', () => {
+    const project = chapters(); const scene = project.scenes[0]!;
+    project.annotations.push({ id: 'timed-cue', kind: 'presentation-label', sceneId: scene.id, layerId: scene.layers[0]!.id, label: 'Frozen cue', points: [{ x: 0.5, y: 0.5 }], startMs: 0, endMs: 550 });
+    const authored = setSceneTransition(project, scene.id, { kind: 'fade', durationMs: 500 });
+    expect(sampleChapterFrame(authored, 625, scene.id).project.annotations.find(annotation => annotation.id === 'timed-cue')?.visible).toBe(true);
+    expect(buildExportFrames(authored, scene.id, options).find(frame => frame.timeMs === 625)?.svg).toContain('Frozen cue');
+  });
+
+  it('keeps later implicit chapter cuts in bounded timed exports', () => {
+    const project = chapters(); project.timeline.durationMs = 3000;
+    const extended = cloneTacticalScene(project, 'arrival', { id: 'third', name: 'Third', startMs: 2000, durationMs: 1000 });
+    const authored = setSceneTransition(extended, project.scenes[0]!.id, { kind: 'fade', durationMs: 500 });
+    const times = buildExportFrames(authored, project.scenes[0]!.id, options).map(frame => frame.timeMs);
+    expect(times).toContain(1999); expect(times).toContain(2000);
+    expect(times.length).toBeLessThanOrEqual(options.maxFrames);
+    expect(sampleChapterFrame(authored, 2000, 'arrival').sceneId).toBe('third');
   });
 });

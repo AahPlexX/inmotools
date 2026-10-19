@@ -10,6 +10,7 @@ import {
 } from './presentation3d-runtime';
 
 interface Tactical3DViewProps {
+  opacity?: number;
   project: TacticalProject;
   sceneId: string;
   selectedTokenId?: string;
@@ -81,6 +82,7 @@ function applyCamera(camera: THREE.PerspectiveCamera, controls: OrbitControls, s
   controls.update();
 }
 export default function Tactical3DView({
+  opacity = 1,
   project,
   sceneId,
   selectedTokenId,
@@ -351,6 +353,7 @@ export default function Tactical3DView({
       {renderError ? <div className="notice" role="alert">{renderError}</div> : null}
       <div
         ref={hostRef}
+        style={{ opacity }}
         className="tactical-3d-canvas"
         role="img"
         aria-label="Interactive three-dimensional tactical pitch presentation"

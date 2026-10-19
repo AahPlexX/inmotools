@@ -160,11 +160,17 @@ export interface TacticalLayer {
   locked: boolean;
 }
 
+export interface SceneTransition {
+  kind: 'cut' | 'fade' | 'morph';
+  durationMs: number;
+}
+
 export interface TacticalScene {
   id: string;
   name: string;
   startMs: number;
   durationMs: number;
+  transition?: SceneTransition;
   layers: TacticalLayer[];
   objects: TacticalObject[];
 }

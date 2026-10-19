@@ -11,7 +11,7 @@ updated: 2026-10-19
 
 # Tactical Matchboard Studio — spec
 
-As built through ball-flight runtime `4e05ed2d731de2cfd38b0359bb85942967294ea3` (TMS-R07); prior verified requirements and evidence remain in the tracker. Requirement prefix: `TMS`. Status of each requirement: [TRACKER.md](../../../src/tools/tactics/TRACKER.md). History: [2026-09-21 design](2026-09-21-tactical-matchboard-studio-design.md), [2026-09-02 ethical support addendum](2026-09-02-tactical-ethical-support-addendum.md), [FEATURE_MATRIX.md](../../../src/tools/tactics/FEATURE_MATRIX.md) (rows 1–67, cited below as "formerly <n>"), [HANDOFF.md](../../../src/tools/tactics/HANDOFF.md), [TODO_SEQUENCE.md](../../../src/tools/tactics/TODO_SEQUENCE.md), [plan](../plans/2026-09-21-tactical-matchboard-studio.md). Owner input: [owner feature notes 2026-10-05](../../research/owner-feature-notes-2026-10-05.md#tactical-matchboard-studio-tactical-animation--matchboard-studio).
+Baseline main `160a3c39`; TMS-R31 implementation and pending integration evidence are recorded in `.tasks/items/T-tactical-matchboard-studio-20261019-b823.md`. Prior verified requirements and evidence remain in the tracker. Requirement prefix: `TMS`. Status of each requirement: [TRACKER.md](../../../src/tools/tactics/TRACKER.md). History: [2026-09-21 design](2026-09-21-tactical-matchboard-studio-design.md), [2026-09-02 ethical support addendum](2026-09-02-tactical-ethical-support-addendum.md), [FEATURE_MATRIX.md](../../../src/tools/tactics/FEATURE_MATRIX.md) (rows 1–67, cited below as "formerly <n>"), [HANDOFF.md](../../../src/tools/tactics/HANDOFF.md), [TODO_SEQUENCE.md](../../../src/tools/tactics/TODO_SEQUENCE.md), [plan](../plans/2026-09-21-tactical-matchboard-studio.md). Owner input: [owner feature notes 2026-10-05](../../research/owner-feature-notes-2026-10-05.md#tactical-matchboard-studio-tactical-animation--matchboard-studio).
 
 ## Purpose
 
@@ -212,6 +212,8 @@ None: no function was compared between an ML and a non-ML method.
 - TMS-R31: defaults are cut, fade-through-background and roster-matched player/ball morph; snapshots freeze at transition start and arrival, unpaired players/props/drawings switch halfway, and an optional exit transition enables chapter playback. Owner may override.
 
 ## Change log
+
+- **2026-10-19:** TMS-R31 defines optional cut, fade-through-background and roster-matched player/ball morph exit transitions, shared chapter sampling, timed-export boundary retention, backward compatibility and scene-edit/import validation.
 
 - **2026-10-16:** TMS-R07 specifies the canonical ball-track presets, editable launch angle, physical pitch distance, authored timing and retained manual elevation editing. Runtime `4e05ed2d` adds these controls without a dependency or schema change.
 

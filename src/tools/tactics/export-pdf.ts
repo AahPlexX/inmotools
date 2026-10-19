@@ -4,7 +4,7 @@ import { readExportMetadata, sampleExportTimes } from './export-engine';
 import { displayPitchOverlays } from './pitch-engine';
 import type { ExportMetadata } from './export-types';
 import type { MatchboardUnicodeFonts } from './pdf-unicode-font';
-import { sampleTacticalProjectAtTime } from './timeline-engine';
+import { hasChapterTransitions, sampleChapterFrame } from './transition-engine';
 import type { NormalizedPoint, TacticalProject } from './tactics-types';
 
 export const PDF_INFO_FIELDS = ['title', 'creator', 'description', 'tags', 'createdAt', 'modifiedAt'] as const;
@@ -87,7 +87,7 @@ function drawPageString(
   fonts: PageFonts,
   value: string,
   bold: boolean,
-  options: { x: number; y: number; size: number; color: ReturnType<typeof rgb> },
+  options: { x: number; y: number; size: number; color: ReturnType<typeof rgb>; opacity?: number },
 ): void {
   const prepared = preparePageText(value, fonts.unicode);
   const text = prepared.unicode ? prepared.text : degradeToBasicLatin(prepared.text);
@@ -194,8 +194,10 @@ function layerVisible(project: TacticalProject, sceneId: string, layerId: string
   return project.scenes.find((scene) => scene.id === sceneId)?.layers.find((layer) => layer.id === layerId)?.visible === true;
 }
 
-function drawDiagram(page: PDFPage, fonts: PageFonts, project: TacticalProject, sceneId: string, box: Box): void {
+function drawDiagram(page: PDFPage, fonts: PageFonts, project: TacticalProject, sceneId: string, box: Box, opacity = 1): void {
   page.drawRectangle({
+    opacity,
+    borderOpacity: opacity,
     x: box.x,
     y: box.y,
     width: box.width,
@@ -204,6 +206,8 @@ function drawDiagram(page: PDFPage, fonts: PageFonts, project: TacticalProject, 
   });
   const inset = 4;
   page.drawRectangle({
+    opacity,
+    borderOpacity: opacity,
     x: box.x + inset,
     y: box.y + inset,
     width: Math.max(1, box.width - inset * 2),
@@ -212,6 +216,7 @@ function drawDiagram(page: PDFPage, fonts: PageFonts, project: TacticalProject, 
     borderWidth: 1,
   });
   page.drawLine({
+    opacity,
     start: { x: box.x + box.width / 2, y: box.y + inset },
     end: { x: box.x + box.width / 2, y: box.y + box.height - inset },
     color: rgb(1, 1, 1),
@@ -223,7 +228,7 @@ function drawDiagram(page: PDFPage, fonts: PageFonts, project: TacticalProject, 
     for (let index = 1; index < overlay.points.length; index += 1) {
       const start = mapPoint(overlay.points[index - 1]!, box);
       const end = mapPoint(overlay.points[index]!, box);
-      page.drawLine({ start, end, color: rgb(1, 1, 1), thickness: 0.8, opacity: 0.8 });
+      page.drawLine({ start, end, color: rgb(1, 1, 1), thickness: 0.8, opacity: opacity * 0.8 });
     }
   }
 
@@ -231,6 +236,8 @@ function drawDiagram(page: PDFPage, fonts: PageFonts, project: TacticalProject, 
     if (item.sceneId !== sceneId || !item.visible || !layerVisible(project, sceneId, item.layerId)) continue;
     const point = mapPoint(item.position, box);
     page.drawRectangle({
+      opacity,
+      borderOpacity: opacity,
       x: point.x - 4,
       y: point.y - 4,
       width: 8,
@@ -244,13 +251,14 @@ function drawDiagram(page: PDFPage, fonts: PageFonts, project: TacticalProject, 
     for (let index = 1; index < annotation.points.length; index += 1) {
       const start = mapPoint(annotation.points[index - 1]!, box);
       const end = mapPoint(annotation.points[index]!, box);
-      page.drawLine({ start, end, color: rgb(0.996, 0.941, 0.541), thickness: 1.5 });
+      page.drawLine({ opacity, start, end, color: rgb(0.996, 0.941, 0.541), thickness: 1.5 });
     }
     const label = annotation.label?.trim();
     const last = annotation.points[annotation.points.length - 1];
     if (label && last) {
       const point = mapPoint(last, box);
       drawPageString(page, fonts, label, false, {
+        opacity,
         x: Math.min(box.x + box.width - 40, point.x + 6),
         y: point.y + 6,
         size: 8,
@@ -266,6 +274,8 @@ function drawDiagram(page: PDFPage, fonts: PageFonts, project: TacticalProject, 
     const point = mapPoint(token.position, box);
     const fill = hexColor(team?.primaryColor ?? '');
     page.drawCircle({
+      opacity,
+      borderOpacity: opacity,
       x: point.x,
       y: point.y,
       size: Math.max(10, Math.min(box.width, box.height) * 0.035),
@@ -276,6 +286,7 @@ function drawDiagram(page: PDFPage, fonts: PageFonts, project: TacticalProject, 
     const jersey = player?.jerseyNumber?.trim();
     if (jersey) {
       drawPageString(page, fonts, jersey, false, {
+        opacity,
         x: point.x - 3,
         y: point.y - 3,
         size: 7,
@@ -286,6 +297,8 @@ function drawDiagram(page: PDFPage, fonts: PageFonts, project: TacticalProject, 
 
   const ball = mapPoint(project.ball.position, box);
   page.drawCircle({
+    opacity,
+    borderOpacity: opacity,
     x: ball.x,
     y: ball.y,
     size: 8,
@@ -401,7 +414,9 @@ export async function renderCoachingPdfPackage(
     bold: await pdf.embedFont(StandardFonts.HelveticaBold),
     unicode: null,
   };
-  if (pageTextNeedsUnicode(project, sceneId, metadata, roster)) {
+  const samples = sampleExportTimes(project.timeline.durationMs, project.exportPreferences.frameRate, contactFrames);
+  const drawnScenes = new Set([sceneId, ...(hasChapterTransitions(project) ? samples.map(timeMs => sampleChapterFrame(project, timeMs, sceneId).sceneId) : [])]);
+  if ([...drawnScenes].some(drawnSceneId => pageTextNeedsUnicode(project, drawnSceneId, metadata, roster))) {
     try {
       const { embedMatchboardUnicodeFonts } = await import('./pdf-unicode-font');
       fonts.unicode = await embedMatchboardUnicodeFonts(pdf);
@@ -422,7 +437,6 @@ export async function renderCoachingPdfPackage(
     height: diagramHeight,
   });
 
-  const samples = sampleExportTimes(project.timeline.durationMs, project.exportPreferences.frameRate, contactFrames);
   if (samples.length > 1) {
     for (let offset = 0; offset < samples.length; offset += 4) {
       const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
@@ -450,12 +464,13 @@ export async function renderCoachingPdfPackage(
           size: 9,
           color: rgb(0.12, 0.16, 0.22),
         });
-        drawDiagram(page, fonts, sampleTacticalProjectAtTime(project, timeMs), sceneId, {
+        const chapter = sampleChapterFrame(project, timeMs, sceneId);
+        drawDiagram(page, fonts, chapter.project, chapter.sceneId, {
           x,
           y,
           width: cellWidth,
           height: cellHeight - 16,
-        });
+        }, chapter.opacity);
       });
     }
   }
