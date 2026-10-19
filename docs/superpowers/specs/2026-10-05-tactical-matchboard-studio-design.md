@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
-updated: 2026-10-16
+updated: 2026-10-19
 ---
 
 # Tactical Matchboard Studio — spec
@@ -97,7 +97,7 @@ Out of scope:
 | TMS-R28 | Bézier motion paths with draggable and keyboard-adjustable nodes and tangent handles (formerly 17) | Drag a handle and move it with arrow keys; the path curves |
 | TMS-R29 | Easing per segment: linear, smooth, ease-in, ease-out, ease-in-out, hold and custom cubic-bezier (formerly 18) | Set a custom cubic-bezier; sampling follows it |
 | TMS-R30 | Multi-scene sequencing: create, duplicate, rename, reorder, split and join scenes (formerly 19) | Split a scene, rename and reorder; authored motion is kept |
-| TMS-R31 | Chapter transitions between scenes (cut, fade or morph with a duration) play in preview and export | Set a 500 ms fade between two scenes; preview and export show it |
+| TMS-R31 | Optional cut, fade-through-background and roster-matched player/ball morph exit transitions occupy an outgoing scene’s final integer-millisecond duration before the next contiguous scene; chapter preview and timed exports share deterministic samples | Set a 500 ms fade; preview and exported frames show the same opacity before, during and after it; morph matches roster identities; transition settings round-trip and invalid imports are refused |
 | TMS-R32 | Per-object and per-layer visibility spans over time (formerly 20) | Hide a layer from 1 s; players reappear before 1 s and stay in the project |
 | TMS-R33 | Timed substitutions: at an authored time a substitute comes on and a player goes off | Author a substitution at 2 s; the board swaps the players at 2 s |
 | TMS-R34 | Track offsets, grouped timing and ordered stagger for selected targets (formerly 21) | Stagger three players by 200 ms; their tracks shift in order |
@@ -209,7 +209,7 @@ None: no function was compared between an ML and a non-ML method.
 
 - TMS-R07: preset angles are local authoring defaults (ground 0°, driven 10°, lofted 35°, chipped 55°), not measured football characteristics; owner may override. Airborne angles remain editable and flight duration is authored.
 
-- TMS-R31: which transition kinds count as "chapter transitions" (cut, fade, morph) is not recorded; owner may override.
+- TMS-R31: defaults are cut, fade-through-background and roster-matched player/ball morph; snapshots freeze at transition start and arrival, unpaired players/props/drawings switch halfway, and an optional exit transition enables chapter playback. Owner may override.
 
 ## Change log
 

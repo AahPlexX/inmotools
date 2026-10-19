@@ -6,14 +6,14 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
-updated: 2026-10-16
+updated: 2026-10-19
 ---
 
 # Tactical Matchboard Studio — tracker
 
 ## Resume here
 
-85 requirements: 79 verified, 1 implemented, 1 partial, 4 missing. TMS-R07 ball flight presets are verified on runtime `4e05ed2d731de2cfd38b0359bb85942967294ea3`, selector correction `3b7b53d44e77d0ca9cd70e556da238cba72da126`, GREEN workflow `38934899167` / job `117087815510`, and integration merge `336643b4`. Next: TMS-R31, then R44, R52, R78, R75 and R83. Read `CURRENT_HANDOFF.md` for continuation; `HANDOFF.md` is archival.
+85 requirements: 79 verified, 1 implemented, 1 partial, 4 missing. TMS-R07 ball flight presets are verified on runtime `4e05ed2d731de2cfd38b0359bb85942967294ea3`, selector correction `3b7b53d44e77d0ca9cd70e556da238cba72da126`, GREEN workflow `38934899167` / job `117087815510`, and integration merge `336643b4`. TMS-R31 is active in task `T-tactical-matchboard-studio-20261019-b823`; focused RED contracts precede implementation. Next: finish TMS-R31, then R44, R52, R78, R75 and R83. Read `CURRENT_HANDOFF.md` for continuation; `HANDOFF.md` is archival.
 
 ## Documents
 
