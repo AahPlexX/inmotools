@@ -2,7 +2,7 @@
 tool: tactical-matchboard-studio
 doc: handoff
 status: active
-updated: 2026-10-16
+updated: 2026-10-19
 tracker: src/tools/tactics/TRACKER.md
 ---
 
@@ -24,7 +24,9 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 
 ## Exact next action
 
-Start **TMS-R31 scene transitions** from current `main` using `pnpm task:start tactical-matchboard-studio fix "TMS-R31 scene transitions"` after these closure records integrate. Read the spec's R31 acceptance and its owner-overridable transition-kind note, then establish a focused RED preview/export contract before implementation. Relevant existing modules are `scene-engine.ts`, `timeline-engine.ts`, `board-engine.ts` and `export-engine.ts`; preview and export must share the same deterministic transition sampling. No dependency is currently justified. Do not revive archived PDF branches.
+TMS-R31 is active in `.tasks/items/T-tactical-matchboard-studio-20261019-b823.md` on `fix/tactical-matchboard-studio`, based on main `160a3c39`. Cut/fade-through/morph authoring and shared chapter sampling are implemented; focused units, TypeScript/build, local lint and desktop/mobile acceptance pass. Next: finish governed integration, record its exact evidence, then mark R31 verified. Continue with R44 after R31 integrates; do not reopen the completed R07 task or archived PDF branches.
+
+R31 stores optional exit-transition metadata on scenes. It uses the outgoing scene’s final interval and the next contiguous scene’s arrival; cut is instantaneous, fade passes through the background, and morph pairs visible roster identities plus the ball. Unpaired actors/props/drawings switch halfway. Existing projects without settings retain their selected-scene behavior. Setting a transition enables chapter playback at the existing playhead. Preview, 3D, animated SVG/HTML/video/frame exports and PDF contact sheets share the sampled chapter. Animated exports retain boundary/transition samples within the existing cap or report an insufficient cap. Clone/split/reorder/join and JSON import have transition-specific regression coverage; no dependency or schema bump was added.
 
 ## Verified R07 behavior
 

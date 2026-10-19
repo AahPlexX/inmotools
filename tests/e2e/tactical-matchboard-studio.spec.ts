@@ -1047,6 +1047,75 @@ async function readDownload(page: Page, name: string) {
   return { filename: download.suggestedFilename(), bytes: Buffer.concat(chunks) };
 }
 
+test('authors chapter fades and morphs with matching preview and standalone export', async ({ page }) => {
+  test.setTimeout(120_000);
+  const scenePicker = page.getByRole('combobox', { name: 'Scene view', exact: true });
+  const firstScene = await scenePicker.inputValue();
+  await coordinateInput(page, 'X').fill('20');
+  await coordinateInput(page, 'Y').fill('50');
+  await page.getByRole('button', { name: 'Set position', exact: true }).click();
+  await page.getByText('Timeline & motion', { exact: true }).click();
+  await page.getByLabel('Split at (ms)').fill('1000');
+  await page.getByLabel('New scene name', { exact: true }).fill('Arrival');
+  await page.getByRole('button', { name: 'Split scene', exact: true }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Timeline scene split.');
+  await scenePicker.selectOption({ label: 'Arrival' });
+  await coordinateInput(page, 'X').fill('80');
+  await page.getByRole('button', { name: 'Set position', exact: true }).click();
+  await scenePicker.selectOption(firstScene);
+  await page.getByLabel('Exit transition').selectOption('fade');
+  await page.getByLabel('Transition duration (ms)').fill('500');
+  await page.getByRole('button', { name: 'Save chapter transition', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.status-line').last()).toContainText('Chapter transition saved.');
+  await expect(page.getByRole('button', { name: 'Save chapter transition', exact: true })).toBeFocused();
+  const svg = page.locator('.tactical-board-svg > svg');
+  const seek = async (time: string) => {
+    await page.getByLabel('Playhead (ms)').fill(time);
+    await page.getByRole('button', { name: 'Set playhead', exact: true }).click();
+  };
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByLabel('Exit transition')).toHaveValue('none');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(page.getByLabel('Exit transition')).toHaveValue('fade');
+  await seek('625');
+  await expect(svg).toHaveAttribute('opacity', '0.5');
+  await page.getByRole('button', { name: 'Show 3D view', exact: true }).click();
+  await expect(page.getByTestId('tactical-3d-canvas')).toHaveCSS('opacity', '0.5');
+  await page.getByRole('button', { name: 'Hide 3D view', exact: true }).click();
+  await seek('750');
+  await expect(svg).toHaveAttribute('opacity', '0');
+  await seek('875');
+  await expect(svg).toHaveAttribute('opacity', '0.5');
+  await seek('1000');
+  await expect(svg).not.toHaveAttribute('opacity');
+  await expect(scenePicker.locator('option:checked')).toHaveText('Arrival');
+  await page.getByText('Professional export', { exact: true }).click();
+  const html = await readDownload(page, 'Download standalone HTML');
+  const data = /id="tactical-playback-data">([\s\S]*?)<\/script>/.exec(html.bytes.toString('utf8'));
+  expect(data).not.toBeNull();
+  const payload = JSON.parse(data![1]!) as { frames: Array<{ timeMs: number; svg: string }> };
+  expect(payload.frames.find(frame => frame.timeMs === 625)?.svg).toContain('opacity="0.5"');
+  expect(payload.frames.find(frame => frame.timeMs === 875)?.svg).toContain('opacity="0.5"');
+  await scenePicker.selectOption(firstScene);
+  await page.getByLabel('Exit transition').selectOption('morph');
+  await page.getByRole('button', { name: 'Save chapter transition', exact: true }).click();
+  await seek('750');
+  await expect(page.locator('.tactical-board-svg g[data-tactical-kind="player"]').first()).toHaveAttribute('transform', /translate\(500 /);
+  await expect(svg).not.toHaveAttribute('opacity');
+  await scenePicker.selectOption(firstScene);
+  await page.getByLabel('Transition duration (ms)').fill('1001');
+  await page.getByRole('button', { name: 'Save chapter transition', exact: true }).click();
+  await expect(page.locator('.status-line').last()).toContainText('transition kind or duration is invalid');
+  const form = page.getByRole('form', { name: 'Chapter transition', exact: true });
+  for (const control of await form.locator('input, select, button').all()) {
+    expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  const accessibility = await new AxeBuilder({ page }).include('form[aria-label="Chapter transition"]').withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(accessibility.violations).toEqual([]);
+});
+
 test('exports metadata, analytics, playback, and a capability-checked video fallback', async ({ page }) => {
   test.setTimeout(120_000);
   await page.getByText('Professional export', { exact: true }).click();

@@ -1,4 +1,5 @@
 import { addTimelineScene, sampleTacticalTimeline } from './timeline-engine';
+import { reconcileSceneTransitions, validateChapterTransitions } from './transition-engine';
 import type { TacticalProject, TacticalScene } from './tactics-types';
 
 export interface CloneTacticalSceneInput {
@@ -142,7 +143,7 @@ export function cloneTacticalScene(
       })),
   ];
 
-  return {
+  const cloned = {
     ...project,
     scenes: addTimelineScene(project.scenes, scene),
     playerTokens,
@@ -150,6 +151,9 @@ export function cloneTacticalScene(
     equipment,
     annotations,
   };
+  const transitionErrors = validateChapterTransitions(cloned);
+  if (transitionErrors.length) throw new Error(`Cloning would invalidate chapter transitions. ${transitionErrors.join(' ')}`);
+  return cloned;
 }
 
 
@@ -283,7 +287,7 @@ export function reorderTacticalScene(
 
   return {
     ...project,
-    scenes: reordered.map((scene) => ({ ...scene, startMs: starts.get(scene.id) ?? scene.startMs })),
+    scenes: reconcileSceneTransitions(reordered.map((scene) => ({ ...scene, startMs: starts.get(scene.id) ?? scene.startMs }))),
     timeline: {
       ...project.timeline,
       playheadMs: shiftByScene(project.timeline.playheadMs),
@@ -346,7 +350,7 @@ export function splitTacticalScene(
     );
   }
 
-  const cloned = cloneTacticalScene(project, sceneId, {
+  const cloned = cloneTacticalScene({ ...project, scenes: project.scenes.map(scene => ({ ...scene, transition: undefined })) }, sceneId, {
     id: input.rightId,
     name: input.rightName,
     startMs: input.splitMs,
@@ -356,9 +360,10 @@ export function splitTacticalScene(
   const rightSceneId = input.rightId.trim();
   return {
     ...cloned,
-    scenes: cloned.scenes.map((scene) => scene.id === sceneId
-      ? { ...scene, durationMs: input.splitMs - source.startMs }
-      : scene),
+    scenes: reconcileSceneTransitions(cloned.scenes.map((scene) => scene.id === sceneId
+      ? { ...scene, durationMs: input.splitMs - source.startMs, transition: undefined }
+      : scene.id === rightSceneId ? { ...scene, transition: source.transition ? { ...source.transition } : undefined }
+      : { ...scene, transition: project.scenes.find(original => original.id === scene.id)?.transition })),
     annotations: cloned.annotations
       .filter((annotation) => {
         if (annotation.sceneId === sceneId) {
@@ -506,6 +511,7 @@ export function joinTacticalScenes(
 
   const mergedScene: TacticalScene = {
     ...left,
+    transition: right.transition ? { ...right.transition } : undefined,
     durationMs: left.durationMs + right.durationMs,
     layers: mergedLayers,
     objects: [

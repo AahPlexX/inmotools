@@ -6,12 +6,12 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
-updated: 2026-10-16
+updated: 2026-10-19
 ---
 
 # Tactical Matchboard Studio — spec
 
-As built through ball-flight runtime `4e05ed2d731de2cfd38b0359bb85942967294ea3` (TMS-R07); prior verified requirements and evidence remain in the tracker. Requirement prefix: `TMS`. Status of each requirement: [TRACKER.md](../../../src/tools/tactics/TRACKER.md). History: [2026-09-21 design](2026-09-21-tactical-matchboard-studio-design.md), [2026-09-02 ethical support addendum](2026-09-02-tactical-ethical-support-addendum.md), [FEATURE_MATRIX.md](../../../src/tools/tactics/FEATURE_MATRIX.md) (rows 1–67, cited below as "formerly <n>"), [HANDOFF.md](../../../src/tools/tactics/HANDOFF.md), [TODO_SEQUENCE.md](../../../src/tools/tactics/TODO_SEQUENCE.md), [plan](../plans/2026-09-21-tactical-matchboard-studio.md). Owner input: [owner feature notes 2026-10-05](../../research/owner-feature-notes-2026-10-05.md#tactical-matchboard-studio-tactical-animation--matchboard-studio).
+Baseline main `160a3c39`; TMS-R31 implementation and pending integration evidence are recorded in `.tasks/items/T-tactical-matchboard-studio-20261019-b823.md`. Prior verified requirements and evidence remain in the tracker. Requirement prefix: `TMS`. Status of each requirement: [TRACKER.md](../../../src/tools/tactics/TRACKER.md). History: [2026-09-21 design](2026-09-21-tactical-matchboard-studio-design.md), [2026-09-02 ethical support addendum](2026-09-02-tactical-ethical-support-addendum.md), [FEATURE_MATRIX.md](../../../src/tools/tactics/FEATURE_MATRIX.md) (rows 1–67, cited below as "formerly <n>"), [HANDOFF.md](../../../src/tools/tactics/HANDOFF.md), [TODO_SEQUENCE.md](../../../src/tools/tactics/TODO_SEQUENCE.md), [plan](../plans/2026-09-21-tactical-matchboard-studio.md). Owner input: [owner feature notes 2026-10-05](../../research/owner-feature-notes-2026-10-05.md#tactical-matchboard-studio-tactical-animation--matchboard-studio).
 
 ## Purpose
 
@@ -97,7 +97,7 @@ Out of scope:
 | TMS-R28 | Bézier motion paths with draggable and keyboard-adjustable nodes and tangent handles (formerly 17) | Drag a handle and move it with arrow keys; the path curves |
 | TMS-R29 | Easing per segment: linear, smooth, ease-in, ease-out, ease-in-out, hold and custom cubic-bezier (formerly 18) | Set a custom cubic-bezier; sampling follows it |
 | TMS-R30 | Multi-scene sequencing: create, duplicate, rename, reorder, split and join scenes (formerly 19) | Split a scene, rename and reorder; authored motion is kept |
-| TMS-R31 | Chapter transitions between scenes (cut, fade or morph with a duration) play in preview and export | Set a 500 ms fade between two scenes; preview and export show it |
+| TMS-R31 | Optional cut, fade-through-background and roster-matched player/ball morph exit transitions occupy an outgoing scene’s final integer-millisecond duration before the next contiguous scene; chapter preview and timed exports share deterministic samples | Set a 500 ms fade; preview and exported frames show the same opacity before, during and after it; morph matches roster identities; transition settings round-trip and invalid imports are refused |
 | TMS-R32 | Per-object and per-layer visibility spans over time (formerly 20) | Hide a layer from 1 s; players reappear before 1 s and stay in the project |
 | TMS-R33 | Timed substitutions: at an authored time a substitute comes on and a player goes off | Author a substitution at 2 s; the board swaps the players at 2 s |
 | TMS-R34 | Track offsets, grouped timing and ordered stagger for selected targets (formerly 21) | Stagger three players by 200 ms; their tracks shift in order |
@@ -209,9 +209,11 @@ None: no function was compared between an ML and a non-ML method.
 
 - TMS-R07: preset angles are local authoring defaults (ground 0°, driven 10°, lofted 35°, chipped 55°), not measured football characteristics; owner may override. Airborne angles remain editable and flight duration is authored.
 
-- TMS-R31: which transition kinds count as "chapter transitions" (cut, fade, morph) is not recorded; owner may override.
+- TMS-R31: defaults are cut, fade-through-background and roster-matched player/ball morph; snapshots freeze at transition start and arrival, unpaired players/props/drawings switch halfway, and an optional exit transition enables chapter playback. Owner may override.
 
 ## Change log
+
+- **2026-10-19:** TMS-R31 defines optional cut, fade-through-background and roster-matched player/ball morph exit transitions, shared chapter sampling, timed-export boundary retention, backward compatibility and scene-edit/import validation.
 
 - **2026-10-16:** TMS-R07 specifies the canonical ball-track presets, editable launch angle, physical pitch distance, authored timing and retained manual elevation editing. Runtime `4e05ed2d` adds these controls without a dependency or schema change.
 

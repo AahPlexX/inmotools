@@ -17,6 +17,7 @@ import {
   type VideoExportCandidate,
 } from './export-types';
 import { sampleTacticalProjectAtTime } from './timeline-engine';
+import { chapterExportTimes, sampleChapterFrame } from './transition-engine';
 import type { TacticalProject } from './tactics-types';
 
 export type { AnalyticsReportRow, ExportMetadata, ExportMetadataDraft, RasterMime, RasterSurface, VideoEncodeRequest, VideoExportCandidate } from './export-types';
@@ -170,11 +171,11 @@ export function sampleExportTimes(durationMs: number, frameRate: number, maxFram
 export function composeFramedSvg(
   project: TacticalProject,
   sceneId: string,
-  options: { width: number; height: number; showCaption: boolean },
+  options: { width: number; height: number; showCaption: boolean; boardOpacity?: number },
 ): string {
   const width = requireEvenDimension(options.width, 'Frame width');
   const height = requireEvenDimension(options.height, 'Frame height');
-  const board = serializeTacticalBoardSvg(project, sceneId).trim();
+  const board = serializeTacticalBoardSvg(project, sceneId, { opacity: options.boardOpacity }).trim();
   assertPassiveSvg(board);
   const viewBox = board.match(/viewBox="0 0 ([0-9.]+) ([0-9.]+)"/);
   const boardWidth = Number(viewBox?.[1] ?? 1000);
@@ -303,15 +304,16 @@ export function buildExportFrames(
   options: { width: number; height: number; frameRate: number; maxFrames: number; showCaption: boolean },
 ): Array<{ timeMs: number; svg: string }> {
   requireScene(project, sceneId);
-  const times = sampleExportTimes(project.timeline.durationMs, options.frameRate, options.maxFrames);
-  return times.map((timeMs) => ({
-    timeMs,
-    svg: composeFramedSvg(sampleTacticalProjectAtTime(project, timeMs), sceneId, {
+  const times = chapterExportTimes(project, sampleExportTimes(project.timeline.durationMs, options.frameRate, options.maxFrames), options.maxFrames);
+  return times.map((timeMs) => {
+    const frame = sampleChapterFrame(project, timeMs, sceneId);
+    return { timeMs, svg: composeFramedSvg(frame.project, frame.sceneId, {
       width: options.width,
       height: options.height,
       showCaption: options.showCaption,
-    }),
-  }));
+      boardOpacity: frame.opacity,
+    }) };
+  });
 }
 
 export function buildStandalonePlaybackHtml(

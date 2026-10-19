@@ -6,14 +6,14 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
-updated: 2026-10-16
+updated: 2026-10-19
 ---
 
 # Tactical Matchboard Studio — tracker
 
 ## Resume here
 
-85 requirements: 79 verified, 1 implemented, 1 partial, 4 missing. TMS-R07 ball flight presets are verified on runtime `4e05ed2d731de2cfd38b0359bb85942967294ea3`, selector correction `3b7b53d44e77d0ca9cd70e556da238cba72da126`, GREEN workflow `38934899167` / job `117087815510`, and integration merge `336643b4`. Next: TMS-R31, then R44, R52, R78, R75 and R83. Read `CURRENT_HANDOFF.md` for continuation; `HANDOFF.md` is archival.
+85 requirements: 79 verified, 2 implemented, 1 partial, 3 missing. TMS-R07 ball flight presets are verified on runtime `4e05ed2d731de2cfd38b0359bb85942967294ea3`, selector correction `3b7b53d44e77d0ca9cd70e556da238cba72da126`, GREEN workflow `38934899167` / job `117087815510`, and integration merge `336643b4`. TMS-R31 is active in task `T-tactical-matchboard-studio-20261019-b823`; cut/fade/morph sampling and authoring are implemented; local acceptance passes and governed integration is pending. Next: finish TMS-R31, then R44, R52, R78, R75 and R83. Read `CURRENT_HANDOFF.md` for continuation; `HANDOFF.md` is archival.
 
 ## Documents
 
@@ -62,7 +62,7 @@ updated: 2026-10-16
 | TMS-R28 | verified | e2e "edits curved trajectory handles with keyboard and pointer input"; unit "samples quadratic and cubic Bézier geometry independently of timing easing" | |
 | TMS-R29 | verified | unit "supports cubic-bezier interpolation with bounded deterministic output"; e2e "authors custom cubic-bezier timing easing for a motion segment" | |
 | TMS-R30 | verified | e2e "splits, renames, and reorders non-overlapping tactical scenes"; unit "joins contiguous scenes without losing scene-owned players or authored motion" | |
-| TMS-R31 | missing | — | Scenes play back to back; no transition between them |
+| TMS-R31 | implemented | unit "samples a 500 ms fade identically for chapter preview and exported frames", "renders chapter fade opacity in vector PDF contact sheets"; e2e "authors chapter fades and morphs with matching preview and standalone export" | Local checks pass; governed integration pending. Exit transitions share deterministic preview/export sampling; existing projects with no settings keep selected-scene behavior. |
 | TMS-R32 | verified | unit "samples temporal visibility for layers and annotations without deleting canonical content"; e2e "temporally hides a scene layer without deleting its players" | |
 | TMS-R33 | verified | unit "authors one timed substitution event that swaps outgoing and incoming player visibility"; e2e "authors a timed substitution and swaps the two player tokens at the authored millisecond" | One atomic edit writes paired timeline visibility keyframes with additive substitution tags; authoring validates player tokens, same team/scene and immediate-before visibility |
 | TMS-R34 | verified | unit "offsets a selected group with deterministic ordered stagger"; e2e "authors scene sequencing, visibility, offsets, and grouped stagger timing" | |

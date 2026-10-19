@@ -4,6 +4,7 @@ import type {
 } from './tactics-types';
 import { isNormalizedPoint, refreshStoredTrainingMarkings, trainingFormatProfiles } from './pitch-engine';
 import { validateTacticalTimeline } from './timeline-engine';
+import { validateChapterTransitions } from './transition-engine';
 import { createEmptyVideoReview, validateVideoReview } from './video-review-engine';
 export {
   createCameraPresetState,
@@ -168,6 +169,7 @@ export function validateTacticalProject(project: TacticalProject): string[] {
   }
 
   errors.push(...validateTacticalTimeline(project.timeline));
+  errors.push(...validateChapterTransitions(project));
 
   for (const token of project.playerTokens) {
     validatePosition(errors, token.id, token.position);

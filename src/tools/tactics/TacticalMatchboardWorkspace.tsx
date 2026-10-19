@@ -43,7 +43,7 @@ import { authorEntityCoordinate } from './coordinate-engine';
 import { tacticalPitchGuides, snapWithTacticalAssist } from './guide-engine';
 import { applyPresentationVisibility, onionSkinGhosts } from './presentation-authoring-engine';
 import { transformTacticalProject } from './pitch-engine';
-import { sampleTacticalProjectAtTime } from './timeline-engine';
+import { hasChapterTransitions, sampleChapterFrame } from './transition-engine';
 import {
   PITCH_RULE_PROFILES,
   applyPitchRuleProfile,
@@ -195,25 +195,30 @@ export default function TacticalMatchboardWorkspace() {
   const overlayOpen = helpOpen || actionsOpen || inspectorSheet || timelineSheet;
 
   const project = history.present;
+  const chapterFrame = useMemo(
+    () => sampleChapterFrame(project, Math.min(previewTimeMs, project.timeline.durationMs), activeSceneId),
+    [activeSceneId, previewTimeMs, project],
+  );
   const presentationProject = useMemo(
     () => {
       const timeMs = Math.min(previewTimeMs, project.timeline.durationMs);
-      return applyPresentationVisibility(sampleTacticalProjectAtTime(project, timeMs), timeMs);
+      return hasChapterTransitions(project) ? chapterFrame.project : applyPresentationVisibility(chapterFrame.project, timeMs);
     },
-    [previewTimeMs, project],
+    [chapterFrame.project, previewTimeMs, project],
   );
   const sampledCamera = useMemo(
     () => sampleCameraState(project.cameraStates, Math.min(previewTimeMs, project.timeline.durationMs), project.pitch.dimensions),
     [previewTimeMs, project.cameraStates, project.pitch.dimensions, project.timeline.durationMs],
   );
   const activeCamera = cameraDraft ?? sampledCamera;
-  const activeScene = project.scenes.find((scene) => scene.id === activeSceneId) ?? project.scenes[0];
+  const activeScene = project.scenes.find((scene) => scene.id === chapterFrame.sceneId) ?? project.scenes[0];
   const sceneId = activeScene?.id ?? '';
   const layerId = activeScene?.layers[0]?.id ?? '';
   const boardRenderOptions = useMemo(() => {
     const timeMs = Math.min(previewTimeMs, project.timeline.durationMs);
     const overlay = project.scenarios.find((scenario) => scenario.id === scenarioOverlayId);
     return {
+      opacity: chapterFrame.opacity,
       ghosts: onionSkin ? onionSkinGhosts(project, timeMs, sceneId) : undefined,
       guides: snapAssist.enabled && snapAssist.pitchGuides ? tacticalPitchGuides(project) : undefined,
       scenarioGhosts: overlay
@@ -224,6 +229,7 @@ export default function TacticalMatchboardWorkspace() {
       ballSelected: boardTarget === 'ball',
     };
   }, [
+    chapterFrame.opacity,
     boardTarget,
     onionSkin,
     previewTimeMs,
@@ -1233,6 +1239,7 @@ export default function TacticalMatchboardWorkspace() {
               onChange={(event) => {
                 const nextSceneId = event.target.value;
                 setActiveSceneId(nextSceneId);
+                if (hasChapterTransitions(project)) setPreviewTimeMs(project.scenes.find(scene => scene.id === nextSceneId)?.startMs ?? 0);
                 const nextTokenId = project.playerTokens.find((token) => token.sceneId === nextSceneId)?.id;
                 setSelectedTokenId(nextTokenId);
                 setBoardTarget('player');
@@ -1399,6 +1406,7 @@ export default function TacticalMatchboardWorkspace() {
             <Suspense fallback={<div className="tactical-3d-loading" role="status">Loading the local 3D view…</div>}>
               <Tactical3DView
                 project={presentationProject}
+                opacity={chapterFrame.opacity}
                 sceneId={sceneId}
                 selectedTokenId={selectedTokenId}
                 cameraState={activeCamera}

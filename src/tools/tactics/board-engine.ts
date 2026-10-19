@@ -9,6 +9,7 @@ import type {
 } from './tactics-types';
 
 export interface TacticalBoardRenderOptions {
+  opacity?: number;
   ghosts?: Array<{ tokenId: string; position: NormalizedPoint; relation: 'previous' | 'next' }>;
   guides?: Array<{ axis: 'x' | 'y'; value: number; label: string }>;
   scenarioGhosts?: Array<{ tokenId: string; position: NormalizedPoint }>;
@@ -239,7 +240,7 @@ export function serializeTacticalBoardSvg(
   const description = project.metadata.description.trim() || scene.name;
 
   const parts: string[] = [
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${number(BOARD_WIDTH)} ${number(height)}" role="img" aria-labelledby="${escapeAttribute(titleId)} ${escapeAttribute(descId)}">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${number(BOARD_WIDTH)} ${number(height)}" role="img" aria-labelledby="${escapeAttribute(titleId)} ${escapeAttribute(descId)}"${options?.opacity !== undefined && options.opacity !== 1 ? ` opacity="${number(options.opacity)}"` : ''}>`,
     `<title id="${escapeAttribute(titleId)}">${escapeText(title)}</title>`,
     `<desc id="${escapeAttribute(descId)}">${escapeText(description)}</desc>`,
     '<defs>',
