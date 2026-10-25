@@ -7,7 +7,7 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T22:42:30Z
+timestamp: 2026-10-25T22:53:46Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated focused gates; full R78 acceptance pending
 documentation: R78 candidate implementation and corrective TDD; R44/R52 locally accepted
@@ -17,7 +17,7 @@ documentation: R78 candidate implementation and corrective TDD; R44/R52 locally 
 
 ## Resume here
 
-85 requirements: **82 verified, 1 implemented, 2 partial, 0 missing**. Latest locally accepted runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06` adds R52; full units 4,231 passed / 18 existing skips, type/production/PWA build pass, lint 4,104 existing warnings / 0 errors, canonical four-spec browser gate 112 passed / 2 existing skips / 0 failures / 0 retries (one worker, 13.9 min). All 14 new R52 and 8 R44 browser cases pass. Exact input/environment/TDD/receipt identities: [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md); R44 history: [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md). R52/R44 have no remaining implementation/local-acceptance work. Their tasks stay active for owner-managed integration; no hosted CI, main integration or deployment is claimed. The owner authorizes continued work/pushes on the fixed chat branch and handles integration. **Active R78 candidate / acceptance pending:** [task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md); 19 new units, type/build and all 16 focused browser cases pass; freeze full local acceptance before R75/R83; do not wait for integration or disconnect the connector. `HANDOFF.md` is archival.
+85 requirements: **82 verified, 1 implemented, 2 partial, 0 missing**. Latest locally accepted runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06` adds R52; full units 4,231 passed / 18 existing skips, type/production/PWA build pass, lint 4,104 existing warnings / 0 errors, canonical four-spec browser gate 112 passed / 2 existing skips / 0 failures / 0 retries (one worker, 13.9 min). All 14 new R52 and 8 R44 browser cases pass. Exact input/environment/TDD/receipt identities: [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md); R44 history: [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md). R52/R44 have no remaining implementation/local-acceptance work. Their tasks stay active for owner-managed integration; no hosted CI, main integration or deployment is claimed. The owner authorizes continued work/pushes on the fixed chat branch and handles integration. **Active R78 candidate / acceptance pending:** [task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md); runtime 94d8428 passes 4,250 full units, type/build and lint; 16 focused + 2 native-scroll/pinch cases pass; final 130-case owned browser gate next before R75/R83; do not wait for integration or disconnect the connector. `HANDOFF.md` is archival.
 
 ## Documents
 
@@ -113,7 +113,7 @@ documentation: R78 candidate implementation and corrective TDD; R44/R52 locally 
 | TMS-R75 | partial | unit "composes even social-card sizes and escapes active text" | Social cards are square, portrait, story and landscape 1920×1080; no 1200×630 card |
 | TMS-R76 | verified | e2e "reflows and preserves 44px essential targets across phone, tablet, laptop, and desktop widths", "narrow sheets keep the pitch first and return focus" | |
 | TMS-R77 | verified | e2e "player actions from right-click and the touch button lock the same player" | |
-| TMS-R78 | partial | unit "opens once at 500 ms with the original CSS-pixel anchor and no input mutation", "keeps 150 seeded offscreen anchors and oversized panels within their viewport" | Candidate controller/hook/radial dialog share the seven R77 callbacks. Original/corrective RED and current 19-unit GREEN are in task 7d78; 16 focused browser cases pass; frozen full acceptance pending, not verified yet |
+| TMS-R78 | partial | unit "opens once at 500 ms with the original CSS-pixel anchor and no input mutation", "keeps 150 seeded offscreen anchors and oversized panels within their viewport" | Candidate controller/hook/radial dialog share the seven R77 callbacks. Original/corrective RED and current 19-unit GREEN are in task 7d78; Full units/build/lint and 16 focused + 2 native scroll/pinch cases pass. Final four-spec / 130-case browser acceptance pending, not verified yet |
 | TMS-R79 | verified | unit "keeps a tooltip inside the viewport and flips it above a low anchor"; e2e "help, shortcuts, and tooltips stay available without taking over text fields" | |
 | TMS-R80 | verified | unit "keeps shortcut chords unique and described", "ignores authoring shortcuts while typing, on controls, or under an open overlay"; e2e "reduced motion steps playback instead of animating it" | |
 | TMS-R81 | verified | e2e "has no serious or critical accessibility violations in the tactical workspace" | |

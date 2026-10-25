@@ -1685,6 +1685,22 @@ test('TMS-R78 preserves quick taps and cancels motion extra contacts and pointer
   touch = await beginPlayerTouch(page); await touch.end(true); await page.clock.runFor(650); await expect(menu).toHaveCount(0);
 });
 
+test('TMS-R78 retains native page scrolling and mobile pinch without arming actions', async ({ page, isMobile }) => {
+  const touch = await beginPlayerTouch(page); const x = await coordinateInput(page, 'X').inputValue(); const y = await coordinateInput(page, 'Y').inputValue();
+  const before = await page.evaluate(() => scrollY);
+  await touch.session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 7, x: touch.point.x, y: touch.point.y - 30 }] });
+  await touch.session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 7, x: touch.point.x, y: touch.point.y - 100 }] });
+  await expect.poll(async () => page.evaluate(() => scrollY)).toBeGreaterThan(before); await touch.end();
+  if (isMobile) {
+    const pinch = await beginPlayerTouch(page); const scale = await page.evaluate(() => visualViewport?.scale ?? 1);
+    await pinch.session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 7, ...pinch.point }, { id: 8, x: pinch.point.x + 60, y: pinch.point.y }] });
+    for (const distance of [15, 35]) await pinch.session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 7, x: pinch.point.x - distance, y: pinch.point.y }, { id: 8, x: pinch.point.x + 60 + distance, y: pinch.point.y }] });
+    await expect.poll(async () => page.evaluate(() => visualViewport?.scale ?? 1)).toBeGreaterThan(scale); await pinch.end();
+  }
+  await expect(radialActions(page)).toHaveCount(0);
+  await expect(coordinateInput(page, 'X')).toHaveValue(x); await expect(coordinateInput(page, 'Y')).toHaveValue(y);
+});
+
 test('TMS-R78 cancels interrupted and unmounted holds without stale menu callbacks', async ({ page }) => {
   await page.clock.install(); const menu = radialActions(page);
   for (const type of ['scroll', 'resize', 'blur']) {
