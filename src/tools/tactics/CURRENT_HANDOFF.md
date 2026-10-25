@@ -3,10 +3,10 @@ tool: tactical-matchboard-studio
 doc: handoff
 status: active
 updated: 2026-10-25
-timestamp: 2026-10-25T22:03:00Z
+timestamp: 2026-10-25T22:36:50Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
-documentation: R78 baseline/RED observed; implementation next; R44/R52 locally accepted
+validator: Arena.ai Agent Mode (same agent); automated focused gates; full R78 acceptance pending
+documentation: R78 candidate implementation and corrective TDD; R44/R52 locally accepted
 tracker: src/tools/tactics/TRACKER.md
 ---
 
@@ -20,7 +20,8 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 - Latest locally verified requirement: **TMS-R52 first-person player camera**, runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06` on `arena/981e49e9-inmotools`; R44 remains verified on the combined source. Neither is integrated to main or deployed at final remote inspection.
 - Latest local gates: **4,231 units passed / 18 existing skips**; type/production/PWA build passed (14.48 s, 408 precache entries); lint **4,104 existing warnings / 0 errors**; canonical four owned browser specs **112 passed / 2 existing skips / 0 failures / 0 retries**, one worker, 13.9 min. Browser execution head `bd5d5b306de510f2203e90a6355740dae730db9c` changes only records.
 - R52 [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md) and R44 [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) remain active solely for owner-managed integration, not local implementation/acceptance.
-- Next implementation: **R78**, then R75, R83. The owner permits continuing/pushing on the fixed chat branch and handles integration; no need to wait for main. No PR was opened, other branch pushed or connector disconnected. Prior hosted dispatch was refused HTTP 403; no hosted validation was initiated in this continuation and no hosted acceptance/deployment is claimed.
+- Active R78 candidate: controller/hook/shared radial actions implemented; 19 new units / 24 focused units, clean new-module lint and type/build pass. Current 16-case focused browser batch is running, not accepted. Finish its result and frozen full local gates; task 7d78 records corrective RED and artifact limits.
+- Next implementation: **R78 acceptance**, then R75, R83. The owner permits continuing/pushing on the fixed chat branch and handles integration; no need to wait for main. No PR was opened, other branch pushed or connector disconnected. Prior hosted dispatch was refused HTTP 403; no hosted validation was initiated in this continuation and no hosted acceptance/deployment is claimed.
 - Last main-integrated requirement remains **TMS-R31 scene transitions**.
 - R31 runtime `a528848db0c030c9010aa6fbb76061627077a084`, GREEN workflow `39195675178` / job `117877804494`, integration merge `15e3133a228a67e0913d8c01ea6b8e727896dc8a`.
 - R31 gate: 4,195 units passed / 18 skipped; TypeScript and production/PWA build passed (5.68 s); four owned Tactical browser specs: 90 passed / 2 existing duplicate mobile skips / 0 failures / no reported retries (3.5 min). Completed task: `.tasks/items/T-tactical-matchboard-studio-20261019-b823.md`.
@@ -31,7 +32,7 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 
 ## Exact next action
 
-**Continue TMS-R78 touch long-press/radial player actions**, then R75 and R83, on `arena/981e49e9-inmotools`. [Task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md) records the pre-implementation contract/defaults and observed RED. Baseline passed (227 Tactical units, type/production/PWA build, 2 existing R77 browser cases); 17 new units fail on missing gesture/visibility/placement APIs and 2 native CDP-touch cases fail on the absent radial dialog. Six new browser contracts are written; remaining cases have not run yet. Implement the controller, stable-board touch hook and responsive radial presentation sharing the seven R77 callbacks; keep the normal non-drag workflow and original assertions/timeouts. R52 implementation/local acceptance is complete on `bedf5ece25cab5a541e8f09605b0dd52e7323f06`; do not rebuild R52/R44 or reopen completed R31/R07/PDF work. The owner explicitly permits branch pushes and handles integration. Do not create a PR, switch/create/push another branch, weaken branch/workflow rules, or close/disconnect the connector. R44/R52 tasks remain active only until actual owner integration evidence is recorded.
+**Finish TMS-R78 touch long-press/radial player actions acceptance**, then R75 and R83, on `arena/981e49e9-inmotools`. [Task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md) records contract `6473cab`, original RED `61ed61a`, current candidate and corrective regressions. Current focused browser batch passed all 16 cases (one worker, 2.0 min); receipt `/home/user/inmotools-r78-focused-browser-final.log`. Freeze/commit candidate and run full units/lint/type/build plus the canonical four owned browser specs, one worker and original assertions/timeouts/zero local retries. Only mark R78 verified after these finish. New helpers/components/units lint is clean; 19 new / 24 focused units and latest type/production/PWA build pass. Earlier failed batches are not acceptance. Keep the non-drag alternatives and owner-managed integration nonblocking; no PR, other branch, connector disconnection, hosted/deployment claim or rebuilding R44/R52/R31/R07/PDF.
 
 R31 stores optional exit-transition metadata on scenes. It uses the outgoing scene’s final interval and the next contiguous scene’s arrival; cut is instantaneous, fade passes through the background, and morph pairs visible roster identities plus the ball. Unpaired actors/props/drawings switch halfway. Existing projects without settings retain their selected-scene behavior. Setting a transition enables chapter playback at the existing playhead. Preview, 3D, animated SVG/HTML/video/frame exports and PDF contact sheets share the sampled chapter. Animated exports retain boundary/transition samples within the existing cap or report an insufficient cap. Clone/split/reorder/join and JSON import have transition-specific regression coverage; no dependency or schema bump was added.
 

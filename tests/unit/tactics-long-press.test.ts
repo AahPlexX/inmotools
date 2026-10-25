@@ -36,6 +36,15 @@ describe('TMS-R78 touch long-press and radial geometry', () => {
     vi.advanceTimersByTime(1000); expect(open).toHaveBeenCalledTimes(1); expect(input).toEqual(before);
   });
 
+  it('copies inherited native pointer coordinates instead of retaining the event object', () => {
+    class NativeLikeTouch {
+      get pointerId() { return 7; } get pointerType() { return 'touch'; } get isPrimary() { return true; }
+      get button() { return 0; } get clientX() { return 120; } get clientY() { return 240; }
+    }
+    const { gesture, open } = controller(); gesture.begin(new NativeLikeTouch(), 'token-2'); vi.advanceTimersByTime(500);
+    expect(open).toHaveBeenCalledExactlyOnceWith('token-2', { x: 120, y: 240 });
+  });
+
   it('keeps a quick tap out of the action menu and cancels its timer', () => {
     const { gesture, open, cancel } = controller(); gesture.begin(touch, 'token-2');
     vi.advanceTimersByTime(150); gesture.end(touch.pointerId); vi.advanceTimersByTime(1000);
@@ -103,6 +112,13 @@ describe('TMS-R78 touch long-press and radial geometry', () => {
     gesture.cancel(); gesture.end(7); expect(gesture.consumeClick()).toBe(true); expect(gesture.consumeClick()).toBe(false);
     gesture.begin(touch, 'token-2'); vi.advanceTimersByTime(500); gesture.begin({ ...touch, pointerType: 'mouse' }, undefined);
     expect(gesture.consumeClick()).toBe(false);
+  });
+
+  it('keeps compatibility mouse defaults blocked until the click without consuming the guard early', () => {
+    const { gesture } = controller(); expect(gesture.compatibilityClickPending()).toBe(false);
+    gesture.begin(touch, 'token-2'); vi.advanceTimersByTime(500); gesture.end(7); gesture.cancel();
+    expect(gesture.compatibilityClickPending()).toBe(true); expect(gesture.compatibilityClickPending()).toBe(true);
+    expect(gesture.consumeClick()).toBe(true); expect(gesture.compatibilityClickPending()).toBe(false);
   });
 
   it('allows idempotent cancellation from scroll blur mode or overlay interruption', () => {

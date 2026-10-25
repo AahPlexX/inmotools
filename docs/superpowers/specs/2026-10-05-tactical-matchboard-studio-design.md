@@ -7,10 +7,10 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T21:56:31Z
+timestamp: 2026-10-25T22:36:50Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
-documentation: R78 contract/TDD continuation; R44/R52 locally accepted
+validator: Arena.ai Agent Mode (same agent); automated focused gates; full R78 acceptance pending
+documentation: R78 candidate implementation and corrective TDD; R44/R52 locally accepted
 ---
 
 # Tactical Matchboard Studio — spec
@@ -229,6 +229,8 @@ No function was compared between an ML and a non-ML method.
 - TMS-R31: defaults are cut, fade-through-background and roster-matched player/ball morph; snapshots freeze at transition start and arrival, unpaired players/props/drawings switch halfway, and an optional exit transition enables chapter playback. Owner may override.
 
 ## Change log
+
+- 2026-10-25 — R78 candidate implements the pre-recorded touch contract, shared commands, focus/viewport fallback and cancellation. Original RED `61ed61a` and corrective inherited-pointer, compatibility-focus, unavailable-focus and caption-overflow contracts are in task 7d78. Current focused/full acceptance remains pending; no verification or hosted integration is claimed yet.
 
 - timestamp: 2026-10-25T21:56:31Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: same-agent contract review; TDD/acceptance pending | documentation: R78 contract specified before implementation; conservative hold/slop, cancellation, same-action canonical editing, focus/activation safety and radial/compact viewport behavior recorded. No status upgrade or dependency/schema change.
 

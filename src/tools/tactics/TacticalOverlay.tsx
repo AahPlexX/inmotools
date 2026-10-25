@@ -20,6 +20,7 @@ export function useFocusTrap(
   active: boolean,
   container: RefObject<HTMLElement | null>,
   onEscape: () => void,
+  preventRestoreScroll = false,
 ): void {
   const escapeRef = useRef(onEscape);
   escapeRef.current = onEscape;
@@ -61,9 +62,9 @@ export function useFocusTrap(
     document.addEventListener('keydown', onKey, true);
     return () => {
       document.removeEventListener('keydown', onKey, true);
-      if (previous && document.contains(previous)) previous.focus();
+      if (previous && document.contains(previous)) previous.focus({ preventScroll: preventRestoreScroll });
     };
-  }, [active, container]);
+  }, [active, container, preventRestoreScroll]);
 }
 
 export function TacticalDialog({

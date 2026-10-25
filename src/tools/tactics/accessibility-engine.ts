@@ -1,3 +1,5 @@
+import type { TacticalProject } from './tactics-types';
+
 export type TacticalShortcutId =
   | 'help'
   | 'close-overlay'
@@ -263,7 +265,7 @@ export const TACTICAL_SHORTCUTS: readonly TacticalShortcut[] = [
     label: 'Player actions',
     chords: ['shift+f10', 'contextmenu'],
     display: 'Shift+F10 or the context menu key',
-    summary: 'Opens the same player actions as a right-click. The Player actions button is the touch equivalent.',
+    summary: 'Opens the same player actions as a right-click. A touch hold or the Player actions button exposes the same commands.',
     allowInEditable: false,
     allowWhenOverlay: false,
     allowRepeat: false,
@@ -295,7 +297,7 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
     id: 'actions',
     title: 'Right-click and touch',
     paragraphs: [
-      'Right-click a player to open player actions. The same dialog opens from the "Player actions" button or from Shift+F10.',
+      'Right-click a player to open player actions. The same commands open from the "Player actions" button or from Shift+F10. In Move mode, hold a player still for half a second to open touch actions, then lift and choose a button. Sliding or scrolling cancels the hold.',
       'Locking a player or a layer blocks later moves until you unlock it. Undo still restores the previous board.',
     ],
   },
@@ -459,5 +461,94 @@ export function reducedMotionTransportStep(
   return {
     timeMs: 0,
     message: 'Reduced motion returned playback to the start.',
+  };
+}
+
+export const PLAYER_LONG_PRESS_DELAY_MS = 500;
+export const PLAYER_LONG_PRESS_SLOP_PX = 10;
+
+export interface PlayerActionAnchor { x: number; y: number }
+
+export interface TacticalLongPressInput {
+  pointerId: number;
+  pointerType: string;
+  isPrimary: boolean;
+  button: number;
+  clientX: number;
+  clientY: number;
+}
+
+export function createTacticalLongPress<Handle>(options: {
+  schedule: (callback: () => void, delay: number) => Handle;
+  cancel: (handle: Handle) => void;
+  isEligible: (tokenId: string) => boolean;
+  onOpen: (tokenId: string, anchor: PlayerActionAnchor) => void;
+}) {
+  let pending: { input: Pick<TacticalLongPressInput, 'pointerId' | 'clientX' | 'clientY'>; tokenId: string; timer?: Handle } | undefined;
+  let disposed = false;
+  let suppressClick = false;
+
+  function cancel() {
+    const previous = pending;
+    pending = undefined;
+    if (previous?.timer !== undefined) options.cancel(previous.timer);
+  }
+
+  return {
+    begin(input: TacticalLongPressInput, tokenId: string | undefined) {
+      cancel();
+      suppressClick = false;
+      if (disposed || input.pointerType !== 'touch' || !input.isPrimary || input.button !== 0
+        || !Number.isInteger(input.pointerId) || input.pointerId < 0
+        || !Number.isFinite(input.clientX) || !Number.isFinite(input.clientY) || !tokenId?.trim()) return;
+      const candidate = { input: { pointerId: input.pointerId, clientX: input.clientX, clientY: input.clientY }, tokenId, timer: undefined as Handle | undefined };
+      pending = candidate;
+      candidate.timer = options.schedule(() => {
+        if (disposed || pending !== candidate) return;
+        pending = undefined;
+        if (!options.isEligible(candidate.tokenId)) return;
+        suppressClick = true;
+        options.onOpen(candidate.tokenId, { x: candidate.input.clientX, y: candidate.input.clientY });
+      }, PLAYER_LONG_PRESS_DELAY_MS);
+    },
+    move(input: Pick<TacticalLongPressInput, 'pointerId' | 'clientX' | 'clientY'>) {
+      if (!pending || pending.input.pointerId !== input.pointerId) return;
+      if (!Number.isFinite(input.clientX) || !Number.isFinite(input.clientY)
+        || Math.hypot(input.clientX - pending.input.clientX, input.clientY - pending.input.clientY) > PLAYER_LONG_PRESS_SLOP_PX) cancel();
+    },
+    end(pointerId: number) { if (pending?.input.pointerId === pointerId) cancel(); },
+    pointerId: () => pending?.input.pointerId,
+    cancel,
+    dispose() { disposed = true; cancel(); },
+    compatibilityClickPending: () => suppressClick,
+    consumeClick() { const suppressed = suppressClick; suppressClick = false; return suppressed; },
+  };
+}
+
+export function isVisiblePlayerActionTarget(project: TacticalProject, sceneId: string, tokenId: string | undefined): boolean {
+  const scene = project.scenes.find(candidate => candidate.id === sceneId);
+  const token = project.playerTokens.find(candidate => candidate.sceneId === sceneId && candidate.id === tokenId);
+  return Boolean(scene && token?.visible && scene.layers.some(layer => layer.id === token.layerId && layer.visible)
+    && project.teams.some(team => team.id === token.teamId && team.roster.some(player => player.id === token.playerId)));
+}
+
+export function placePlayerActionMenu(
+  anchor: PlayerActionAnchor,
+  size: { width: number; height: number },
+  viewport: { width: number; height: number },
+): { left: number; top: number; width: number; height: number } {
+  if (![anchor.x, anchor.y, size.width, size.height, viewport.width, viewport.height].every(Number.isFinite)) {
+    throw new RangeError('Menu placement values must be finite.');
+  }
+  if ([size.width, size.height, viewport.width, viewport.height].some(value => value <= 0)) {
+    throw new RangeError('Menu and viewport dimensions must be positive.');
+  }
+  const gap = Math.min(8, viewport.width / 4, viewport.height / 4);
+  const width = Math.min(size.width, viewport.width - 2 * gap);
+  const height = Math.min(size.height, viewport.height - 2 * gap);
+  return {
+    left: Math.min(Math.max(gap, anchor.x - width / 2), viewport.width - gap - width),
+    top: Math.min(Math.max(gap, anchor.y - height / 2), viewport.height - gap - height),
+    width, height,
   };
 }

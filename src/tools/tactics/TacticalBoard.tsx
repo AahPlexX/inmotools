@@ -5,6 +5,8 @@ import {
   type AnalysisDisplaySettings,
 } from './TacticalAnalysisPanel';
 import type { NormalizedPoint, TacticalProject } from './tactics-types';
+import type { PlayerActionAnchor } from './accessibility-engine';
+import { usePlayerLongPress } from './usePlayerLongPress';
 import {
   PITCH_PAN_STEP,
   PITCH_ZOOM_MAX,
@@ -28,7 +30,8 @@ export interface TacticalBoardProps {
   renderOptions?: TacticalBoardRenderOptions;
   onSelectToken: (tokenId: string) => void;
   onPitchPoint: (point: NormalizedPoint) => void;
-  onOpenActions: (tokenId?: string) => void;
+  onOpenActions: (tokenId?: string, anchor?: PlayerActionAnchor) => void;
+  overlayOpen: boolean;
   onSelectBall?: () => void;
   onSelectAnnotation?: (annotationId: string) => void;
   onFreehandGesture?: (phase: 'start' | 'extend' | 'end', point: NormalizedPoint) => void;
@@ -65,6 +68,7 @@ export default function TacticalBoard({
   onSelectToken,
   onPitchPoint,
   onOpenActions,
+  overlayOpen,
   onSelectBall,
   onSelectAnnotation,
   onFreehandGesture,
@@ -79,6 +83,11 @@ export default function TacticalBoard({
   const panDragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const drawingRef = useRef(false);
   viewportRef.current = viewport;
+  const boardRef = useRef<HTMLDivElement>(null);
+  const longPress = usePlayerLongPress(boardRef, {
+    project, sceneId, selectedTokenId, enabled: interactionMode === 'move' && !panDrag && !overlayOpen,
+    view: viewport, onOpen: (tokenId, anchor) => onOpenActions(tokenId, anchor),
+  });
 
   function pointFromEvent(event: ReactPointerEvent<HTMLDivElement>): NormalizedPoint {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -92,13 +101,14 @@ export default function TacticalBoard({
   }
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    const entity = entityFromTarget(event.target);
+    longPress.begin(event, entity?.kind === 'player' ? entity.id : undefined);
     if (!event.isPrimary || event.button !== 0) return;
     if (panDrag) {
       panDragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
       event.currentTarget.setPointerCapture(event.pointerId);
       return;
     }
-    const entity = entityFromTarget(event.target);
     if (entity?.kind === 'annotation') {
       onSelectAnnotation?.(entity.id);
       return;
@@ -150,6 +160,7 @@ export default function TacticalBoard({
 
   function handleContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
     event.preventDefault();
+    if (longPress.suppressContextMenu(event.nativeEvent)) return;
     const entity = entityFromTarget(event.target);
     onOpenActions(entity?.kind === 'player' ? entity.id : undefined);
   }
@@ -163,7 +174,7 @@ export default function TacticalBoard({
         ? 'Arrow start set. Tap or click the pitch to place the arrow end.'
         : 'Tap or click the pitch to place the arrow start.'
       : selectedTokenId
-        ? 'Tap or click the pitch to move the selected player.'
+        ? 'Tap or click the pitch to move the selected player. Hold a player still for half a second for touch actions.'
         : 'Select a player, then tap or click the pitch to move them.';
   const modeLabel = panDrag
     ? 'Pan tool'
@@ -195,7 +206,9 @@ export default function TacticalBoard({
         <button type="button" aria-pressed={panDrag} onClick={() => setPanDrag((current) => !current)}>Drag to pan</button>
       </div>
       <div
+        ref={boardRef}
         className="tactical-board"
+        tabIndex={-1}
         data-interaction-mode={panDrag ? 'pan' : interactionMode}
         data-selected-token={selectedTokenId ?? ''}
         data-pitch-zoom={String(viewport.zoom)}
@@ -205,6 +218,7 @@ export default function TacticalBoard({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onLostPointerCapture={longPress.captureLost}
         onContextMenu={handleContextMenu}
         role="group"
         aria-label={instruction}
