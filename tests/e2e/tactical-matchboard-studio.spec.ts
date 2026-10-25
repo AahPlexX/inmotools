@@ -7,6 +7,7 @@ import type { CDPSession, Locator, Page } from '@playwright/test';
 import { buildBeginnerTacticalProject, placeMirroredOpposition } from '../../src/tools/tactics/workspace-engine';
 import { exportTacticalProjectJson, importTacticalProjectJson } from '../../src/tools/tactics/project-io';
 import { addTimelineSubstitutionEvent } from '../../src/tools/tactics/substitution-engine';
+import type { TacticalSnapshotRecord } from '../../src/tools/tactics/persistence-engine';
 
 const localReviewVideo = path.join(process.cwd(), 'tests/fixtures/tactical-review-sample.webm');
 
@@ -1029,6 +1030,30 @@ test('preserves crash recovery across reload before starter autosave can overwri
 
   await page.getByText('Project vault & interchange', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Restore latest autosave' })).toBeEnabled();
+
+  // An earlier starter autosave can already enable Restore. Observe this edit's
+  // committed recovery data before reload, rather than racing the debounce.
+  const tokenId = await board(page).getAttribute('data-selected-token');
+  await expect.poll(() => page.evaluate(async (selectedId) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('inmotools-tactical-matchboard');
+      request.addEventListener('success', () => resolve(request.result), { once: true });
+      request.addEventListener('error', () => reject(request.error), { once: true });
+    });
+    try {
+      const records = await new Promise<TacticalSnapshotRecord[]>((resolve, reject) => {
+        const request = database.transaction('snapshots', 'readonly').objectStore('snapshots').getAll();
+        request.addEventListener('success', () => resolve(request.result as TacticalSnapshotRecord[]), { once: true });
+        request.addEventListener('error', () => reject(request.error), { once: true });
+      });
+      const latest = records.filter(record => record.kind === 'autosave')
+        .sort((a, b) => b.createdAtMs - a.createdAtMs || b.id.localeCompare(a.id))[0];
+      const x = latest?.project.playerTokens.find(token => token.id === selectedId)?.position.x;
+      return x === undefined ? null : x * 100;
+    } finally {
+      database.close();
+    }
+  }, tokenId)).toBeCloseTo(moved, 1);
 
   await page.reload();
   await expect(page.getByTestId('suite-workspace').getByRole('heading', { name: 'Tactical Matchboard Studio', exact: true })).toBeVisible();
