@@ -6,14 +6,18 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
-updated: 2026-10-19
+updated: 2026-10-25
+timestamp: 2026-10-25T16:29:56Z
+agent: Arena.ai Agent Mode (model name not exposed)
+validator: Arena.ai Agent Mode (same agent; automated gates pending)
+documentation: TMS-R44 contract and active continuation
 ---
 
 # Tactical Matchboard Studio — tracker
 
 ## Resume here
 
-85 requirements: 80 verified, 1 implemented, 1 partial, 3 missing. TMS-R31 chapter transitions are verified on runtime `a528848db0c030c9010aa6fbb76061627077a084`, GREEN workflow `39195675178` / job `117877804494`, integration merge `15e3133a228a67e0913d8c01ea6b8e727896dc8a`. Completed task: `T-tactical-matchboard-studio-20261019-b823`. Next: R44, R52, R78, R75 and R83. Read `CURRENT_HANDOFF.md` for continuation; `HANDOFF.md` is archival.
+85 requirements: 80 verified, 1 implemented, 1 partial, 3 missing. TMS-R31 chapter transitions are verified on runtime `a528848db0c030c9010aa6fbb76061627077a084`, GREEN workflow `39195675178` / job `117877804494`, integration merge `15e3133a228a67e0913d8c01ea6b8e727896dc8a`. Completed task: `T-tactical-matchboard-studio-20261019-b823`. TMS-R44 is active in [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md): contract recorded, RED tests next. Work is confined to the platform-fixed `arena/981e49e9-inmotools` branch; normal main integration is blocked by that workflow constraint. Then R52, R78, R75 and R83. Read `CURRENT_HANDOFF.md` for continuation; `HANDOFF.md` is archival.
 
 ## Documents
 
@@ -120,7 +124,7 @@ updated: 2026-10-19
 
 ## Open work
 
-1. TMS-R44, R52, R78: build in that order.
+1. TMS-R44: active contract/TDD task `T-tactical-matchboard-studio-20261025-4d44`; no runtime accepted yet. Then R52 and R78.
 2. TMS-R75: 1200×630 card.
 3. TMS-R83: offline test.
 
