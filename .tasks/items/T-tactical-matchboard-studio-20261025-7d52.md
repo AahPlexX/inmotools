@@ -9,7 +9,7 @@ branch: arena/981e49e9-inmotools
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T18:45:50Z
+timestamp: 2026-10-25T18:55:14Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent; automated TDD and acceptance pending)
 documentation: TMS-R52 contract and owner-authorized branch continuation
@@ -25,7 +25,7 @@ Standing quality, TDD, documentation, no-PR and metadata requirements remain rec
 
 ## Resume here
 
-R44 remains locally verified and unchanged. Continue **R52**, then R78, R75 and R83. This task records the R52 contract before runtime code; next establish the focused baseline, write/run RED unit and browser contracts, then implement and validate on frozen inputs. TMS-R52 remains missing until runtime exists, and is not verified until its affected local acceptance passes. Hosted workflow-dispatch permission previously returned HTTP 403; no unchanged retry, CI/deployment success or main integration is claimed.
+R44 remains locally verified and unchanged. Continue **R52**, then R78, R75 and R83. This task records the R52 contract before runtime code; baseline and RED are complete; next implement the recorded camera/visibility/renderer/UI contract, then run GREEN and frozen acceptance. TMS-R52 remains missing until runtime exists, and is not verified until its affected local acceptance passes. Hosted workflow-dispatch permission previously returned HTTP 403; no unchanged retry, CI/deployment success or main integration is claimed.
 
 ## Workflow and source identity
 
@@ -55,3 +55,10 @@ R44 remains locally verified and unchanged. Continue **R52**, then R78, R75 and 
 ## Log
 
 - timestamp: 2026-10-25T18:45:50Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: repository/remote inspection and docs/completion check | documentation: Owner-authorized continuation recorded; baseline docs 193 pass; computed tool state 81/85 verified, 1 implemented, 1 partial, 2 missing. R44 accepted source and main are unchanged. Restored pinned pnpm 12.3.4 and exact-lockfile SheetJS archive via the immutable GitHub blob documented in task 4d44; external frozen installation succeeds in 8.9 s. Repository manifests/lockfile/patches are unchanged; cache-only dependency locator and verify-deps wrapper match the prior documented method.
+
+## TDD baseline and RED
+
+- timestamp: 2026-10-25T18:55:14Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: Vitest 5.0.1 / TypeScript 7.0.2 / Vite 8.3.0 / PWA 1.3.0 | documentation: Baseline records-only `2fab4c5`, runtime still R44 `117c119`: all 211 Tactical units pass across 24 files (5.03 s); type and production/PWA build pass (15.66 s, 408 precache entries). Existing lazy-3D browser acceptance passes desktop/mobile, 2 passed / 0 skips / 0 retries, one worker, 16.3 s. Receipts `/home/user/inmotools-r52-baseline-{units,build,browser}.log`.
+- timestamp: 2026-10-25T18:55:14Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: Vitest RED contracts | documentation: Before any R52 runtime change, all **15 new unit cases fail** (715 ms), because `createPlayerCameraState`/`applyTactical3DCamera` do not exist. Contracts cover cardinal/wrapped/large finite headings, edge and non-square physical geometry (150 seeded cases), sampled pose/visibility, all roster statuses, exact substitution/layer time, invalid inputs/finite overflow, real Three.js eye/heading without orbit clamps, restoration, immutability and explicit capture/undo/redo/interchange. Receipt `/home/user/inmotools-r52-red-units.log`.
+- timestamp: 2026-10-25T18:55:14Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: Playwright RED / Chromium 153.0.8010.0 | documentation: New first-person render contract fails desktop/mobile at the absent First-person player camera control after successful import and existing 3D load: **2 failed**, no existing assertions or timeouts modified. Six new browser contracts are authored before runtime for sampled WebGL pose/orbit lock, visibility/substitution, canonical editing/capture/JSON, invalid drafts, keyboard/touch/reflow/axe and WebGL-unavailable fallback. RED artifacts copied under ignored `review-receipts/r52-red-browser/`. Receipt `/home/user/inmotools-r52-red-browser.log`.
+- timestamp: 2026-10-25T18:55:14Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: exact archive/browser smoke | documentation: Environment-only recovery uses the prior immutable SheetJS blob and matching lockfile SHA-512. Pinned Chromium package extracted to `/tmp/chromium`, bundled NSS/NSPR to `/tmp/al2023/lib`, with local revision-1243 launcher and software ANGLE/SwiftShader. Browser reports 153.0.8010.0; WebGL2 smoke returns true. This is not the official downloadable 153.0.8010.12 browser or hosted Node 24 CI. Dependencies, test config and lockfile stay unchanged.

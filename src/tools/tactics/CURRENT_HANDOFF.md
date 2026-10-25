@@ -3,7 +3,7 @@ tool: tactical-matchboard-studio
 doc: handoff
 status: active
 updated: 2026-10-25
-timestamp: 2026-10-25T18:45:50Z
+timestamp: 2026-10-25T18:55:14Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
 documentation: TMS-R52 contract and owner-authorized branch continuation
@@ -31,7 +31,7 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 
 ## Exact next action
 
-Owner's latest request authorizes continuing and pushing on `arena/981e49e9-inmotools`; the owner will handle integration. Do not close/disconnect the connector. R44 is locally verified and unchanged; its integration does not block continued feature work. **Resume R52** via [active task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md): contract recorded, focused baseline/RED tests next, then implementation and affected acceptance. Continue R78, R75 and R83 in that order afterward. No PR, other branch push, branch-policy workaround, hosted CI, main integration or deployment is claimed. R44 task 4d44 remains active for owner-managed integration.
+Owner's latest request authorizes continuing and pushing on `arena/981e49e9-inmotools`; the owner will handle integration. Do not close/disconnect the connector. R44 is locally verified and unchanged; its integration does not block continued feature work. **Resume R52** via [active task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md): focused baseline passes and RED is captured (15 unit cases / 2 browser cases); implement R52 next, then GREEN and frozen affected acceptance. Continue R78, R75 and R83 in that order afterward. No PR, other branch push, branch-policy workaround, hosted CI, main integration or deployment is claimed. R44 task 4d44 remains active for owner-managed integration.
 
 R31 stores optional exit-transition metadata on scenes. It uses the outgoing scene’s final interval and the next contiguous scene’s arrival; cut is instantaneous, fade passes through the background, and morph pairs visible roster identities plus the ball. Unpaired actors/props/drawings switch halfway. Existing projects without settings retain their selected-scene behavior. Setting a transition enables chapter playback at the existing playhead. Preview, 3D, animated SVG/HTML/video/frame exports and PDF contact sheets share the sampled chapter. Animated exports retain boundary/transition samples within the existing cap or report an insufficient cap. Clone/split/reorder/join and JSON import have transition-specific regression coverage; no dependency or schema bump was added.
 

@@ -1041,6 +1041,169 @@ test('preserves crash recovery across reload before starter autosave can overwri
 });
 
 
+async function loadPlayerCameraProject(page: Page) {
+  const base = buildBeginnerTacticalProject({
+    title: 'R52 player camera contract', teamName: 'Team', primaryColor: '#154c79', secondaryColor: '#ffffff',
+    formationId: 'ussf-4v4-1-2-1', pitchDimensions: { lengthMeters: 100, widthMeters: 50 }, direction: 'left-to-right',
+  });
+  const viewer = base.playerTokens[0]!; const incoming = base.playerTokens[3]!;
+  viewer.position = { x: 0.25, y: 0.75 }; viewer.rotationDeg = 0;
+  base.playerTokens[1]!.position = { x: 0.1, y: 0.2 }; base.playerTokens[1]!.rotationDeg = 90;
+  incoming.visible = false; incoming.rotationDeg = 180;
+  base.teams[0]!.roster.find(player => player.id === incoming.playerId)!.status = 'substitute';
+  base.timeline.tracks.push({ id: 'r52-viewer-motion', targetId: viewer.id, keyframes: [
+    { id: 'r52-start', timeMs: 0, position: viewer.position, rotationDeg: 0, interpolation: 'linear' },
+    { id: 'r52-end', timeMs: 1000, position: { x: 0.75, y: 0.25 }, rotationDeg: 90, interpolation: 'hold' },
+  ] });
+  base.timeline.tracks.push({ id: 'r52-layer-visibility', targetId: base.scenes[0]!.layers[0]!.id, keyframes: [
+    { id: 'r52-layer-shown', timeMs: 0, visible: true, interpolation: 'hold' },
+    { id: 'r52-layer-hidden', timeMs: 2500, visible: false, interpolation: 'hold' },
+  ] });
+  const project = addTimelineSubstitutionEvent(base, { id: 'r52-substitution', outgoingTargetId: viewer.id, incomingTargetId: incoming.id, timeMs: 2000 });
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+  await page.getByLabel('Import project file').setInputFiles({
+    name: 'r52-player-camera.json', mimeType: 'application/json', buffer: Buffer.from(exportTacticalProjectJson(project)),
+  });
+  await expect(setupPanel(page).getByLabel('Project title')).toHaveValue('R52 player camera contract');
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+  await page.getByRole('button', { name: 'Show 3D view', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '3D pitch view', exact: true })).toBeVisible();
+  return { viewerId: viewer.id, incomingId: incoming.id };
+}
+
+async function seekPlayerCamera(page: Page, timeMs: number) {
+  const timeline = page.getByText('Timeline & motion', { exact: true });
+  if (!await page.getByLabel('Playhead (ms)', { exact: true }).isVisible()) await timeline.click();
+  await page.getByLabel('Playhead (ms)', { exact: true }).fill(String(timeMs));
+  await page.getByRole('button', { name: 'Set playhead', exact: true }).click();
+}
+
+test('TMS-R52 renders the sampled player eye and heading with locked orbit and preset exit', async ({ page }) => {
+  const { viewerId } = await loadPlayerCameraProject(page);
+  const toggle = page.getByRole('checkbox', { name: 'First-person player camera', exact: true });
+  await expect(toggle).toBeVisible(); await expect(toggle).not.toBeChecked();
+  const canvas = page.locator('#tactical-3d-panel canvas');
+  await expect(canvas).toBeVisible();
+  await toggle.check();
+  const summary = page.getByTestId('tactical-player-camera-summary');
+  await expect(summary).toContainText(viewerId);
+  await expect(summary).toContainText('X -25.00 m; Y 1.70 m; Z 12.50 m');
+  await expect(summary).toContainText('Heading 0.0°'); await expect(summary).toContainText('FOV 70.0°');
+  const image = await canvas.screenshot(); const box = await canvas.boundingBox();
+  if (!box) throw new Error('WebGL player camera is not visible.');
+  await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.5);
+  await page.mouse.down(); await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.65, { steps: 5 }); await page.mouse.up();
+  expect(await canvas.screenshot()).toEqual(image);
+  await seekPlayerCamera(page, 500);
+  await expect(summary).toContainText('X 0.00 m; Y 1.70 m; Z 0.00 m'); await expect(summary).toContainText('Heading 45.0°');
+  expect(await canvas.screenshot()).not.toEqual(image);
+  await page.getByLabel('Camera preset', { exact: true }).selectOption('broadcast');
+  await expect(toggle).not.toBeChecked(); await expect(summary).toContainText(/orbit.*authored/i);
+  await expect(page.locator('#tactical-3d-panel .notice')).toHaveCount(0);
+});
+
+test('TMS-R52 follows sampled visibility and substitutions without switching the selected player', async ({ page }) => {
+  const { incomingId } = await loadPlayerCameraProject(page);
+  await page.getByRole('checkbox', { name: 'First-person player camera', exact: true }).check();
+  const summary = page.getByTestId('tactical-player-camera-summary');
+  await seekPlayerCamera(page, 1999); await expect(summary).toContainText('Heading 90.0°');
+  await seekPlayerCamera(page, 2000); await expect(summary).toContainText(/unavailable.*visible/i);
+  await expect(page.getByRole('button', { name: 'Capture camera at playhead', exact: true })).toBeDisabled();
+  await page.locator('.tactical-player-list button').nth(3).click();
+  await expect(summary).toContainText(incomingId); await expect(summary).toContainText('Heading 180.0°');
+  await seekPlayerCamera(page, 2500); await expect(summary).toContainText(/unavailable.*visible/i);
+  await seekPlayerCamera(page, 1999); await expect(summary).toContainText(/unavailable.*visible/i);
+  await page.locator('.tactical-player-list button').first().click(); await expect(summary).toContainText('Heading 90.0°');
+  await page.locator('#tactical-ball').click(); await expect(summary).toContainText(/unavailable.*visible/i);
+});
+
+test('TMS-R52 keeps edits and explicit camera captures canonical through undo redo and JSON', async ({ page }) => {
+  await loadPlayerCameraProject(page);
+  await page.locator('.tactical-player-list button').nth(1).click();
+  const toggle = page.getByRole('checkbox', { name: 'First-person player camera', exact: true });
+  await toggle.check(); const summary = page.getByTestId('tactical-player-camera-summary');
+  await expect(summary).toContainText('X -40.00 m');
+  await page.getByRole('button', { name: 'Move player right', exact: true }).click(); await expect(summary).toContainText('X -38.00 m');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click(); await expect(summary).toContainText('X -40.00 m');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click(); await expect(summary).toContainText('X -38.00 m');
+  await page.getByLabel('Player eye height (m)', { exact: true }).fill('1.2');
+  await page.getByLabel('Player field of view (deg)', { exact: true }).fill('90');
+  await page.getByRole('button', { name: 'Capture camera at playhead', exact: true }).click();
+  await expect(page.getByText('1 camera keyframe', { exact: true })).toBeVisible();
+  await seekPlayerCamera(page, 500);
+  await page.getByRole('button', { name: 'Capture camera at playhead', exact: true }).click();
+  await expect(page.getByText('2 camera keyframes', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click(); await expect(page.getByText('1 camera keyframe', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Redo', exact: true }).click(); await expect(page.getByText('2 camera keyframes', { exact: true })).toBeVisible();
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+  const download = await readDownload(page, 'Export project JSON');
+  const exported = importTacticalProjectJson(download.bytes.toString('utf8'), download.filename);
+  expect(exported.playerTokens[1]!.position.x).toBeCloseTo(0.12, 10);
+  expect(exported.cameraStates.map(camera => camera.timeMs)).toEqual([0, 500]);
+  for (const camera of exported.cameraStates) {
+    expect(camera.position).toEqual({ x: -38, y: 1.2, z: -15 }); expect(camera.fieldOfViewDeg).toBe(90);
+    expect(camera.target.x).toBeCloseTo(-38, 10); expect(camera.target.y).toBe(1.2); expect(camera.target.z).toBeCloseTo(-5, 10);
+    expect(Object.keys(camera).sort()).toEqual(['fieldOfViewDeg', 'id', 'position', 'target', 'timeMs']);
+  }
+  expect(download.bytes.toString('utf8')).not.toMatch(/playerView|eyeHeightMeters|firstPerson/);
+  await page.getByLabel('Import project file').setInputFiles({ name: 'r52-captured.json', mimeType: 'application/json', buffer: download.bytes });
+  await expect(toggle).not.toBeChecked(); await expect(page.getByLabel('Player eye height (m)', { exact: true })).toHaveValue('1.7');
+  await expect(page.getByLabel('Player field of view (deg)', { exact: true })).toHaveValue('70');
+  await expect(page.getByText('2 camera keyframes', { exact: true })).toBeVisible();
+});
+
+test('TMS-R52 explains invalid draft settings without capturing or losing the project', async ({ page }) => {
+  await loadPlayerCameraProject(page);
+  await page.getByRole('checkbox', { name: 'First-person player camera', exact: true }).check();
+  const height = page.getByLabel('Player eye height (m)', { exact: true }); const fov = page.getByLabel('Player field of view (deg)', { exact: true });
+  const capture = page.getByRole('button', { name: 'Capture camera at playhead', exact: true }); const summary = page.getByTestId('tactical-player-camera-summary');
+  for (const value of ['', '0', '3.1']) {
+    await height.fill(value); await expect(height).toHaveValue(value); await expect(height).toHaveAttribute('aria-invalid', 'true');
+    await expect(summary).toContainText(/eye height/i); await expect(capture).toBeDisabled();
+  }
+  await height.fill('1.2'); await fov.fill('121'); await expect(fov).toHaveAttribute('aria-invalid', 'true');
+  await expect(summary).toContainText(/field of view/i); await expect(capture).toBeDisabled();
+  await fov.fill('90'); await expect(summary).toContainText('Y 1.20 m'); await expect(summary).toContainText('FOV 90.0°'); await expect(capture).toBeEnabled();
+  await expect(page.getByText('0 camera keyframes', { exact: true })).toBeVisible();
+});
+
+test('TMS-R52 has keyboard touch and accessible reflowing player camera controls', async ({ page, isMobile }) => {
+  await loadPlayerCameraProject(page);
+  const toggle = page.getByRole('checkbox', { name: 'First-person player camera', exact: true });
+  await toggle.focus(); await toggle.press('Space'); await expect(toggle).toBeChecked();
+  const height = page.getByLabel('Player eye height (m)', { exact: true }); const fov = page.getByLabel('Player field of view (deg)', { exact: true });
+  await height.fill('1.8'); await height.press('ArrowUp'); await expect(height).toHaveValue('1.9');
+  await fov.focus(); await fov.press('ArrowDown'); await expect(fov).toHaveValue('65');
+  if (isMobile) { await toggle.tap(); await expect(toggle).not.toBeChecked(); await toggle.tap(); await expect(toggle).toBeChecked(); }
+  for (const width of [320, 390, 768]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+    expect(await page.locator('#tactical-3d-panel').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    for (const target of [toggle.locator('..'), height, fov]) expect((await target.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+  }
+  const results = await new AxeBuilder({ page }).include('#tactical-3d-panel').analyze();
+  expect(results.violations.filter(violation => ['serious', 'critical'].includes(violation.impact ?? ''))).toEqual([]);
+});
+
+test('TMS-R52 preserves the 2D editor and camera description when WebGL is unavailable', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, context: string, options?: unknown) {
+      if (context === 'webgl' || context === 'webgl2' || context === 'experimental-webgl') return null;
+      return Reflect.apply(original, this, [context, options]) as RenderingContext | null;
+    } as typeof original;
+  });
+  await page.reload(); await loadPlayerCameraProject(page);
+  await page.locator('.tactical-player-list button').nth(1).click();
+  await page.getByRole('checkbox', { name: 'First-person player camera', exact: true }).check();
+  await expect(page.locator('#tactical-3d-panel .notice')).toContainText(/webgl/i);
+  await expect(page.locator('#tactical-3d-panel canvas')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Move player right', exact: true }).click();
+  await expect(coordinateInput(page, 'X')).toHaveValue('12.0');
+  await expect(page.getByTestId('tactical-player-camera-summary')).toContainText('X -38.00 m');
+  await expect(page.locator('.tactical-board-svg')).toBeVisible();
+});
+
 test('synchronizes the lazy 3D pitch, canonical player editing, and authored camera keyframes', async ({ page }) => {
   await page.getByRole('button', { name: 'Show 3D view' }).click();
   await expect(page.getByRole('heading', { name: '3D pitch view' })).toBeVisible();
