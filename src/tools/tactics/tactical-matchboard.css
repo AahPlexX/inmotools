@@ -414,6 +414,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .tactical-analysis-interception-label {
+    fill: CanvasText;
+    stroke: Canvas;
+  }
+
   .tactical-board-svg g[data-selected="true"] > circle,
   .tactical-board-svg [data-tactical-kind="annotation"][data-selected="true"] {
     transition: none;
@@ -585,6 +590,34 @@
   stroke-dasharray: 6 4;
 }
 
+.tactical-interception-summary {
+  overflow-wrap: anywhere;
+}
+
+.tactical-analysis-interception {
+  fill: rgb(250 204 21 / 12%);
+  stroke: #facc15;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.tactical-analysis-interception-span {
+  stroke: #ffffff;
+  stroke-width: 5;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.tactical-analysis-interception-label {
+  fill: #ffffff;
+  stroke: #142b25;
+  stroke-width: 3;
+  paint-order: stroke;
+  font-size: 28px;
+  font-weight: 700;
+}
+
 .tactical-analysis-vision {
   fill: rgb(255 255 255 / 9%);
   stroke: rgb(255 255 255 / 76%);
@@ -621,6 +654,8 @@
   .tactical-analysis-lane,
   .tactical-analysis-ring,
   .tactical-analysis-tether,
+  .tactical-analysis-interception,
+  .tactical-analysis-interception-span,
   .tactical-analysis-vision {
     stroke: CanvasText;
   }

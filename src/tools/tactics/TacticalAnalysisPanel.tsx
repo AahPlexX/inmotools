@@ -2,6 +2,7 @@ import {
   buildOccupancyHeatMap,
   computeConvexTeamGeometry,
   computeEuclideanVoronoi,
+  createDefenderInterceptionCones,
   createDistanceRing,
   createPositionalGrid,
   createVisionSector,
@@ -9,14 +10,17 @@ import {
   measureTether,
   measureTrajectory,
   sampleAuthoredTrajectory,
-  type ConvexTeamGeometry,
-  type DistanceRing,
-  type OccupancyHeatMap,
-  type PassingLaneClearance,
-  type TacticalTether,
-  type TrajectoryMetrics,
-  type VisionSector,
-  type VoronoiCell,
+} from './analysis-engine';
+import type {
+  ConvexTeamGeometry,
+  DefenderInterceptionCone,
+  DistanceRing,
+  OccupancyHeatMap,
+  PassingLaneClearance,
+  TacticalTether,
+  TrajectoryMetrics,
+  VisionSector,
+  VoronoiCell,
 } from './analysis-engine';
 import type { PlayerToken, TacticalProject } from './tactics-types';
 
@@ -24,6 +28,8 @@ export interface AnalysisDisplaySettings {
   voronoi: boolean;
   hulls: boolean;
   passingLane: boolean;
+  interceptionCones: boolean;
+  interceptionAngleDeg: number;
   vision: boolean;
   positionalGrid: boolean;
   distanceRing: boolean;
@@ -47,6 +53,8 @@ export const DEFAULT_ANALYSIS_DISPLAY_SETTINGS: AnalysisDisplaySettings = {
   voronoi: false,
   hulls: false,
   passingLane: false,
+  interceptionCones: false,
+  interceptionAngleDeg: 90,
   vision: false,
   positionalGrid: false,
   distanceRing: false,
@@ -77,6 +85,8 @@ export interface TacticalAnalysisView {
   voronoi: VoronoiCell[];
   hulls: TeamGeometrySummary[];
   passingLane?: PassingLaneClearance;
+  interceptionCones: DefenderInterceptionCone[];
+  interceptionWarning?: string;
   vision?: VisionSector;
   grid: ReturnType<typeof createPositionalGrid>;
   ring?: DistanceRing;
@@ -98,7 +108,8 @@ export function deriveTacticalAnalysis(
   selectedTokenId: string | undefined,
   settings: AnalysisDisplaySettings,
 ): TacticalAnalysisView {
-  const visibleSceneTokens = project.playerTokens.filter((token) => token.sceneId === sceneId && token.visible);
+  const visibleLayers = new Set(project.scenes.find(scene => scene.id === sceneId)?.layers.filter(layer => layer.visible).map(layer => layer.id));
+  const visibleSceneTokens = project.playerTokens.filter(token => token.sceneId === sceneId && token.visible && visibleLayers.has(token.layerId));
   const selectedToken = visibleSceneTokens.find((token) => token.id === selectedTokenId) ?? visibleSceneTokens[0];
   const sceneTokens = visibleSceneTokens.filter(
     (token) => settings.includeGoalkeepers || !isGoalkeeper(project, token),
@@ -128,7 +139,7 @@ export function deriveTacticalAnalysis(
         .map((token) => ({ id: token.id, position: token.position }))
     : [];
 
-  const passingLane = settings.passingLane && selectedToken
+  const passingLane = (settings.passingLane || settings.interceptionCones) && selectedToken
     ? measurePassingLaneClearance(
         selectedToken.position,
         project.ball.position,
@@ -137,6 +148,25 @@ export function deriveTacticalAnalysis(
         settings.defenderRadiusMeters,
       )
     : undefined;
+
+  let interceptionCones: DefenderInterceptionCone[] = [];
+  let interceptionWarning: string | undefined;
+  if (settings.interceptionCones && selectedToken) {
+    const opponents = sceneTokens.filter(token => {
+      if (token.teamId === selectedToken.teamId) return false;
+      const status = project.teams.find(team => team.id === token.teamId)?.roster.find(player => player.id === token.playerId)?.status;
+      return status === 'active' || status === 'substitute';
+    });
+    try {
+      interceptionCones = createDefenderInterceptionCones(
+        selectedToken.position, project.ball.position,
+        opponents.map(token => ({ id: token.id, position: token.position })),
+        project.pitch.dimensions, settings.defenderRadiusMeters, settings.interceptionAngleDeg,
+      );
+    } catch (error) {
+      interceptionWarning = error instanceof Error ? error.message : 'Interception geometry is unavailable.';
+    }
+  }
 
   const vision = settings.vision && selectedToken
     ? createVisionSector(
@@ -192,6 +222,8 @@ export function deriveTacticalAnalysis(
     voronoi,
     hulls,
     passingLane,
+    interceptionCones,
+    interceptionWarning,
     vision,
     grid,
     ring,
@@ -298,7 +330,7 @@ export function TacticalAnalysisOverlay({
         </>
       ) : null}
 
-      {settings.passingLane && selected ? (
+      {(settings.passingLane || settings.interceptionCones) && selected ? (
         <line
           data-analysis-kind="passing-lane"
           x1={selected.position.x * 1000}
@@ -308,6 +340,30 @@ export function TacticalAnalysisOverlay({
           className={view.passingLane?.blocked ? 'tactical-analysis-lane blocked' : 'tactical-analysis-lane'}
         />
       ) : null}
+
+      {view.interceptionCones.map(cone => (
+        <g key={cone.defenderId} data-analysis-kind="interception-cone" data-defender-id={cone.defenderId}>
+          <polygon points={polygonPoints(cone.polygon)} className="tactical-analysis-interception" />
+          {cone.reachableLane ? (
+            <line
+              data-analysis-kind="interception-span"
+              data-defender-id={cone.defenderId}
+              x1={cone.reachableLane.from.x * 1000}
+              y1={cone.reachableLane.from.y * 1000}
+              x2={cone.reachableLane.to.x * 1000}
+              y2={cone.reachableLane.to.y * 1000}
+              className="tactical-analysis-interception-span"
+            />
+          ) : null}
+          <text
+            data-analysis-kind="interception-label"
+            x={Math.max(16, Math.min(984, cone.origin.x * 1000))}
+            y={Math.max(30, Math.min(980, cone.origin.y * 1000 - 18))}
+            textAnchor={cone.origin.x < 0.2 ? 'start' : cone.origin.x > 0.8 ? 'end' : 'middle'}
+            className="tactical-analysis-interception-label"
+          >{cone.reachMeters.toFixed(2)} m</text>
+        </g>
+      ))}
 
       {settings.vision && view.vision ? (
         <polygon
@@ -397,7 +453,7 @@ export default function TacticalAnalysisPanel({
       : 'Geometric clearance: ∞ m (no opposing defender geometry is present).';
 
   return (
-    <details className="tactical-setup tactical-authoring">
+    <details className="tactical-setup tactical-authoring tactical-analysis-panel">
       <summary>Spatial analysis</summary>
       <div className="tactical-authoring-grid">
         <section aria-labelledby="spatial-overlays-heading">
@@ -405,6 +461,7 @@ export default function TacticalAnalysisPanel({
           <label><input type="checkbox" checked={settings.voronoi} onChange={(event) => update('voronoi', event.target.checked)} /> Voronoi territory</label>
           <label><input type="checkbox" checked={settings.hulls} onChange={(event) => update('hulls', event.target.checked)} /> Team hulls</label>
           <label><input type="checkbox" checked={settings.passingLane} onChange={(event) => update('passingLane', event.target.checked)} /> Passing lane to ball</label>
+          <label><input type="checkbox" aria-describedby="interception-note" checked={settings.interceptionCones} onChange={(event) => update('interceptionCones', event.target.checked)} /> Defender interception cones</label>
           <label><input type="checkbox" checked={settings.vision} onChange={(event) => update('vision', event.target.checked)} /> Orientation sector</label>
           <label><input type="checkbox" checked={settings.positionalGrid} onChange={(event) => update('positionalGrid', event.target.checked)} /> Positional grid</label>
           <label><input type="checkbox" checked={settings.distanceRing} onChange={(event) => update('distanceRing', event.target.checked)} /> Distance ring</label>
@@ -416,6 +473,7 @@ export default function TacticalAnalysisPanel({
         <section aria-labelledby="spatial-settings-heading">
           <h3 id="spatial-settings-heading">Analysis settings</h3>
           <label>Defender radius (m)<input {...numberInput(settings.defenderRadiusMeters, (value) => update('defenderRadiusMeters', value), { min: 0.1, step: 0.1 })} /></label>
+          <label>Interception cone angle (deg)<input aria-describedby="interception-note" {...numberInput(settings.interceptionAngleDeg, (value) => update('interceptionAngleDeg', value), { min: 1, max: 180, step: 1 })} /></label>
           <label>Vision angle (deg)<input {...numberInput(settings.visionAngleDeg, (value) => update('visionAngleDeg', value), { min: 1, max: 360, step: 1 })} /></label>
           <label>Vision range (m)<input {...numberInput(settings.visionRangeMeters, (value) => update('visionRangeMeters', value), { min: 0.1, step: 0.1 })} /></label>
           <label>Distance-ring radius (m)<input {...numberInput(settings.ringRadiusMeters, (value) => update('ringRadiusMeters', value), { min: 0.1, step: 0.1 })} /></label>
@@ -481,6 +539,22 @@ export default function TacticalAnalysisPanel({
               {settings.tetherTargetId === 'ball' ? 'Selected-player tether to ball' : 'Player/unit spacing'}: {formatDistance(view.tether.distanceMeters)}.
             </p>
           ) : null}
+        </section>
+
+        <section aria-labelledby="interception-heading">
+          <h3 id="interception-heading">Defender interception</h3>
+          <p id="interception-note">Instantaneous geometric reach, not a speed, reaction-time or pass-success prediction. Each cone uses the defender radius in metres and points at the nearest point on the selected-player-to-ball lane; an on-lane defender faces toward the ball. Enabling cones also displays that lane.</p>
+          <div className="tactical-interception-summary" data-testid="interception-summary">
+            {!settings.interceptionCones ? <p>Enable defender interception cones to inspect configured reach.</p>
+              : view.interceptionWarning ? <output>{view.interceptionWarning}</output>
+              : !view.selectedToken ? <p>Select a visible player to define the lane.</p>
+              : !view.interceptionCones.length ? <p>No visible opposing players are included in this scene.</p>
+              : <ul>{view.interceptionCones.map(cone => (
+                <li key={cone.defenderId}>
+                  {cone.defenderId}: reach {cone.reachMeters.toFixed(2)} m; {cone.distanceToLaneMeters.toFixed(2)} m to lane; {(cone.reachableLane?.lengthMeters ?? 0).toFixed(2)} m of lane within reach{!cone.reachableLane ? ' (outside configured reach)' : cone.reachableLane.lengthMeters === 0 ? ' (tangent contact)' : ''}.
+                </li>
+              ))}</ul>}
+          </div>
         </section>
 
         <section aria-labelledby="trajectory-metrics-heading">

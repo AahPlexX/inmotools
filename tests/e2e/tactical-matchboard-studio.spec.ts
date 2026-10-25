@@ -2,9 +2,11 @@ import AxeBuilder from '@axe-core/playwright';
 import JSZip from 'jszip';
 import path from 'node:path';
 import { inflateSync } from 'node:zlib';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { buildBeginnerTacticalProject, placeMirroredOpposition } from '../../src/tools/tactics/workspace-engine';
-import { exportTacticalProjectJson } from '../../src/tools/tactics/project-io';
+import { exportTacticalProjectJson, importTacticalProjectJson } from '../../src/tools/tactics/project-io';
+import { addTimelineSubstitutionEvent } from '../../src/tools/tactics/substitution-engine';
 
 const localReviewVideo = path.join(process.cwd(), 'tests/fixtures/tactical-review-sample.webm');
 
@@ -775,26 +777,29 @@ async function loadInterceptionProject(page: Page) {
   project.ball.position = { x: 0.9, y: 0.5 };
   const opponents = project.playerTokens.filter(token => token.teamId !== project.playerTokens[0]!.teamId);
   opponents[0]!.position = { x: 0.5, y: 0.3 };
+  project.teams.find(team => team.id === opponents[0]!.teamId)!.roster.find(player => player.id === opponents[0]!.playerId)!.role = 'goalkeeper';
   opponents[1]!.position = { x: 0.5, y: 0.9 };
   opponents[2]!.visible = false;
+  project.teams.find(team => team.id === opponents[2]!.teamId)!.roster.find(player => player.id === opponents[2]!.playerId)!.status = 'substitute';
   project.scenes[0]!.layers.push({ id: 'hidden-defenders', name: 'Hidden defenders', visible: false, locked: false });
   opponents[3]!.layerId = 'hidden-defenders';
   project.timeline.tracks.push({ id: 'defender-motion', targetId: opponents[0]!.id, keyframes: [
     { id: 'defender-start', timeMs: 0, position: opponents[0]!.position, interpolation: 'linear' },
     { id: 'defender-end', timeMs: 1000, position: { x: 0.5, y: 0.5 }, interpolation: 'hold' },
   ] });
+  const scheduled = addTimelineSubstitutionEvent(project, { id: 'r44-substitution', outgoingTargetId: opponents[0]!.id, incomingTargetId: opponents[2]!.id, timeMs: 2000 });
   await page.getByText('Project vault & interchange', { exact: true }).click();
   await page.getByLabel('Import project file').setInputFiles({
-    name: 'r44-interception.json', mimeType: 'application/json', buffer: Buffer.from(exportTacticalProjectJson(project)),
+    name: 'r44-interception.json', mimeType: 'application/json', buffer: Buffer.from(exportTacticalProjectJson(scheduled)),
   });
   await expect(setupPanel(page).getByLabel('Project title')).toHaveValue('R44 interception contract');
   await page.getByText('Project vault & interchange', { exact: true }).click();
   await page.getByText('Spatial analysis', { exact: true }).click();
-  return opponents[0]!.id;
+  return { defenderId: opponents[0]!.id, substituteId: opponents[2]!.id };
 }
 
-test('TMS-R44 displays defender reach and exact lane coverage through controls and sampled motion', async ({ page }) => {
-  const defenderId = await loadInterceptionProject(page);
+test('TMS-R44 displays configured defender reach and exact finite-lane coverage', async ({ page }) => {
+  const { defenderId } = await loadInterceptionProject(page);
   const toggle = page.getByLabel('Defender interception cones', { exact: true });
   const cones = page.locator('[data-analysis-kind="interception-cone"]');
   const summary = page.getByTestId('interception-summary');
@@ -821,6 +826,15 @@ test('TMS-R44 displays defender reach and exact lane coverage through controls a
   await page.getByLabel('Include goalkeepers in team geometry').uncheck();
   await expect(cones).toHaveCount(1);
   await page.getByLabel('Include goalkeepers in team geometry').check();
+  await expect(cones).toHaveCount(2);
+});
+
+test('TMS-R44 follows sampled motion and timed substitution visibility', async ({ page }) => {
+  const { defenderId, substituteId } = await loadInterceptionProject(page);
+  const toggle = page.getByLabel('Defender interception cones', { exact: true });
+  const cones = page.locator('[data-analysis-kind="interception-cone"]');
+  const summary = page.getByTestId('interception-summary');
+  await toggle.check();
   await page.getByLabel('Defender radius (m)', { exact: true }).fill('12');
   await page.getByLabel('Interception cone angle (deg)', { exact: true }).fill('180');
   await page.getByText('Timeline & motion', { exact: true }).click();
@@ -829,9 +843,20 @@ test('TMS-R44 displays defender reach and exact lane coverage through controls a
   await expect(summary.getByRole('listitem').first()).toContainText('5.00 m to lane; 21.82 m of lane within reach');
   await toggle.uncheck(); await expect(cones).toHaveCount(0);
   await toggle.check(); await expect(cones).toHaveCount(2);
-
-  await page.getByLabel('Playhead (ms)').fill('0');
+  await page.getByLabel('Playhead (ms)').fill('2000');
   await page.getByRole('button', { name: 'Set playhead', exact: true }).click();
+  await expect(page.locator(`[data-analysis-kind="interception-cone"][data-defender-id="${defenderId}"]`)).toHaveCount(0);
+  await expect(page.locator(`[data-analysis-kind="interception-cone"][data-defender-id="${substituteId}"]`)).toHaveCount(1);
+  await expect(cones).toHaveCount(2);
+});
+
+test('TMS-R44 respects canonical undo and leaves display settings out of project JSON', async ({ page }) => {
+  await loadInterceptionProject(page);
+  const cones = page.locator('[data-analysis-kind="interception-cone"]');
+  const summary = page.getByTestId('interception-summary');
+  await page.getByLabel('Defender interception cones', { exact: true }).check();
+  await page.getByLabel('Defender radius (m)', { exact: true }).fill('12');
+  await page.getByLabel('Interception cone angle (deg)', { exact: true }).fill('180');
   await coordinateInput(page, 'X').fill('90'); await coordinateInput(page, 'Y').fill('50');
   await page.getByRole('button', { name: 'Set position', exact: true }).click();
   await expect(summary).toContainText('distinct lane endpoints'); await expect(cones).toHaveCount(0);
@@ -841,6 +866,13 @@ test('TMS-R44 displays defender reach and exact lane coverage through controls a
   await expect(summary).toContainText('distinct lane endpoints');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(cones).toHaveCount(2);
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+  const download = await readDownload(page, 'Export project JSON');
+  const exported = importTacticalProjectJson(download.bytes.toString('utf8'), download.filename);
+  expect(exported.playerTokens[0]!.position).toEqual({ x: 0.1, y: 0.5 });
+  expect(exported.analysisSettings.passingLaneRadiusMeters).toBe(1.5);
+  expect('interceptionCones' in exported.analysisSettings).toBe(false);
+  expect('interceptionAngleDeg' in exported.analysisSettings).toBe(false);
 });
 
 test('TMS-R44 keeps interception controls and summaries accessible at phone and tablet widths', async ({ page, isMobile }) => {

@@ -3,6 +3,7 @@ import fc from 'fast-check';
 import { createDefenderInterceptionCones } from '../../src/tools/tactics/analysis-engine';
 import { DEFAULT_ANALYSIS_DISPLAY_SETTINGS, deriveTacticalAnalysis } from '../../src/tools/tactics/TacticalAnalysisPanel';
 import { sampleTacticalProjectAtTime } from '../../src/tools/tactics/timeline-engine';
+import { addTimelineSubstitutionEvent } from '../../src/tools/tactics/substitution-engine';
 import { buildBeginnerTacticalProject, placeMirroredOpposition } from '../../src/tools/tactics/workspace-engine';
 import type { NormalizedPoint, TacticalProject } from '../../src/tools/tactics/tactics-types';
 
@@ -98,6 +99,7 @@ describe('TMS-R44 defender interception cones', () => {
   it('rejects invalid coordinates, dimensions and defender identities and explains a degenerate lane', () => {
     expect(() => createDefenderInterceptionCones(from, from, [defender], pitch, 10)).toThrow(/distinct.*endpoints/i);
     expect(() => createDefenderInterceptionCones(from, to, [defender], { ...pitch, widthMeters: 0 }, 10)).toThrow(/pitch width/i);
+    expect(() => createDefenderInterceptionCones(from, to, [defender], { lengthMeters: 1e308, widthMeters: 1e308 }, 10)).toThrow(/finite interception geometry/i);
     expect(() => createDefenderInterceptionCones({ x: Number.NaN, y: 0 }, to, [defender], pitch, 10)).toThrow();
     expect(() => createDefenderInterceptionCones(from, to, [{ ...defender, position: { x: 2, y: 0 } }], pitch, 10)).toThrow();
     expect(() => createDefenderInterceptionCones(from, to, [{ ...defender, id: ' ' }], pitch, 10)).toThrow(/defender id/i);
@@ -111,14 +113,15 @@ describe('TMS-R44 defender interception cones', () => {
         length: fc.integer({ min: 20, max: 120 }), width: fc.integer({ min: 10, max: 90 }),
         x: fc.integer({ min: 0, max: 1000 }), y: fc.integer({ min: 0, max: 1000 }),
         radius: fc.integer({ min: 1, max: 1000 }), angle: fc.integer({ min: 1, max: 180 }),
-        laneY: fc.integer({ min: 0, max: 1000 }),
+        laneStartY: fc.integer({ min: 0, max: 1000 }), laneEndY: fc.integer({ min: 0, max: 1000 }),
       }),
       input => {
         const dimensions = { lengthMeters: input.length, widthMeters: input.width };
-        const start = { x: 0.1, y: input.laneY / 1000 }; const end = { x: 0.9, y: input.laneY / 1000 };
+        const start = { x: 0.1, y: input.laneStartY / 1000 }; const end = { x: 0.9, y: input.laneEndY / 1000 };
         const opponent = { id: 'property-defender', position: { x: input.x / 1000, y: input.y / 1000 } };
         const radius = input.radius / 10;
         const [cone] = createDefenderInterceptionCones(start, end, [opponent], dimensions, radius, input.angle);
+        expect(cone!.polygon.length).toBeLessThanOrEqual(44);
         for (const point of cone!.polygon) {
           expect(Number.isFinite(point.x) && Number.isFinite(point.y)).toBe(true);
           expect(point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1).toBe(true);
@@ -126,7 +129,7 @@ describe('TMS-R44 defender interception cones', () => {
         }
         const heading = cone!.rotationDeg * Math.PI / 180;
         for (let step = 0; step <= 40; step += 1) {
-          const point = { x: 0.1 + 0.8 * step / 40, y: start.y };
+          const point = { x: 0.1 + 0.8 * step / 40, y: start.y + (end.y - start.y) * step / 40 };
           const dx = (point.x - opponent.position.x) * input.length;
           const dy = (point.y - opponent.position.y) * input.width;
           const distance = Math.hypot(dx, dy);
@@ -141,7 +144,7 @@ describe('TMS-R44 defender interception cones', () => {
     ), { numRuns: 150, seed: 440025 });
   });
 
-  it('derives cones only for visible opposing active players and respects goalkeeper and layer filters', () => {
+  it('derives cones only for visible opposing players and respects goalkeeper and layer filters', () => {
     const project = oppositionProject();
     const opponents = project.playerTokens.filter(token => token.teamId !== project.playerTokens[0]!.teamId);
     const scene = project.scenes[0]!;
@@ -153,9 +156,9 @@ describe('TMS-R44 defender interception cones', () => {
     }
     const snapshot = structuredClone(project);
     const view = deriveTacticalAnalysis(project, scene.id, project.playerTokens[0]!.id, settings);
-    expect(view.interceptionCones.map(cone => cone.defenderId)).toEqual([opponents[0]!.id, opponents[6]!.id]);
+    expect(view.interceptionCones.map(cone => cone.defenderId)).toEqual([opponents[0]!.id, opponents[5]!.id, opponents[6]!.id]);
     const withoutKeeper = deriveTacticalAnalysis(project, scene.id, project.playerTokens[0]!.id, { ...settings, includeGoalkeepers: false });
-    expect(withoutKeeper.interceptionCones.map(cone => cone.defenderId)).toEqual([opponents[6]!.id]);
+    expect(withoutKeeper.interceptionCones.map(cone => cone.defenderId)).toEqual([opponents[5]!.id, opponents[6]!.id]);
     expect(withoutKeeper.selectedToken?.id).toBe(project.playerTokens[0]!.id);
     expect(project).toEqual(snapshot);
   });
@@ -175,6 +178,21 @@ describe('TMS-R44 defender interception cones', () => {
     expect(cone.origin.y).toBeCloseTo(0.4, 10);
     expect(cone.distanceToLaneMeters).toBeCloseTo(5, 10);
     expect(project).toEqual(snapshot);
+  });
+
+  it('includes a substituted-on defender according to sampled visibility rather than roster status', () => {
+    const base = oppositionProject();
+    const selected = base.playerTokens[0]!;
+    const opponents = base.playerTokens.filter(token => token.teamId !== selected.teamId);
+    const outgoing = opponents[0]!; const incoming = opponents[1]!;
+    incoming.visible = false;
+    base.teams.find(team => team.id === incoming.teamId)!.roster.find(player => player.id === incoming.playerId)!.status = 'substitute';
+    const project = addTimelineSubstitutionEvent(base, { id: 'cone-swap', outgoingTargetId: outgoing.id, incomingTargetId: incoming.id, timeMs: 2000 });
+    const before = deriveTacticalAnalysis(sampleTacticalProjectAtTime(project, 1999), selected.sceneId, selected.id, settings).interceptionCones.map(cone => cone.defenderId);
+    const after = deriveTacticalAnalysis(sampleTacticalProjectAtTime(project, 2000), selected.sceneId, selected.id, settings).interceptionCones.map(cone => cone.defenderId);
+    expect(before).toContain(outgoing.id); expect(before).not.toContain(incoming.id);
+    expect(after).not.toContain(outgoing.id); expect(after).toContain(incoming.id);
+    expect(after).toHaveLength(before.length);
   });
 
   it('keeps cones opt-in and reports coincident lane endpoints without invalid geometry', () => {

@@ -7,9 +7,9 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T16:38:54Z
+timestamp: 2026-10-25T16:54:04Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent; automated gates pending)
+validator: Arena.ai Agent Mode (same agent; automated owned-browser acceptance pending)
 documentation: TMS-R44 contract and active continuation
 ---
 
@@ -17,7 +17,7 @@ documentation: TMS-R44 contract and active continuation
 
 ## Resume here
 
-85 requirements: 80 verified, 1 implemented, 1 partial, 3 missing. TMS-R31 chapter transitions are verified on runtime `a528848db0c030c9010aa6fbb76061627077a084`, GREEN workflow `39195675178` / job `117877804494`, integration merge `15e3133a228a67e0913d8c01ea6b8e727896dc8a`. Completed task: `T-tactical-matchboard-studio-20261019-b823`. TMS-R44 is active in [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md): 19 unit and 2 desktop/mobile browser RED failures recorded; implementation next. Work is confined to the platform-fixed `arena/981e49e9-inmotools` branch; normal main integration is blocked by that workflow constraint. Then R52, R78, R75 and R83. Read `CURRENT_HANDOFF.md` for continuation; `HANDOFF.md` is archival.
+85 requirements: 80 verified, 1 implemented, 2 partial, 2 missing. R44 runtime is present in active [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md): 20 geometry units and the fresh 4,215-pass repository unit suite pass; final four-spec browser acceptance and lint/docs gates are next. R31 remains verified on runtime `a528848db0c030c9010aa6fbb76061627077a084`, GREEN workflow `39195675178`, integration `15e3133a`. Work is confined to `arena/981e49e9-inmotools`; normal main integration is blocked by that platform constraint. Then R52, R78, R75 and R83. Read `CURRENT_HANDOFF.md`; `HANDOFF.md` is archival.
 
 ## Documents
 
@@ -79,7 +79,7 @@ documentation: TMS-R44 contract and active continuation
 | TMS-R41 | verified | unit "builds physical-Euclidean Voronoi territory clipped to the pitch" | |
 | TMS-R42 | verified | unit "derives convex hull, centroid, width, depth, area and perimeter in physical units", "keeps the selected goalkeeper active when goalkeepers are excluded from team geometry" | |
 | TMS-R43 | verified | unit "reports geometric passing-lane clearance without converting it into a probability" | |
-| TMS-R44 | missing | — | Contract and RED tests in task 4d44; engine and controls are not implemented yet |
+| TMS-R44 | partial | unit "computes exact finite-lane reach in physical metres without mutating input"; focused desktop/mobile browser checks in task 4d44 | Runtime and focused checks pass; runtime unit/type/build gates pass; final owned browser/lint/docs gates pending; not integrated to main |
 | TMS-R45 | verified | unit "builds authored orientation sectors using physical range and pitch dimensions" | |
 | TMS-R46 | verified | unit "creates configurable positional-play grids without implying an official formation" | |
 | TMS-R47 | verified | unit "creates physical distance rings and dynamic tethers" | |
@@ -124,7 +124,7 @@ documentation: TMS-R44 contract and active continuation
 
 ## Open work
 
-1. TMS-R44: active RED/implementation task `T-tactical-matchboard-studio-20261025-4d44`; no runtime accepted yet. Then R52 and R78.
+1. TMS-R44: active RED/implementation task `T-tactical-matchboard-studio-20261025-4d44`; final owned browser/lint/docs acceptance pending. Then R52 and R78.
 2. TMS-R75: 1200×630 card.
 3. TMS-R83: offline test.
 

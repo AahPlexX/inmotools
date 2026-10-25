@@ -42,6 +42,24 @@ export interface PassingLaneClearance {
   blocked: boolean;
 }
 
+export interface InterceptionLaneSpan {
+  from: NormalizedPoint;
+  to: NormalizedPoint;
+  lengthMeters: number;
+}
+
+export interface DefenderInterceptionCone {
+  defenderId: string;
+  origin: NormalizedPoint;
+  polygon: NormalizedPoint[];
+  rotationDeg: number;
+  angleDeg: number;
+  reachMeters: number;
+  nearestLanePoint: NormalizedPoint;
+  distanceToLaneMeters: number;
+  reachableLane?: InterceptionLaneSpan;
+}
+
 export interface VisionSector {
   center: NormalizedPoint;
   points: NormalizedPoint[];
@@ -371,6 +389,109 @@ export function measurePassingLaneClearance(
     minimumClearanceMeters,
     blocked: minimumClearanceMeters <= 0,
   };
+}
+
+/** Instantaneous configured reach, not a speed, reaction-time or probability model. */
+export function createDefenderInterceptionCones(
+  from: NormalizedPoint,
+  to: NormalizedPoint,
+  defenders: PassingLaneDefender[],
+  pitchInput: PitchDimensions,
+  reachMeters: number,
+  angleDeg = 90,
+): DefenderInterceptionCone[] {
+  const pitch = requirePitch(pitchInput);
+  const reach = requirePositive(reachMeters, 'Defender reach radius');
+  if (!Number.isFinite(angleDeg) || angleDeg <= 0 || angleDeg > 180) {
+    throw new RangeError('Interception cone angle must be within (0, 180].');
+  }
+  const diagonal = Math.hypot(pitch.lengthMeters, pitch.widthMeters);
+  if (diagonal > Number.MAX_VALUE / 2) throw new RangeError('Pitch dimensions exceed finite interception geometry bounds.');
+  const start = normalizedToMeters(from, pitch);
+  const end = normalizedToMeters(to, pitch);
+  const length = meterDistance(start, end);
+  if (length <= EPSILON) throw new RangeError('Interception cones need two distinct lane endpoints.');
+  const ux = (end.xMeters - start.xMeters) / length;
+  const uy = (end.yMeters - start.yMeters) / length;
+  const halfAngle = angleDeg * Math.PI / 360;
+  // Reach beyond the pitch diagonal cannot change any in-pitch geometry.
+  const radius = Math.min(reach, diagonal);
+  const normalize = (point: MeterPoint): NormalizedPoint => createNormalizedPoint(
+    Math.max(0, Math.min(1, point.xMeters / pitch.lengthMeters)),
+    Math.max(0, Math.min(1, point.yMeters / pitch.widthMeters)),
+  );
+  const lanePoint = (distance: number): NormalizedPoint => normalize({
+    xMeters: start.xMeters + ux * distance,
+    yMeters: start.yMeters + uy * distance,
+  });
+  const ids = new Set<string>();
+
+  return defenders.map(defender => {
+    const id = defender.id.trim();
+    if (!id) throw new Error('Defender id is required.');
+    if (ids.has(id)) throw new Error('Defender ids must be unique.');
+    ids.add(id);
+    const origin = normalizedToMeters(defender.position, pitch);
+    const sx = start.xMeters - origin.xMeters;
+    const sy = start.yMeters - origin.yMeters;
+    const projection = -(sx * ux + sy * uy);
+    const nearest = Math.max(0, Math.min(length, projection));
+    const nearestPoint = { xMeters: start.xMeters + ux * nearest, yMeters: start.yMeters + uy * nearest };
+    const distance = meterDistance(origin, nearestPoint);
+    const heading = distance > EPSILON
+      ? Math.atan2(nearestPoint.yMeters - origin.yMeters, nearestPoint.xMeters - origin.xMeters)
+      : Math.atan2(uy, ux);
+    const lower = heading - halfAngle;
+    const upper = heading + halfAngle;
+    const planes = [
+      { a: Math.sin(lower), b: -Math.cos(lower) },
+      { a: -Math.sin(upper), b: Math.cos(upper) },
+    ];
+
+    const steps = Math.max(2, Math.ceil(angleDeg / 5));
+    let polygon: MeterPoint[] = [{ ...origin }];
+    for (let index = 0; index <= steps; index += 1) {
+      const angle = lower + (2 * halfAngle * index) / steps;
+      polygon.push({ xMeters: origin.xMeters + radius * Math.cos(angle), yMeters: origin.yMeters + radius * Math.sin(angle) });
+    }
+    // Clip edges, rather than clamping arc vertices, so the sector retains its shape.
+    for (const [a, b, c] of [[-1, 0, 0], [1, 0, pitch.lengthMeters], [0, -1, 0], [0, 1, pitch.widthMeters]] as const) {
+      polygon = clipHalfPlane(polygon, a, b, c);
+    }
+
+    let reachableLane: InterceptionLaneSpan | undefined;
+    const perpendicular = Math.abs(sx * uy - sy * ux);
+    if (perpendicular <= radius + EPSILON) {
+      const halfChord = radius * Math.sqrt(Math.max(0, 1 - (perpendicular / radius) ** 2));
+      let first = Math.max(0, projection - halfChord);
+      let last = Math.min(length, projection + halfChord);
+      for (const { a, b } of planes) {
+        const value = a * sx + b * sy;
+        const slope = a * ux + b * uy;
+        if (Math.abs(slope) <= EPSILON) {
+          if (value > EPSILON) { first = 1; last = 0; break; }
+        } else if (slope > 0) last = Math.min(last, -value / slope);
+        else first = Math.max(first, -value / slope);
+      }
+      if (first <= last + EPSILON) {
+        first = Math.max(0, Math.min(length, first));
+        last = Math.max(first, Math.min(length, last));
+        reachableLane = { from: lanePoint(first), to: lanePoint(last), lengthMeters: last - first };
+      }
+    }
+
+    return {
+      defenderId: id,
+      origin: createNormalizedPoint(defender.position.x, defender.position.y),
+      polygon: polygon.map(normalize),
+      rotationDeg: heading * 180 / Math.PI,
+      angleDeg,
+      reachMeters: reach,
+      nearestLanePoint: normalize(nearestPoint),
+      distanceToLaneMeters: distance,
+      reachableLane,
+    };
+  });
 }
 
 export function createVisionSector(

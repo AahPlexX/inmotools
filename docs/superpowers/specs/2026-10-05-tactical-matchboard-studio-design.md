@@ -7,9 +7,9 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T16:29:56Z
+timestamp: 2026-10-25T16:54:04Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent; automated gates pending)
+validator: Arena.ai Agent Mode (same agent; automated owned-browser acceptance pending)
 documentation: TMS-R44 contract and active continuation
 ---
 
@@ -124,7 +124,7 @@ Out of scope:
 | TMS-R41 | Voronoi territory in physical metres clipped to the pitch (formerly 27) | Turn on Voronoi; one cell per player is drawn |
 | TMS-R42 | Team convex hull with centroid, width, depth, area and perimeter, goalkeeper optional (formerly 28) | Turn on the hull; the summary lists area in m² |
 | TMS-R43 | Passing-lane clearance from the nearest defender, in metres, without probability (formerly 29) | Select a lane; clearance and blocked/open are shown |
-| TMS-R44 | Optional per-defender interception sectors show configured physical reach across the selected-player-to-ball lane, clipped to the pitch, with exact reachable lane spans and metre-labelled graphical/text equivalents | Enable cones; each visible opposing active player gets a cone and a metre-labelled lane-coverage summary; radius/angle edits and sampled motion update geometry; hidden players/layers and zero-length lanes are handled without invalid SVG |
+| TMS-R44 | Optional per-defender interception sectors show configured physical reach across the selected-player-to-ball lane, clipped to the pitch, with exact reachable lane spans and metre-labelled graphical/text equivalents | Enable cones; each visible opposing player (including substituted-on players; excluding coaches/neutrals) gets a cone and a metre-labelled lane-coverage summary; radius/angle edits and sampled motion update geometry; hidden players/layers and zero-length lanes are handled without invalid SVG |
 | TMS-R45 | Authored player orientation drives a vision sector of configurable angle and range (default 90°, 120° settable) (formerly 30) | Set 120° and 20 m; the sector draws at the player's rotation |
 | TMS-R46 | Positional play grid (default five channels with half-spaces and three rows, custom rows/columns) (formerly 31) | Turn on the grid; channels and thirds draw |
 | TMS-R47 | Distance rings and player/ball tethers in metres with imperial display (formerly 32) | Tether two players; the distance shows |
@@ -218,6 +218,8 @@ None: no function was compared between an ML and a non-ML method.
 - TMS-R31: defaults are cut, fade-through-background and roster-matched player/ball morph; snapshots freeze at transition start and arrival, unpaired players/props/drawings switch halfway, and an optional exit transition enables chapter playback. Owner may override.
 
 ## Change log
+
+- timestamp: 2026-10-25T16:49:37Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: Arena.ai Agent Mode (same agent; regression added before correction) | documentation: R44 eligibility follows sampled on-pitch visibility, including a roster substitute brought on by R33; only coaches/neutrals are excluded. No alternate substitution or motion state is introduced.
 
 - timestamp: 2026-10-25T16:29:56Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: Arena.ai Agent Mode (same agent; TDD/acceptance pending) | documentation: TMS-R44 contract specified before code: opt-in pitch-clipped reach sectors, finite-lane coverage, physical units, visibility, accessible controls and non-predictive interpretation. No requirement is marked newly verified.
 
