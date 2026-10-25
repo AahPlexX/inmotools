@@ -1711,16 +1711,47 @@ test('TMS-R78 preserves quick taps and cancels motion extra contacts and pointer
 });
 
 test('TMS-R78 retains native page scrolling and mobile pinch without arming actions', async ({ page, isMobile }) => {
-  const touch = await beginPlayerTouch(page); const x = await coordinateInput(page, 'X').inputValue(); const y = await coordinateInput(page, 'Y').inputValue();
-  const before = await page.evaluate(() => scrollY);
-  await touch.session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 7, x: touch.point.x, y: touch.point.y - 30 }] });
-  await touch.session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 7, x: touch.point.x, y: touch.point.y - 100 }] });
-  await expect.poll(async () => page.evaluate(() => scrollY)).toBeGreaterThan(before); await touch.end();
+  const target = page.locator('.tactical-board-svg #token-2');
+  // Read the target's coordinates before contact: traced locator reads can take
+  // longer than a legitimate 500 ms hold. Reset selection to cover SVG updates.
+  await target.click();
+  const x = await coordinateInput(page, 'X').inputValue(); const y = await coordinateInput(page, 'Y').inputValue();
+  await page.locator('.tactical-board-svg #token-1').click();
+  await target.scrollIntoViewIfNeeded(); await target.click({ trial: true });
+  const session = await page.context().newCDPSession(page);
+  let contactActive = false;
+  try {
+    await session.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
+    const before = await page.evaluate(() => scrollY);
+    const box = await target.boundingBox(); if (!box) throw new Error('Touch target is unavailable.');
+    const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 7, ...point }] }); contactActive = true;
+    await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 7, x: point.x, y: point.y - 30 }] });
+    await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 7, x: point.x, y: point.y - 100 }] });
+    await expect.poll(async () => page.evaluate(() => scrollY)).toBeGreaterThan(before);
+    // Wait for native scroll completion, including fling, before aiming another
+    // contact at a token. No fixed sleep or altered page scrolling behavior.
+    const finished = await page.evaluateHandle(() => {
+      const state = { complete: false };
+      globalThis.addEventListener('scrollend', () => { state.complete = true; }, { once: true, capture: true });
+      return state;
+    });
+    try {
+      await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); contactActive = false;
+      await expect.poll(() => finished.evaluate(state => state.complete)).toBe(true);
+    } finally { await finished.dispose(); }
+  } finally {
+    if (contactActive) await session.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+    await session.detach();
+  }
   if (isMobile) {
-    const pinch = await beginPlayerTouch(page); const scale = await page.evaluate(() => visualViewport?.scale ?? 1);
-    await pinch.session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 7, ...pinch.point }, { id: 8, x: pinch.point.x + 60, y: pinch.point.y }] });
-    for (const distance of [15, 35]) await pinch.session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 7, x: pinch.point.x - distance, y: pinch.point.y }, { id: 8, x: pinch.point.x + 60 + distance, y: pinch.point.y }] });
-    await expect.poll(async () => page.evaluate(() => visualViewport?.scale ?? 1)).toBeGreaterThan(scale); await pinch.end();
+    const scale = await page.evaluate(() => visualViewport?.scale ?? 1);
+    const pinch = await beginPlayerTouch(page);
+    try {
+      await pinch.session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 7, ...pinch.point }, { id: 8, x: pinch.point.x + 60, y: pinch.point.y }] });
+      for (const distance of [15, 35]) await pinch.session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 7, x: pinch.point.x - distance, y: pinch.point.y }, { id: 8, x: pinch.point.x + 60 + distance, y: pinch.point.y }] });
+      await expect.poll(async () => page.evaluate(() => visualViewport?.scale ?? 1)).toBeGreaterThan(scale);
+    } finally { await pinch.end(); }
   }
   await expect(radialActions(page)).toHaveCount(0);
   await expect(coordinateInput(page, 'X')).toHaveValue(x); await expect(coordinateInput(page, 'Y')).toHaveValue(y);

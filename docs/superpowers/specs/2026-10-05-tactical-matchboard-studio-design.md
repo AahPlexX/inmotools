@@ -7,7 +7,7 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T23:16:39Z
+timestamp: 2026-10-25T23:48:37Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated focused gates; full R78 acceptance pending
 documentation: R78 candidate implementation and corrective TDD; R44/R52 locally accepted
@@ -230,7 +230,7 @@ No function was compared between an ML and a non-ML method.
 
 ## Change log
 
-- 2026-10-25 — R78 candidate implements the pre-recorded touch contract, shared commands, focus/viewport fallback and cancellation. Original RED `61ed61a` and corrective inherited-pointer, compatibility-focus, unavailable-focus and caption-overflow contracts are in task 7d78. All 16 focused browser cases pass on candidate `0b53d59`; frozen runtime `94d8428` passes full units/build/lint and two additional native scroll/pinch cases. First full four-spec gate: 127 passed / 2 existing skips / 1 old recovery-readiness failure / 0 retries (all 16 R78 pass). The test now additionally observes the committed moved autosave before reload; 2 focused recovery cases pass, original final assertions/timeouts and runtime unchanged. Fresh complete acceptance remains pending; no verification or hosted integration is claimed yet.
+- 2026-10-25 — R78 candidate implements the pre-recorded touch contract, shared commands, focus/viewport fallback and cancellation. Original RED `61ed61a` and corrective inherited-pointer, compatibility-focus, unavailable-focus and caption-overflow contracts are in task 7d78. All 16 focused browser cases pass on candidate `0b53d59`; frozen runtime `94d8428` passes full units/build/lint and two additional native scroll/pinch cases. First full gate: 127 passed / 2 existing skips / 1 old recovery-readiness failure / 0 retries. Stronger persisted-autosave readiness passes both projects in the second full gate (126 passed / 2 existing skips / 2 native-fixture failures / 0 retries). Native measurements now precede contact and actual scroll completion precedes pinch; 2 focused + 6 repeated native cases pass. Original final assertions/timeouts/retries and runtime are unchanged. Task 7d78 retains failed results and the abandoned synthetic-scroll prototype. Fresh complete acceptance is pending; no verification or hosted integration is claimed yet.
 
 - timestamp: 2026-10-25T21:56:31Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: same-agent contract review; TDD/acceptance pending | documentation: R78 contract specified before implementation; conservative hold/slop, cancellation, same-action canonical editing, focus/activation safety and radial/compact viewport behavior recorded. No status upgrade or dependency/schema change.
 
