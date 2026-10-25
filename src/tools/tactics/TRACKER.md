@@ -7,7 +7,7 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T19:12:52Z
+timestamp: 2026-10-25T19:18:13Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
 documentation: TMS-R52 contract and owner-authorized branch continuation
@@ -17,7 +17,7 @@ documentation: TMS-R52 contract and owner-authorized branch continuation
 
 ## Resume here
 
-85 requirements: **81 verified, 1 implemented, 2 partial, 1 missing**. TMS-R44 is locally verified on runtime `117c119741e389b5b169a0f154aa544937bc0365`: 4,215 units pass / 18 existing skips; type/build/lint/docs pass; four owned browser specs: 98 passed / 2 existing skips / 0 failures / 0 retries (one worker, 12.3 min). See [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) and `CURRENT_HANDOFF.md` for exact receipts and the preserved earlier parallel-run diagnostic. No R44 implementation work remains. The task is active for main integration and hosted-CI follow-up only: workflow dispatch is HTTP 403, and the session is fixed to `arena/981e49e9-inmotools`. No main integration or deployment is claimed. Owner now authorizes continued work on the fixed chat branch and will handle integration. **Active R52 acceptance:** [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md), then R78, R75, R83; do not wait for R44 integration to continue. R52 is partial: 16 new units, type/build and focused browser groups pass; freeze runtime, run full repository units/lint and the current four owned specs next. No complete current acceptance is claimed. `HANDOFF.md` is archival.
+85 requirements: **81 verified, 1 implemented, 2 partial, 1 missing**. TMS-R44 is locally verified on runtime `117c119741e389b5b169a0f154aa544937bc0365`: 4,215 units pass / 18 existing skips; type/build/lint/docs pass; four owned browser specs: 98 passed / 2 existing skips / 0 failures / 0 retries (one worker, 12.3 min). See [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) and `CURRENT_HANDOFF.md` for exact receipts and the preserved earlier parallel-run diagnostic. No R44 implementation work remains. The task is active for main integration and hosted-CI follow-up only: workflow dispatch is HTTP 403, and the session is fixed to `arena/981e49e9-inmotools`. No main integration or deployment is claimed. Owner now authorizes continued work on the fixed chat branch and will handle integration. **Active R52 acceptance:** [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md), then R78, R75, R83; do not wait for R44 integration to continue. R52 is partial: 16 new units, type/build and focused browser groups pass; runtime is frozen at `bedf5ec`; full repository units 4,231 passed / 18 existing skips, lint 4,104 warnings / 0 errors, type/build pass. Run the current four owned browser specs next. No complete current acceptance is claimed. `HANDOFF.md` is archival.
 
 ## Documents
 
