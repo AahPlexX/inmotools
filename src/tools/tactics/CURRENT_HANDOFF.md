@@ -3,10 +3,10 @@ tool: tactical-matchboard-studio
 doc: handoff
 status: active
 updated: 2026-10-25
-timestamp: 2026-10-25T19:39:08Z
+timestamp: 2026-10-25T21:56:31Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
-documentation: R52 local acceptance and owner-managed integration; R78 next
+documentation: R78 contract/TDD continuation; R44/R52 locally accepted
 tracker: src/tools/tactics/TRACKER.md
 ---
 
@@ -31,7 +31,7 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 
 ## Exact next action
 
-**Continue TMS-R78 touch long-press/radial player actions**, then R75 and R83, on `arena/981e49e9-inmotools`. First record its task/spec defaults and add RED behavioral/browser contracts against the existing R77 player actions, keyboard equivalent and selection/movement gestures; keep the normal non-drag workflow and original assertions/timeouts. R52 implementation/local acceptance is complete on `bedf5ece25cab5a541e8f09605b0dd52e7323f06`; do not rebuild R52/R44 or reopen completed R31/R07/PDF work. The owner explicitly permits branch pushes and handles integration. Do not create a PR, switch/create/push another branch, weaken branch/workflow rules, or close/disconnect the connector. R44/R52 tasks remain active only until actual owner integration evidence is recorded.
+**Continue TMS-R78 touch long-press/radial player actions**, then R75 and R83, on `arena/981e49e9-inmotools`. [Task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md) records the pre-implementation contract/defaults; establish the focused baseline and add RED behavioral/browser contracts against the existing R77 player actions, keyboard equivalent and selection/movement gestures; keep the normal non-drag workflow and original assertions/timeouts. R52 implementation/local acceptance is complete on `bedf5ece25cab5a541e8f09605b0dd52e7323f06`; do not rebuild R52/R44 or reopen completed R31/R07/PDF work. The owner explicitly permits branch pushes and handles integration. Do not create a PR, switch/create/push another branch, weaken branch/workflow rules, or close/disconnect the connector. R44/R52 tasks remain active only until actual owner integration evidence is recorded.
 
 R31 stores optional exit-transition metadata on scenes. It uses the outgoing scene’s final interval and the next contiguous scene’s arrival; cut is instantaneous, fade passes through the background, and morph pairs visible roster identities plus the ball. Unpaired actors/props/drawings switch halfway. Existing projects without settings retain their selected-scene behavior. Setting a transition enables chapter playback at the existing playhead. Preview, 3D, animated SVG/HTML/video/frame exports and PDF contact sheets share the sampled chapter. Animated exports retain boundary/transition samples within the existing cap or report an insufficient cap. Clone/split/reorder/join and JSON import have transition-specific regression coverage; no dependency or schema bump was added.
 
