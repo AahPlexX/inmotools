@@ -7,10 +7,10 @@ state: active
 branch: arena/981e49e9-inmotools
 created: 2026-10-25
 updated: 2026-10-25
-timestamp: 2026-10-25T21:56:31Z
+timestamp: 2026-10-25T22:03:00Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent; TDD/acceptance pending)
-documentation: TMS-R78 contract and continuation before implementation
+validator: Arena.ai Agent Mode (same agent); automated baseline passed and R78 RED observed; acceptance pending
+documentation: TMS-R78 baseline and executable RED before runtime
 ---
 
 # TMS-R78 touch long-press radial player actions
@@ -23,7 +23,7 @@ Standing quality/TDD/documentation/no-PR/metadata instructions are recorded verb
 
 ## Resume here
 
-R44/R52 are locally verified; continue **R78**, then R75/R83. R78 remains missing while the contract is recorded before runtime. Next: focused Tactical baseline/type/build/existing R77 browser, new RED controller/placement/visibility and real touch browser contracts, implementation, then frozen local owned acceptance. Main integration is owner-managed and does not block work. No hosted CI/deployment is claimed; prior manual workflow permission was HTTP 403, not retried unchanged.
+R44/R52 are locally verified; continue **R78**, then R75/R83. R78 remains missing. Contract commit `6473cab` precedes the new tests; runtime is unchanged. Fresh baseline: 227 Tactical units / 25 files, type/production/PWA build (15.74 s / 408 precache entries) and existing R77 browser actions (2 passed / both projects / one worker / 12.3 s). RED: all 17 new units fail on missing APIs; both executed native-touch browser cases fail on absent radial dialog. Six browser contracts are written; the other ten project-cases have not run yet. Next: implement pure controller/visibility/placement, stable-board touch hook and responsive radial dialog sharing the seven existing callbacks, then run the focused contracts and frozen acceptance. Main integration remains owner-managed and nonblocking; no hosted CI/deployment is claimed.
 
 ## Source and workflow
 
@@ -53,3 +53,9 @@ R44/R52 are locally verified; continue **R78**, then R75/R83. R78 remains missin
 ## Log
 
 - timestamp: 2026-10-25T21:56:31Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: repository/rules/remote/source inspection | documentation: Re-read governance, standards, decisions, validation policy, current handoff, PRD and tracker. Restored published source safely; latest owner-authorized branch remains active. Existing R77 has seven actions sharing canonical edits; R78 contract/defaults recorded before runtime changes. No connector action or unrelated file change.
+
+- timestamp: 2026-10-25T22:03:00Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: automated Vitest/TypeScript/Vite/Playwright; same-agent evidence review | documentation: Baseline on `6473cab`: 227 Tactical units / 25 files passed (5.62 s), type/production/PWA build passed (Vite 15.74 s, 408 entries), existing R77 browser 2 passed (one worker, 12.3 s). New `tactics-long-press.test.ts`: 17 expected failures (749 ms), missing `createTacticalLongPress`, `isVisiblePlayerActionTarget` and `placePlayerActionMenu`, not module-resolution errors. Native CDP touch on nonselected token survives selection, but the new radial dialog does not exist: 2 expected browser failures (both projects), no runtime edit. Other five new browser contracts remain unexecuted at RED. Original assertions/timeouts/retries unchanged. Sandbox receipts: `/home/user/inmotools-r78-baseline-{units,build,browser}.log`, `/home/user/inmotools-r78-red-{units,browser}.log`; raw traces are sandbox-local, not durable hosted evidence.
+
+## Primary API source review
+
+- Reviewed 2026-10-25: [W3C Pointer Events editor source](https://github.com/w3c/pointerevents/blob/gh-pages/index.html), current `gh-pages` content retrieved with GitHub API. Implicit touch capture, explicit capture ownership and suppression of the pointer stream during native pan/zoom support capture on the stable board, cancellation handling and preserving `touch-action`. This is API evidence, not third-party runtime code or a physical-device claim. Chosen 500 ms / 10 px thresholds remain documented authoring defaults, not a claimed browser standard.

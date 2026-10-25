@@ -7,17 +7,17 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T21:56:31Z
+timestamp: 2026-10-25T22:03:00Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
-documentation: R78 contract/TDD continuation; R44/R52 locally accepted
+documentation: R78 baseline/RED observed; implementation next; R44/R52 locally accepted
 ---
 
 # Tactical Matchboard Studio — tracker
 
 ## Resume here
 
-85 requirements: **82 verified, 1 implemented, 1 partial, 1 missing**. Latest locally accepted runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06` adds R52; full units 4,231 passed / 18 existing skips, type/production/PWA build pass, lint 4,104 existing warnings / 0 errors, canonical four-spec browser gate 112 passed / 2 existing skips / 0 failures / 0 retries (one worker, 13.9 min). All 14 new R52 and 8 R44 browser cases pass. Exact input/environment/TDD/receipt identities: [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md); R44 history: [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md). R52/R44 have no remaining implementation/local-acceptance work. Their tasks stay active for owner-managed integration; no hosted CI, main integration or deployment is claimed. The owner authorizes continued work/pushes on the fixed chat branch and handles integration. **Active R78 contract/TDD:** [task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md); baseline/RED next, then R75/R83; do not wait for integration or disconnect the connector. `HANDOFF.md` is archival.
+85 requirements: **82 verified, 1 implemented, 1 partial, 1 missing**. Latest locally accepted runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06` adds R52; full units 4,231 passed / 18 existing skips, type/production/PWA build pass, lint 4,104 existing warnings / 0 errors, canonical four-spec browser gate 112 passed / 2 existing skips / 0 failures / 0 retries (one worker, 13.9 min). All 14 new R52 and 8 R44 browser cases pass. Exact input/environment/TDD/receipt identities: [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md); R44 history: [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md). R52/R44 have no remaining implementation/local-acceptance work. Their tasks stay active for owner-managed integration; no hosted CI, main integration or deployment is claimed. The owner authorizes continued work/pushes on the fixed chat branch and handles integration. **Active R78 contract/TDD:** [task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md); baseline passed and RED observed (17 new units / 2 native-touch cases); implement next, then R75/R83; do not wait for integration or disconnect the connector. `HANDOFF.md` is archival.
 
 ## Documents
 

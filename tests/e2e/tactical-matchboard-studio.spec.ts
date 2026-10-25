@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import path from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { CDPSession, Page } from '@playwright/test';
 import { buildBeginnerTacticalProject, placeMirroredOpposition } from '../../src/tools/tactics/workspace-engine';
 import { exportTacticalProjectJson, importTacticalProjectJson } from '../../src/tools/tactics/project-io';
 import { addTimelineSubstitutionEvent } from '../../src/tools/tactics/substitution-engine';
@@ -1618,6 +1618,145 @@ test('help, shortcuts, and tooltips stay available without taking over text fiel
   expect(tipBox.y).toBeGreaterThanOrEqual(-1);
   expect(tipBox.right).toBeLessThanOrEqual(tipBox.viewportWidth + 1);
   expect(tipBox.bottom).toBeLessThanOrEqual(tipBox.viewportHeight + 1);
+});
+
+async function beginPlayerTouch(page: Page, tokenId = 'token-2') {
+  const target = page.locator(`.tactical-board-svg #${tokenId}`); await target.scrollIntoViewIfNeeded();
+  const box = await target.boundingBox(); if (!box) throw new Error('Touch player is unavailable.');
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const session: CDPSession = await page.context().newCDPSession(page);
+  await session.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 7, ...point }] });
+  let ended = false;
+  return {
+    point, session,
+    async end(cancel = false) {
+      if (ended) return; ended = true;
+      await session.send('Input.dispatchTouchEvent', { type: cancel ? 'touchCancel' : 'touchEnd', touchPoints: [] });
+      await session.detach();
+    },
+  };
+}
+
+const radialActions = (page: Page) => page.getByTestId('tactical-radial-actions');
+const actionNames = ['Lock selected player', 'Move tool', 'Arrow tool', 'Move player up from actions', 'Move player left from actions', 'Move player right from actions', 'Move player down from actions', 'Close player actions'].sort();
+
+test('TMS-R78 real touch holds a nonselected player through SVG updates without release edits', async ({ page }) => {
+  const touch = await beginPlayerTouch(page);
+  try {
+    await expect(board(page)).toHaveAttribute('data-selected-token', 'token-2');
+    const x = await coordinateInput(page, 'X').inputValue(); const y = await coordinateInput(page, 'Y').inputValue();
+    const menu = radialActions(page); await expect(menu).toBeVisible(); await expect(menu).toHaveAttribute('data-layout', 'radial');
+    await touch.end();
+    await expect(coordinateInput(page, 'X')).toHaveValue(x); await expect(coordinateInput(page, 'Y')).toHaveValue(y);
+    await expect(menu.getByRole('button', { name: 'Lock selected player', exact: true })).toBeVisible();
+    const names = await menu.getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label') ?? button.textContent?.trim() ?? '').sort());
+    expect(names).toEqual(actionNames);
+    await page.locator('.tactical-board').dispatchEvent('contextmenu', { pointerType: 'touch', button: 2 });
+    await expect(menu).toBeVisible(); await expect(page.getByRole('dialog', { name: 'Player actions', exact: true })).toHaveCount(1);
+    await menu.getByRole('button', { name: 'Close player actions', exact: true }).click();
+    await expect(board(page)).toBeFocused();
+    await page.getByRole('button', { name: 'Player actions', exact: true }).click();
+    const legacy = page.getByRole('dialog', { name: 'Player actions', exact: true });
+    expect(await legacy.getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label') ?? button.textContent?.trim() ?? '').sort())).toEqual(actionNames);
+    await expect(radialActions(page)).toHaveCount(0); await page.keyboard.press('Escape');
+  } finally { await touch.end(); }
+});
+
+test('TMS-R78 preserves quick taps and cancels motion extra contacts and pointer cancellation', async ({ page }) => {
+  await page.clock.install(); const menu = radialActions(page);
+  let touch = await beginPlayerTouch(page); await page.clock.runFor(100); await touch.end(); await page.clock.runFor(650); await expect(menu).toHaveCount(0);
+  const surface = await board(page).boundingBox(); if (!surface) throw new Error('Board unavailable.');
+  const session = await page.context().newCDPSession(page);
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 9, x: surface.x + surface.width * 0.72, y: surface.y + surface.height * 0.68 }] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await session.detach();
+  await expect(coordinateInput(page, 'X')).toHaveValue('72.0'); await expect(coordinateInput(page, 'Y')).toHaveValue('68.0');
+  touch = await beginPlayerTouch(page);
+  await touch.session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 7, x: touch.point.x + 16, y: touch.point.y }] });
+  await page.clock.runFor(650); await expect(menu).toHaveCount(0); await touch.end();
+  await expect(coordinateInput(page, 'X')).toHaveValue('72.0'); await expect(coordinateInput(page, 'Y')).toHaveValue('68.0');
+  touch = await beginPlayerTouch(page);
+  await touch.session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 7, ...touch.point }, { id: 8, x: touch.point.x + 30, y: touch.point.y + 20 }] });
+  await page.clock.runFor(650); await expect(menu).toHaveCount(0); await touch.end();
+  touch = await beginPlayerTouch(page); await touch.end(true); await page.clock.runFor(650); await expect(menu).toHaveCount(0);
+});
+
+test('TMS-R78 cancels interrupted and unmounted holds without stale menu callbacks', async ({ page }) => {
+  await page.clock.install(); const menu = radialActions(page);
+  for (const type of ['scroll', 'resize', 'blur']) {
+    const touch = await beginPlayerTouch(page); await page.evaluate(type => globalThis.dispatchEvent(new Event(type)), type);
+    await page.clock.runFor(650); await expect(menu).toHaveCount(0); await touch.end();
+  }
+  let touch = await beginPlayerTouch(page); await page.keyboard.press('a'); await page.clock.runFor(650); await expect(menu).toHaveCount(0); await touch.end();
+  await page.getByRole('button', { name: 'Move', exact: true }).click();
+  touch = await beginPlayerTouch(page); await page.goto('./#/'); await touch.end(); await page.clock.runFor(650); await expect(menu).toHaveCount(0);
+  await page.goto('./#/tools/tactical-matchboard-studio');
+  touch = await beginPlayerTouch(page); await page.clock.runFor(500); await expect(menu).toBeVisible(); await touch.end();
+  await expect(page.getByRole('dialog', { name: 'Player actions', exact: true })).toHaveCount(1); await page.keyboard.press('Escape');
+});
+
+test('TMS-R78 shares canonical nudges locks tools undo redo and JSON without gesture fields', async ({ page }) => {
+  let touch = await beginPlayerTouch(page); const menu = radialActions(page); await expect(menu).toBeVisible(); await touch.end();
+  const x = Number(await coordinateInput(page, 'X').inputValue());
+  await menu.getByRole('button', { name: 'Move player right from actions', exact: true }).click();
+  await expect.poll(async () => Number(await coordinateInput(page, 'X').inputValue())).toBeCloseTo(x + 2, 1);
+  await menu.getByRole('button', { name: 'Lock selected player', exact: true }).click();
+  await expect(menu.getByRole('button', { name: 'Unlock selected player', exact: true })).toBeVisible();
+  await menu.getByRole('button', { name: 'Close player actions', exact: true }).click();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click(); await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(async () => Number(await coordinateInput(page, 'X').inputValue())).toBeCloseTo(x, 1);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click(); await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  touch = await beginPlayerTouch(page); await expect(menu).toBeVisible(); await touch.end();
+  await menu.getByRole('button', { name: 'Move player right from actions', exact: true }).click(); await expect(page.locator('.status-line').last()).toContainText(/locked/i);
+  await menu.getByRole('button', { name: 'Unlock selected player', exact: true }).click();
+  await menu.getByRole('button', { name: 'Arrow tool', exact: true }).click(); await menu.getByRole('button', { name: 'Close player actions', exact: true }).click();
+  await expect(board(page)).toHaveAttribute('data-interaction-mode', 'arrow');
+  await page.getByRole('button', { name: 'Move', exact: true }).click();
+  await page.getByText('Project vault & interchange', { exact: true }).click(); const download = await readDownload(page, 'Export project JSON');
+  const restored = importTacticalProjectJson(download.bytes.toString('utf8'), download.filename);
+  expect(restored.playerTokens[1]!.locked).toBe(false); expect(restored.playerTokens[1]!.position.x * 100).toBeCloseTo(x + 2, 1);
+  expect(download.bytes.toString('utf8')).not.toMatch(/longPress|radialAnchor|actionsAnchor/);
+});
+
+test('TMS-R78 radial controls reflow at edges zoom large text and dark theme with focus return', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.addInitScript(() => localStorage.setItem('inmotools.theme.v1', 'dark')); await page.reload();
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  const touch = await beginPlayerTouch(page); const menu = radialActions(page); await expect(menu).toBeVisible(); await touch.end();
+  await expect(menu.getByRole('button', { name: 'Lock selected player', exact: true })).toBeFocused();
+  await page.keyboard.press('Shift+Tab'); await expect(menu.getByRole('button', { name: 'Close player actions', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab'); await expect(menu.getByRole('button', { name: 'Lock selected player', exact: true })).toBeFocused();
+  for (const width of [320, 390, 768]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect.poll(async () => menu.evaluate(element => {
+      const r = element.getBoundingClientRect(); return r.left >= 7 && r.top >= 7 && r.right <= innerWidth - 7 && r.bottom <= innerHeight - 7;
+    })).toBe(true);
+    const boxes = await menu.getByRole('button').evaluateAll(buttons => buttons.map(button => { const r = button.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; }));
+    for (const box of boxes) { expect(box.width).toBeGreaterThanOrEqual(44); expect(box.height).toBeGreaterThanOrEqual(44); }
+    for (let i = 0; i < boxes.length; i += 1) for (let j = i + 1; j < boxes.length; j += 1) {
+      const a = boxes[i]!; const b = boxes[j]!; expect(Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top))).toBeLessThanOrEqual(1);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  }
+  await page.evaluate(() => { document.documentElement.style.fontSize = '32px'; }); await expect(menu).toHaveAttribute('data-layout', 'compact');
+  await expect.poll(async () => menu.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+  await page.evaluate(() => { document.documentElement.style.fontSize = ''; document.documentElement.style.zoom = '1.5'; });
+  await expect.poll(async () => menu.evaluate(element => { const r = element.getBoundingClientRect(); return r.left >= 7 && r.top >= 7 && r.right <= innerWidth - 7 && r.bottom <= innerHeight - 7; })).toBe(true);
+  const results = await new AxeBuilder({ page }).include('[data-testid="tactical-radial-actions"]').analyze();
+  expect(results.violations.filter(violation => ['serious', 'critical'].includes(violation.impact ?? ''))).toEqual([]);
+  await page.keyboard.press('Escape'); await expect(menu).toHaveCount(0); await expect(board(page)).toBeFocused();
+});
+
+test('TMS-R78 excludes mouse drawing and pan gestures and retains Shift F10 actions', async ({ page }) => {
+  await page.clock.install(); const target = page.locator('.tactical-board-svg #token-2'); await target.scrollIntoViewIfNeeded();
+  const box = await target.boundingBox(); if (!box) throw new Error('Player unavailable.');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down(); await page.clock.runFor(650); await page.mouse.up(); await expect(radialActions(page)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Arrow', exact: true }).click(); let touch = await beginPlayerTouch(page); await page.clock.runFor(650); await touch.end(); await expect(radialActions(page)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Move', exact: true }).click(); await page.getByRole('button', { name: 'Drag to pan', exact: true }).click();
+  touch = await beginPlayerTouch(page); await page.clock.runFor(650); await touch.end(); await expect(radialActions(page)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Drag to pan', exact: true }).click();
+  await page.locator('.tactical-player-list button').nth(1).focus(); await page.keyboard.press('Shift+F10');
+  await expect(page.getByRole('dialog', { name: 'Player actions', exact: true })).toBeVisible(); await expect(radialActions(page)).toHaveCount(0); await page.keyboard.press('Escape');
 });
 
 test('player actions from right-click and the touch button lock the same player', async ({ page }) => {
