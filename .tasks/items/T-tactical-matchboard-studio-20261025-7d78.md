@@ -7,7 +7,7 @@ state: active
 branch: arena/981e49e9-inmotools
 created: 2026-10-25
 updated: 2026-10-25
-timestamp: 2026-10-25T22:36:50Z
+timestamp: 2026-10-25T22:42:30Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated focused gates; full R78 acceptance pending
 documentation: R78 candidate implementation and corrective TDD; R44/R52 locally accepted
@@ -58,7 +58,7 @@ R44/R52 are locally verified; continue **R78**, then R75/R83. R78 is partial: co
 
 ## Primary API source review
 
-- Reviewed 2026-10-25: [W3C Pointer Events editor source](https://github.com/w3c/pointerevents/blob/gh-pages/index.html), current `gh-pages` content retrieved with GitHub API. Implicit touch capture, explicit capture ownership and suppression of the pointer stream during native pan/zoom support capture on the stable board, cancellation handling and preserving `touch-action`. This is API evidence, not third-party runtime code or a physical-device claim. Chosen 500 ms / 10 px thresholds remain documented authoring defaults, not a claimed browser standard.
+- Reviewed 2026-10-25: [W3C Pointer Events editor source](https://github.com/w3c/pointerevents/blob/gh-pages/index.html), current `gh-pages` content retrieved with GitHub API (blob `963ef738bcfb916c827013c7d6bc48f6f56e892b`). Implicit touch capture, explicit capture ownership and suppression of the pointer stream during native pan/zoom support capture on the stable board, cancellation handling and preserving `touch-action`. This is API evidence, not third-party runtime code or a physical-device claim. Chosen 500 ms / 10 px thresholds remain documented authoring defaults, not a claimed browser standard.
 
 ## Candidate implementation and corrective TDD
 
@@ -71,4 +71,6 @@ R44/R52 are locally verified; continue **R78**, then R75/R83. R78 is partial: co
 - Current build/lint/unit receipts: `/home/user/inmotools-r78-{green-engine,focused-lint,fourth-build}.log`. Focused browser receipt `/home/user/inmotools-r78-focused-browser-final.log`: 16 passed (14 R78 plus 2 unchanged R77), one worker, 2.0 min, no failures/retries. Full required checkpoint has not started.
 - Raw initial RED/first-candidate/availability traces and logs were archived and `tar --compare` verified before removal: `/home/user/.cache/inmotools-validation/receipts/inmotools-r78-diagnostics-v1.tar.xz`, 122,137,388 bytes, SHA-256 `e496ec2f0b77d2f4f6458da1bc88e49c6608e226bd7e24ef48bbcd0c4c290d3e`. Per-file manifest is alongside it; extraction into `/home/user/inmotools-r78-receipts` restores its absolute manifest paths. The second candidate's failed mobile trace was overwritten by the next run; its full failure log remains. These are sandbox cache receipts, not committed artifacts or guaranteed durable hosting. No failure is converted into acceptance.
 
-- timestamp: 2026-10-25T22:36:50Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: automated local focused gates; same-agent evidence review | documentation: Complete focused desktop/mobile batch: 16 passed / 0 failures / 0 retries (one worker, 2.0 min), including all seven new R78 contracts and unchanged R77. 19 new units / 24 focused units, 150 seeded geometry samples, clean new-module lint and type/production/PWA build (18.37 s / 408 entries) pass. Candidate is ready to freeze; full required acceptance remains pending and R78 stays partial.
+- timestamp: 2026-10-25T22:36:50Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: automated local focused gates; same-agent evidence review | documentation: Complete focused desktop/mobile batch: 16 passed / 0 failures / 0 retries (one worker, 2.0 min), including all seven new R78 contracts and unchanged R77. 19 new units / 24 focused units, 150 seeded geometry samples, clean new-module lint and type/production/PWA build (18.37 s / 408 entries) pass. Candidate `0b53d59cba01cc1bb8d7de55fb8046399b2f77a5` passed focused acceptance; subsequent type-only import / arrow-callback lint cleanup precedes the frozen full gate. R78 stays partial until required acceptance finishes.
+
+- timestamp: 2026-10-25T22:42:30Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: automated full Oxlint and same-agent review | documentation: First full lint on `0b53d59`: 4,106 warnings / 0 errors, including two new findings (mixed duplicate type import and unbound callback reference). Consolidated type-only imports and made the capture-loss callback an arrow; current full lint 4,103 warnings / 0 errors, 1,295 files / 196 rules / 14.7 s. This also removes one prior inline-type warning; no warning rule was weakened. Full units/build/four-spec browser acceptance next on the frozen cleanup commit. Origin main remains `fa4dd291c0b4556025a5e58f21e4268f6748e9d6`. Canonical `validationPlan` selects exactly the four owned specs; actual source/head identity will be refreshed after this commit.

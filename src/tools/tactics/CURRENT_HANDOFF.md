@@ -3,7 +3,7 @@ tool: tactical-matchboard-studio
 doc: handoff
 status: active
 updated: 2026-10-25
-timestamp: 2026-10-25T22:36:50Z
+timestamp: 2026-10-25T22:42:30Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated focused gates; full R78 acceptance pending
 documentation: R78 candidate implementation and corrective TDD; R44/R52 locally accepted
@@ -32,7 +32,7 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 
 ## Exact next action
 
-**Finish TMS-R78 touch long-press/radial player actions acceptance**, then R75 and R83, on `arena/981e49e9-inmotools`. [Task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md) records contract `6473cab`, original RED `61ed61a`, current candidate and corrective regressions. Current focused browser batch passed all 16 cases (one worker, 2.0 min); receipt `/home/user/inmotools-r78-focused-browser-final.log`. Freeze/commit candidate and run full units/lint/type/build plus the canonical four owned browser specs, one worker and original assertions/timeouts/zero local retries. Only mark R78 verified after these finish. New helpers/components/units lint is clean; 19 new / 24 focused units and latest type/production/PWA build pass. Earlier failed batches are not acceptance. Keep the non-drag alternatives and owner-managed integration nonblocking; no PR, other branch, connector disconnection, hosted/deployment claim or rebuilding R44/R52/R31/R07/PDF.
+**Finish TMS-R78 touch long-press/radial player actions acceptance**, then R75 and R83, on `arena/981e49e9-inmotools`. [Task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md) records contract `6473cab`, original RED `61ed61a`, current candidate and corrective regressions. Current focused browser batch passed all 16 cases (one worker, 2.0 min); receipt `/home/user/inmotools-r78-focused-browser-final.log`. Freeze/commit candidate and run full units/lint/type/build plus the canonical four owned browser specs, one worker and original assertions/timeouts/zero local retries. Only mark R78 verified after these finish. New helpers/components/units lint is clean; full lint after type-only/callback cleanup is 4,103 warnings / 0 errors. The complete candidate `0b53d59` passed 19 new / 24 focused units, type/build and all 16 focused browser cases. Full units/build/browser must now validate the frozen cleanup source. Earlier failed batches are not acceptance. Keep the non-drag alternatives and owner-managed integration nonblocking; no PR, other branch, connector disconnection, hosted/deployment claim or rebuilding R44/R52/R31/R07/PDF.
 
 R31 stores optional exit-transition metadata on scenes. It uses the outgoing scene’s final interval and the next contiguous scene’s arrival; cut is instantaneous, fade passes through the background, and morph pairs visible roster identities plus the ball. Unpaired actors/props/drawings switch halfway. Existing projects without settings retain their selected-scene behavior. Setting a transition enables chapter playback at the existing playhead. Preview, 3D, animated SVG/HTML/video/frame exports and PDF contact sheets share the sampled chapter. Animated exports retain boundary/transition samples within the existing cap or report an insufficient cap. Clone/split/reorder/join and JSON import have transition-specific regression coverage; no dependency or schema bump was added.
 

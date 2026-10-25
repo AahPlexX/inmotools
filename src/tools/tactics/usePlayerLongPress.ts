@@ -124,7 +124,7 @@ export function usePlayerLongPress(board: RefObject<HTMLDivElement | null>, opti
         if (!(error instanceof DOMException) || error.name !== 'NotFoundError') throw error;
       }
     },
-    captureLost(event: ReactPointerEvent<HTMLDivElement>) {
+    captureLost: (event: ReactPointerEvent<HTMLDivElement>) => {
       if (event.target === event.currentTarget) controller.current?.end(event.pointerId);
     },
     suppressContextMenu(event: MouseEvent) {

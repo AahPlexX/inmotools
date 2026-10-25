@@ -18,9 +18,8 @@ import {
   isVisiblePlayerActionTarget,
   placeCollisionSafeTooltip,
   resolveTacticalShortcut,
-  type TacticalTransportRequest,
 } from './accessibility-engine';
-import type { PlayerActionAnchor } from './accessibility-engine';
+import type { PlayerActionAnchor, TacticalTransportRequest } from './accessibility-engine';
 import { serializeTacticalBoardSvg } from './board-engine';
 import {
   commitTacticalProject,
