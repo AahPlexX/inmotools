@@ -9,13 +9,13 @@ branch: arena/981e49e9-inmotools
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T19:18:13Z
+timestamp: 2026-10-25T19:41:33Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent); focused GREEN passed; full owned acceptance pending
-documentation: TMS-R52 contract and owner-authorized branch continuation
+validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
+documentation: R52 local acceptance and owner-managed integration; R78 next
 ---
 
-# TMS-R52 first-person player camera
+# TMS-R52 first-person player camera — integration pending
 
 ## Request
 
@@ -25,7 +25,9 @@ Standing quality, TDD, documentation, no-PR and metadata requirements remain rec
 
 ## Resume here
 
-R52 implementation is ready for frozen acceptance; R44 remains unchanged. All 16 new units pass (22 including existing camera/runtime contracts); type/production/PWA build passes. Six new desktop/mobile contracts passed (12 cases), and the added level-capture regression passes both projects after its correction (2 cases); complete current four-spec acceptance is still pending. Frozen runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06`: fresh full units 4,231 passed / 18 existing skips (379 files passed, 2 skipped), 168.14 s; full lint 4,104 existing warnings / 0 errors, 1,292 files / 196 rules, 19.6 s. Next run the canonical four-spec browser gate with one worker and unchanged timeouts/retries, then refresh exact results and push records. No further runtime edit is intended unless a gate identifies a defect. R52 stays partial until that acceptance; owner handles main integration and no connector is to be disconnected. After R52, continue R78, R75, R83.
+**R52 is locally verified** on runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06`. Full repository units: **4,231 passed / 18 existing skips / 0 failed**; type/production/PWA build passes; full lint **4,104 existing warnings / 0 errors**. Complete canonical four-spec browser gate: **112 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries**, one worker, 13.9 min, on records-only execution head `bd5d5b306de510f2203e90a6355740dae730db9c`. All 16 new units (including 150 seeded geometry cases) and all 14 new browser cases pass; all 8 R44 cases also pass on the combined source. No runtime/test/dependency/evaluator change follows this accepted input.
+
+Task remains `active` solely for **owner-managed integration**, not unfinished R52 implementation or local acceptance. The owner explicitly permits continued pushes/work on `arena/981e49e9-inmotools` and handles integration; no PR or main push is made. No hosted validation was initiated in this continuation; the prior workflow-dispatch HTTP 403 remains a recorded permission issue, not a claimed current hosted success. Do not close/disconnect the connector. **Next product work is R78**, then R75, R83; do not wait for main integration or reopen R44/R52/R31/R07/PDF work.
 
 ## Workflow and source identity
 
@@ -73,3 +75,38 @@ R52 implementation is ready for frozen acceptance; R44 remains unchanged. All 16
 ## Frozen repository checkpoint
 
 - timestamp: 2026-10-25T19:18:13Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: fresh full Vitest / Oxlint and source identity | documentation: Frozen runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06`, clean and pushed. Repository units **4,231 passed / 18 existing skips / 0 failed**, 379 files passed / 2 skipped, 168.14 s. Full lint **4,104 warnings / 0 errors**, 1,292 files / 196 rules, 19.6 s; new unit contracts have no diagnostics. Type/build on identical source blobs passed **14.48 s / 408 PWA precache entries**. Main remains `fa4dd291c0b4556025a5e58f21e4268f6748e9d6` at this checkpoint. Receipts `/home/user/inmotools-r52-final-{units,lint,build}.log`. Full owned browser acceptance is the next gate, not yet a passing result.
+
+## Final local acceptance — supersedes pending local-gate notes above
+
+- timestamp: 2026-10-25T19:39:08Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: fresh canonical affected Playwright gate / same-agent evidence review | documentation: Runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06`; records-only execution head `bd5d5b306de510f2203e90a6355740dae730db9c`; explicit selector base `fa4dd291c0b4556025a5e58f21e4268f6748e9d6`. Exactly ball-flight, studio, substitution and theme specs, desktop/mobile Chromium: **112 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries**, 114 cases, one worker, 13.9 min. All 7 R52 contracts × 2 projects and all 8 R44 cases pass. Existing source assertions and timeouts are retained; no automatic retry, new skip or timeout override is introduced. Receipt `/home/user/inmotools-r52-final-browser.log`; plan `/home/user/inmotools-r52-browser-plan.json`.
+- timestamp: 2026-10-25T19:39:08Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: matching frozen full unit/type/build/lint evidence | documentation: Units **4,231 passed / 18 existing skips / 0 failed** (379 files passed / 2 skipped), 168.14 s. TypeScript and production/PWA build pass (14.48 s Vite; 408 precache entries). Full lint **4,104 existing warnings / 0 errors**, 1,292 files / 196 rules, 19.6 s. New unit file has no diagnostics. Docs/completion checkpoints pass; final Markdown-sensitive checks accompany these record-only changes. These are local requirement gates, not full-site browser/release completion, official browser-download, hosted CI, main integration or deployment evidence.
+- timestamp: 2026-10-25T19:39:08Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: named unit/browser evidence and tool completion checker | documentation: R52 changes from partial to verified; computed tool state is **82/85 verified, 1 implemented, 1 partial, 1 missing**. No prior verified requirement is reduced. Task 7d52 and R44 task 4d44 stay active only for owner integration. Product continuation is R78 long-press/radial actions, R75 1200×630 card, R83 focused offline route proof. Main remains `fa4dd291c0b4556025a5e58f21e4268f6748e9d6` at final remote inspection. No session PR exists and no connector was disconnected.
+
+## Evidence identities and reuse boundary
+
+- Application/tests are the immutable Git blobs in `bedf5ece25cab5a541e8f09605b0dd52e7323f06`. `bd5d5b306de510f2203e90a6355740dae730db9c` changes only task/tracker/handoff records. Package/lockfile, Playwright/Vite config and browser/evaluator inputs are unchanged. Environment: Node 22.22.3, pnpm 12.3.4, Linux x64, TypeScript 7.0.2, Vitest 5.0.1, Vite 8.3.0, PWA 1.3.0, Playwright 1.63.0, local Chromium 153.0.8010.0 with the documented software ANGLE/SwiftShader/NSS recovery. This is not the official 153.0.8010.12 browser or Node 24 hosted environment. No hosted run is inferred from local success.
+- Final Markdown-only updates reuse this matching runtime/build/browser evidence under `docs/VALIDATION_POLICY.md`, with fresh docs/completion and Markdown-sensitive unit checks. No further runtime work is hidden in closure records.
+
+| Input | SHA-256 |
+| --- | --- |
+| `package.json` | `f23c099986320ff139647f1fa91f0923153b2e93f73dfad35ee74bc91a5e1409` |
+| `pnpm-lock.yaml` | `e55b9fbee6aca83793cd7308e948e6672055b53c44b03b1761310e91a8f998b3` |
+| `playwright.config.ts` | `5164513a17db7e1fb5ab64af88e3b866232e273564a493d90c3cb4f2ceac355c` |
+| `vite.config.ts` | `151c795d78de8bd286f6b67952122def347fbbde006c59a619d673157ce6d497` |
+| `src/tools/tactics/presentation3d-engine.ts` | `155f44aa0bdfe7a208152e8fd0ef63fbce69e6d54b3a079fb8bf81c83f2a95b1` |
+| `src/tools/tactics/presentation3d-runtime.ts` | `67652fabb63dbd2264c47ee2f0bbfa4289e955bb76550fb5f099ed9619a2807e` |
+| `src/tools/tactics/Tactical3DView.tsx` | `8a9bee6f00d5377abf88005ef6bf3db610434f338d30d6f94cbf7bd0bde72a1f` |
+| `src/tools/tactics/TacticalMatchboardWorkspace.tsx` | `7bfae0eb7f2abf7274b89e9872d2e21f27a0c14bc3f65680a353190351d27dbe` |
+| `src/tools/tactics/tactical-matchboard.css` | `eb5a3a462f1efee27d4cc5162e4cb74b0d81913af325b0e0b6750a47189b7700` |
+| `tests/unit/tactics-player-camera.test.ts` | `aa558c7c71ee3b86a39737d0a9c7f07048629c2893c86aa86202ddc420f5815e` |
+| `tests/e2e/tactical-matchboard-studio.spec.ts` | `8f60098bb2953472325c03cfdb287d7b1a1cec0feca880d5e9aef0511afec5bc` |
+
+## Portable receipts and owner follow-up
+
+- Ignored raw receipts are sandbox-local and are not part of Git; a future sandbox may not restore them (the prior R44 raw receipts were absent on this restoration). The committed source/test/evaluator identities, results, hashes, reproduction details and exact continuation are the portable record; no permanent external artifact hosting is claimed.
+- Accepted logs/plan are copied under ignored `review-receipts/r52-accepted/`; source, named cases, exact results, identities and continuation are also recorded in these committed documents. Full diagnostics (original missing-feature RED, first browser diagnostics, fractional-input RED, heading-loss RED and level-capture RED/GREEN metadata) were losslessly archived as ignored `review-receipts/r52-diagnostics.tar.xz`, **32,101,436 bytes**, SHA-256 `d1f48a5b6da45b9327da77e881430e8b884930833bdaca4afa885403a6728524`. Its original files were compared with `tar --compare` before removal; `review-receipts/r52-diagnostic-sha256.txt` preserves per-file identities. This reduces the unpacked 122 MiB of generated receipts without dropping evidence or committing binaries.
+- Original diagnostic paths mentioned above can be restored with `tar -xJf review-receipts/r52-diagnostics.tar.xz -C review-receipts`, then checked from that directory with `sha256sum -c r52-diagnostic-sha256.txt`.
+- Owner handles integration on their side. If hosted permission is restored, the existing Pages validation can be dispatched on this branch with `validate=true`, `scope=affected`, and explicit base `fa4dd291c0b4556025a5e58f21e4268f6748e9d6`; existing lint workflow is separate. Read exact run/head/results before recording success. Pages' main-only deployment guards do not deploy this chat branch. Do not change workflows, branch rules, create a PR, push main or disconnect the connector to bypass the recorded constraints.
+
+- timestamp: 2026-10-25T19:41:33Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: authoritative docs workflow unit set and selector/workflow regressions | documentation: Final records-only checkpoint: **61 tests passed / 0 skipped / 0 failed**, seven files, 3.24 s (cad-progress, sheets-wave-b, deployment-config, e2e-spec-selection, validation-dependencies, validation-runner, validation-workflows). Docs sync/check passes **194** standard documents; tool check against origin/main computes **82/85 verified, 1 implemented, 1 partial, 1 missing**, no errors/regressions. Runtime/test/dependency/evaluator digests still match accepted `bedf5ec`.
+- timestamp: 2026-10-25T19:41:33Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: unchanged manifest/lockfile and GitHub push notice | documentation: Existing repository debt is not a new R52 finding: full lint retains 4,104 warnings; GitHub still reports three default-branch dependency alerts (one high, two moderate). Dependency remediation is not performed or claimed in this Tactical-only change; exact package/lockfile pins remain unchanged.

@@ -7,15 +7,15 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T19:12:52Z
+timestamp: 2026-10-25T19:39:08Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
-documentation: TMS-R52 contract and owner-authorized branch continuation
+documentation: R52 local acceptance and owner-managed integration; R78 next
 ---
 
 # Tactical Matchboard Studio — spec
 
-As-built TMS-R44 runtime `117c119741e389b5b169a0f154aa544937bc0365` is locally verified: repository units 4,215 passed / 18 existing skips; type/build/lint/docs pass; four owned browser specs 98 passed / 2 existing skips / 0 failures / 0 retries. Implementation, TDD, exact environment and validation receipts are in [active task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md). Main integration and hosted-CI permissions remain blocked; no deployment is claimed. Prior main-integrated R31 runtime `a528848db0c030c9010aa6fbb76061627077a084` and its accepted workflow `39195675178` remain in the tracker and completed R31 task. Requirement prefix: `TMS`. Status of each requirement: [TRACKER.md](../../../src/tools/tactics/TRACKER.md). History: [2026-09-21 design](2026-09-21-tactical-matchboard-studio-design.md), [2026-09-02 ethical support addendum](2026-09-02-tactical-ethical-support-addendum.md), [FEATURE_MATRIX.md](../../../src/tools/tactics/FEATURE_MATRIX.md) (rows 1–67, cited below as "formerly <n>"), [HANDOFF.md](../../../src/tools/tactics/HANDOFF.md), [TODO_SEQUENCE.md](../../../src/tools/tactics/TODO_SEQUENCE.md), [plan](../plans/2026-09-21-tactical-matchboard-studio.md). Owner input: [owner feature notes 2026-10-05](../../research/owner-feature-notes-2026-10-05.md#tactical-matchboard-studio-tactical-animation--matchboard-studio).
+As-built R52 runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06` (including R44) is locally verified: repository units 4,231 passed / 18 existing skips; type/build/lint/docs pass; canonical four owned browser specs 112 passed / 2 existing skips / 0 failures / 0 retries. TDD, exact source/environment and acceptance receipts: [R52 task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md); prior R44 evidence remains in [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md). The owner handles main integration and permits continued work on the fixed chat branch; hosted CI, integration and deployment are not claimed. Prior main-integrated R31 and its accepted workflow `39195675178` remain in the tracker/completed R31 task. Requirement prefix: `TMS`. Status of each requirement: [TRACKER.md](../../../src/tools/tactics/TRACKER.md). History: [2026-09-21 design](2026-09-21-tactical-matchboard-studio-design.md), [2026-09-02 ethical support addendum](2026-09-02-tactical-ethical-support-addendum.md), [FEATURE_MATRIX.md](../../../src/tools/tactics/FEATURE_MATRIX.md) (rows 1–67, cited below as "formerly <n>"), [HANDOFF.md](../../../src/tools/tactics/HANDOFF.md), [TODO_SEQUENCE.md](../../../src/tools/tactics/TODO_SEQUENCE.md), [plan](../plans/2026-09-21-tactical-matchboard-studio.md). Owner input: [owner feature notes 2026-10-05](../../research/owner-feature-notes-2026-10-05.md#tactical-matchboard-studio-tactical-animation--matchboard-studio).
 
 ## Purpose
 
@@ -227,6 +227,8 @@ No function was compared between an ML and a non-ML method.
 - TMS-R31: defaults are cut, fade-through-background and roster-matched player/ball morph; snapshots freeze at transition start and arrival, unpaired players/props/drawings switch halfway, and an optional exit transition enables chapter playback. Owner may override.
 
 ## Change log
+
+- timestamp: 2026-10-25T19:39:08Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: local unit/type/build/lint/owned-browser/docs gates | documentation: R52 runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06` verified locally: 16 new units (150 seeded geometry cases), 14 new browser cases, complete owned gate 112 passed / 2 existing skips / 0 failures / 0 retries. Player views follow sampled pose/visibility with configurable eye height/FOV and orbit lock; invalid/unavailable states are accessible, explicit captures retain exact level geometry, settings remain ephemeral, and no schema/dependency/config change is introduced. Owner handles integration; R78 is next.
 
 - timestamp: 2026-10-25T19:12:52Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: focused unit/type/build/browser GREEN; complete acceptance pending | documentation: R52 implemented without a schema/dependency change. New regressions cover fractional native settings, partial floating-point heading loss and exact restoration of captured level cameras; source/owned tests will be frozen for the full affected gate.
 
