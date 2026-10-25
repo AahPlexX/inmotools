@@ -750,6 +750,49 @@
   min-height: 44px;
 }
 
+.tactical-player-camera-controls {
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: var(--radius-md, 12px);
+}
+
+.tactical-player-camera-controls label {
+  min-width: 0;
+  flex: 1 1 180px;
+  display: grid;
+  gap: 6px;
+}
+
+.tactical-player-camera-controls .tactical-player-camera-toggle {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tactical-player-camera-controls input[type="number"] {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+}
+
+.tactical-player-camera-controls input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.tactical-player-camera-summary {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .tactical-3d-runtime {
   min-width: 0;
   display: grid;

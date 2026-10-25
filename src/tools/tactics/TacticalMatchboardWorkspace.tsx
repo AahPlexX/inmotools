@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { downloadText } from '../../lib/download';
 import TacticalAnalysisPanel, { DEFAULT_ANALYSIS_DISPLAY_SETTINGS } from './TacticalAnalysisPanel';
 import TacticalBoard from './TacticalBoard';
@@ -61,10 +62,12 @@ import type { CameraState, FormationTemplate, NormalizedPoint, PitchRuleProfile,
 import {
   CAMERA_PRESET_IDS,
   createCameraPresetState,
+  createPlayerCameraState,
+  DEFAULT_PLAYER_CAMERA_SETTINGS,
   sampleCameraState,
   upsertCameraState,
-  type CameraPresetId,
 } from './presentation3d-engine';
+import type { CameraPresetId } from './presentation3d-engine';
 import { MAX_TELESTRATION_POINTS } from './video-review-engine';
 import {
   addTacticalArrow,
@@ -141,6 +144,19 @@ function downloadStem(title: string): string {
   return stem || 'tactical-board';
 }
 
+function stepPlayerCameraSetting(
+  event: ReactKeyboardEvent<HTMLInputElement>,
+  increment: number,
+  setValue: (value: string) => void,
+): void {
+  if (!['ArrowUp', 'ArrowDown'].includes(event.key) || event.altKey || event.ctrlKey || event.metaKey) return;
+  const input = event.currentTarget;
+  if (!Number.isFinite(input.valueAsNumber)) return;
+  event.preventDefault();
+  const next = Number((input.valueAsNumber + (event.key === 'ArrowUp' ? increment : -increment)).toFixed(10));
+  setValue(String(Math.min(Number(input.max), Math.max(Number(input.min), next))));
+}
+
 export default function TacticalMatchboardWorkspace() {
   const [setup, setSetup] = useState<SetupState>(INITIAL_SETUP);
   const [setupOpen, setSetupOpen] = useState(true);
@@ -171,6 +187,9 @@ export default function TacticalMatchboardWorkspace() {
   const [show3D, setShow3D] = useState(false);
   const [cameraPresetId, setCameraPresetId] = useState<CameraPresetId>('tactical');
   const [cameraDraft, setCameraDraft] = useState<CameraState | null>(null);
+  const [playerView, setPlayerView] = useState(false);
+  const [playerEyeHeight, setPlayerEyeHeight] = useState(String(DEFAULT_PLAYER_CAMERA_SETTINGS.eyeHeightMeters));
+  const [playerFieldOfView, setPlayerFieldOfView] = useState(String(DEFAULT_PLAYER_CAMERA_SETTINGS.fieldOfViewDeg));
   const [status, setStatus] = useState('Board ready. Select a player or choose the arrow tool.');
   const [helpOpen, setHelpOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -210,10 +229,26 @@ export default function TacticalMatchboardWorkspace() {
     () => sampleCameraState(project.cameraStates, Math.min(previewTimeMs, project.timeline.durationMs), project.pitch.dimensions),
     [previewTimeMs, project.cameraStates, project.pitch.dimensions, project.timeline.durationMs],
   );
-  const activeCamera = cameraDraft ?? sampledCamera;
   const activeScene = project.scenes.find((scene) => scene.id === chapterFrame.sceneId) ?? project.scenes[0];
   const sceneId = activeScene?.id ?? '';
   const layerId = activeScene?.layers[0]?.id ?? '';
+  const playerCamera = useMemo(() => {
+    if (!show3D || !playerView) return { camera: null, error: '' };
+    try {
+      const camera = createPlayerCameraState(
+        presentationProject,
+        sceneId,
+        boardTarget === 'player' ? selectedTokenId : undefined,
+        Math.min(previewTimeMs, project.timeline.durationMs),
+        { eyeHeightMeters: Number(playerEyeHeight), fieldOfViewDeg: Number(playerFieldOfView) },
+      );
+      return { camera, error: camera ? '' : 'Select a player visible at this playhead on a visible layer.' };
+    } catch (error) {
+      return { camera: null, error: errorMessage(error) };
+    }
+  }, [boardTarget, playerEyeHeight, playerFieldOfView, playerView, presentationProject, previewTimeMs, project.timeline.durationMs, sceneId, selectedTokenId, show3D]);
+  const activeCamera = playerCamera.camera ?? cameraDraft ?? sampledCamera;
+  const playerCameraToken = playerCamera.camera ? presentationProject.playerTokens.find(token => token.id === selectedTokenId) : undefined;
   const boardRenderOptions = useMemo(() => {
     const timeMs = Math.min(previewTimeMs, project.timeline.durationMs);
     const overlay = project.scenarios.find((scenario) => scenario.id === scenarioOverlayId);
@@ -283,12 +318,17 @@ export default function TacticalMatchboardWorkspace() {
       project.pitch.dimensions,
       Math.min(previewTimeMs, project.timeline.durationMs),
     );
+    setPlayerView(false);
     setCameraPresetId(preset);
     setCameraDraft(next);
     setStatus(`3D camera changed to ${preset.replace('-', ' ')} view. Capture it to animate this camera.`);
   }
 
   function captureCameraKeyframe() {
+    if (playerView && !playerCamera.camera) {
+      setStatus(`Player camera capture unavailable. ${playerCamera.error}`);
+      return;
+    }
     const timeMs = Math.min(previewTimeMs, project.timeline.durationMs);
     const next = {
       ...activeCamera,
@@ -318,6 +358,9 @@ export default function TacticalMatchboardWorkspace() {
     setActiveSceneId(firstSceneId);
     setPreviewTimeMs(0);
     setCameraDraft(null);
+    setPlayerView(false);
+    setPlayerEyeHeight(String(DEFAULT_PLAYER_CAMERA_SETTINGS.eyeHeightMeters));
+    setPlayerFieldOfView(String(DEFAULT_PLAYER_CAMERA_SETTINGS.fieldOfViewDeg));
     setSelectedTokenId(firstTokenId);
     setBoardTarget('player');
     setSelectedAnnotationId(null);
@@ -1400,9 +1443,45 @@ export default function TacticalMatchboardWorkspace() {
                   ))}
                 </select>
               </label>
-              <button type="button" onClick={captureCameraKeyframe}>Capture camera at playhead</button>
+              <button type="button" onClick={captureCameraKeyframe} disabled={playerView && !playerCamera.camera}>Capture camera at playhead</button>
               <span aria-live="polite">{project.cameraStates.length} camera keyframe{project.cameraStates.length === 1 ? '' : 's'}</span>
             </div>
+            <fieldset className="tactical-player-camera-controls" aria-describedby="tactical-player-camera-help">
+              <legend>Player camera</legend>
+              <label className="tactical-player-camera-toggle">
+                <input type="checkbox" checked={playerView} onChange={event => setPlayerView(event.target.checked)} />
+                First-person player camera
+              </label>
+              <label>
+                Player eye height (m)
+                <input
+                  type="number" min="0.1" max="3" step="any" value={playerEyeHeight} disabled={!playerView}
+                  aria-invalid={playerView && !(Number(playerEyeHeight) >= 0.1 && Number(playerEyeHeight) <= 3)}
+                  aria-describedby="tactical-player-camera-summary"
+                  onChange={event => setPlayerEyeHeight(event.target.value)}
+                  onKeyDown={event => stepPlayerCameraSetting(event, 0.1, setPlayerEyeHeight)}
+                />
+              </label>
+              <label>
+                Player field of view (deg)
+                <input
+                  type="number" min="10" max="120" step="any" value={playerFieldOfView} disabled={!playerView}
+                  aria-invalid={playerView && !(Number(playerFieldOfView) >= 10 && Number(playerFieldOfView) <= 120)}
+                  aria-describedby="tactical-player-camera-summary"
+                  onChange={event => setPlayerFieldOfView(event.target.value)}
+                  onKeyDown={event => stepPlayerCameraSetting(event, 5, setPlayerFieldOfView)}
+                />
+              </label>
+            </fieldset>
+            <p id="tactical-player-camera-help" className="tactical-3d-help">Player view follows the selected visible player’s authored position and heading, not predicted vision or measured anatomy. Settings are preview-only; capture saves a camera snapshot, not a live player binding. Choose a preset or turn player view off to restore orbit / authored cameras.</p>
+            <output
+              id="tactical-player-camera-summary" data-testid="tactical-player-camera-summary"
+              className="tactical-player-camera-summary" aria-live={playerView && playerCamera.error ? 'polite' : 'off'}
+            >
+              {playerCamera.camera && playerCameraToken
+                ? `Live player view ${playerCameraToken.id}. Eye: X ${playerCamera.camera.position.x.toFixed(2)} m; Y ${playerCamera.camera.position.y.toFixed(2)} m; Z ${playerCamera.camera.position.z.toFixed(2)} m. Heading ${playerCameraToken.rotationDeg.toFixed(1)}°; FOV ${playerCamera.camera.fieldOfViewDeg.toFixed(1)}°. Playhead ${playerCamera.camera.timeMs} ms. Orbit, pan and zoom locked.`
+                : playerView ? `First-person camera unavailable. ${playerCamera.error} Showing orbit / authored camera.` : 'Orbit / authored camera. Player view is off.'}
+            </output>
             <Suspense fallback={<div className="tactical-3d-loading" role="status">Loading the local 3D view…</div>}>
               <Tactical3DView
                 project={presentationProject}
@@ -1410,6 +1489,7 @@ export default function TacticalMatchboardWorkspace() {
                 sceneId={sceneId}
                 selectedTokenId={selectedTokenId}
                 cameraState={activeCamera}
+                playerViewTokenId={playerCamera.camera ? selectedTokenId : undefined}
                 onSelectToken={(tokenId) => {
                   selectPlayer(tokenId);
                   setStatus(`Selected ${tokenId} in the 3D view.`);

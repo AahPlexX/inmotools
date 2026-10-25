@@ -7,7 +7,7 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T18:55:14Z
+timestamp: 2026-10-25T19:12:52Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
 documentation: TMS-R52 contract and owner-authorized branch continuation
@@ -17,7 +17,7 @@ documentation: TMS-R52 contract and owner-authorized branch continuation
 
 ## Resume here
 
-85 requirements: **81 verified, 1 implemented, 1 partial, 2 missing**. TMS-R44 is locally verified on runtime `117c119741e389b5b169a0f154aa544937bc0365`: 4,215 units pass / 18 existing skips; type/build/lint/docs pass; four owned browser specs: 98 passed / 2 existing skips / 0 failures / 0 retries (one worker, 12.3 min). See [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) and `CURRENT_HANDOFF.md` for exact receipts and the preserved earlier parallel-run diagnostic. No R44 implementation work remains. The task is active for main integration and hosted-CI follow-up only: workflow dispatch is HTTP 403, and the session is fixed to `arena/981e49e9-inmotools`. No main integration or deployment is claimed. Owner now authorizes continued work on the fixed chat branch and will handle integration. **Active R52 contract/TDD:** [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md), then R78, R75, R83; do not wait for R44 integration to continue. R52 remains missing; baseline 211 Tactical units/type/build/2 existing 3D browser cases pass; new 15 unit and 2 browser cases are RED before implementation. No acceptance is claimed. `HANDOFF.md` is archival.
+85 requirements: **81 verified, 1 implemented, 2 partial, 1 missing**. TMS-R44 is locally verified on runtime `117c119741e389b5b169a0f154aa544937bc0365`: 4,215 units pass / 18 existing skips; type/build/lint/docs pass; four owned browser specs: 98 passed / 2 existing skips / 0 failures / 0 retries (one worker, 12.3 min). See [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) and `CURRENT_HANDOFF.md` for exact receipts and the preserved earlier parallel-run diagnostic. No R44 implementation work remains. The task is active for main integration and hosted-CI follow-up only: workflow dispatch is HTTP 403, and the session is fixed to `arena/981e49e9-inmotools`. No main integration or deployment is claimed. Owner now authorizes continued work on the fixed chat branch and will handle integration. **Active R52 acceptance:** [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md), then R78, R75, R83; do not wait for R44 integration to continue. R52 is partial: 16 new units, type/build and focused browser groups pass; freeze runtime, run full repository units/lint and the current four owned specs next. No complete current acceptance is claimed. `HANDOFF.md` is archival.
 
 ## Documents
 
@@ -87,7 +87,7 @@ documentation: TMS-R52 contract and owner-authorized branch continuation
 | TMS-R49 | verified | unit "measures distance and speed from authored or imported trajectory samples", "measures selected authored trajectory only across its authored keyframe span"; e2e "derives occupancy and speed metrics only from authored trajectory samples" | |
 | TMS-R50 | verified | unit "round-trips normalized pitch positions through metre-based Three.js world coordinates"; e2e "synchronizes the lazy 3D pitch, canonical player editing, and authored camera keyframes" | |
 | TMS-R51 | verified | unit "falls back to a pitch-aware tactical camera when no authored camera exists"; e2e "synchronizes the lazy 3D pitch, canonical player editing, and authored camera keyframes" | |
-| TMS-R52 | missing | — | Presets are tactical, broadcast, touchline and goal-line only |
+| TMS-R52 | partial | unit "places the eye at the selected player in physical pitch coordinates without mutation", "applies a level real Three.js camera without OrbitControls moving the eye"; e2e "TMS-R52 renders the sampled player eye and heading with locked orbit and preset exit" | Runtime implemented; 16 new units, 7 new browser contracts. Focused groups pass; full frozen repository/owned acceptance pending in task 7d52. No schema/dependency change; owner integrates |
 | TMS-R53 | verified | unit "samples authored camera keyframes deterministically and replaces same-time keyframes", "reports invalid or ambiguous camera keyframes during project validation" | |
 | TMS-R54 | verified | e2e "synchronizes the lazy 3D pitch, canonical player editing, and authored camera keyframes" | |
 | TMS-R55 | verified | unit "authors time-ranged board marks that stay out of the video telestration document" | |
@@ -124,7 +124,7 @@ documentation: TMS-R52 contract and owner-authorized branch continuation
 
 ## Open work
 
-1. TMS-R52 — first-person player camera; active task 7d52, contract recorded before implementation.
+1. TMS-R52 — implemented first-person player camera; active task 7d52, frozen acceptance next.
 2. Owner-managed integration of locally verified R44; task 4d44 remains active until integration evidence exists.
 3. TMS-R78 — touch long-press/radial actions.
 4. TMS-R75 — 1200×630 card.

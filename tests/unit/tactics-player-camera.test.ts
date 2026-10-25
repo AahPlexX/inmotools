@@ -59,16 +59,18 @@ describe('TMS-R52 first-person player camera', () => {
   it('normalizes finite wrapped rotations and keeps an outward view at a pitch edge', () => {
     const project = playerProject(); const token = project.playerTokens[0]!;
     token.position = { x: 1, y: 0 };
-    for (const heading of [-315, 45, 405, Number.MAX_VALUE]) {
+    for (const heading of [-315, 45, 405]) {
       token.rotationDeg = heading;
       const camera = presentation.createPlayerCameraState(project, token.sceneId, token.id, 0)!;
       expect(camera.position).toEqual({ x: 50, y: 1.7, z: -25 });
       expect(Math.hypot(camera.target.x - 50, camera.target.z + 25)).toBeCloseTo(10, 10);
-      if (heading !== Number.MAX_VALUE) {
-        expect(camera.target.x).toBeCloseTo(50 + Math.sqrt(50), 10);
-        expect(camera.target.z).toBeCloseTo(-25 + Math.sqrt(50), 10);
-      }
+      expect(camera.target.x).toBeCloseTo(50 + Math.sqrt(50), 10);
+      expect(camera.target.z).toBeCloseTo(-25 + Math.sqrt(50), 10);
     }
+    token.rotationDeg = Number.MAX_VALUE;
+    const camera = presentation.createPlayerCameraState(project, token.sceneId, token.id, 0)!;
+    expect(Math.hypot(camera.target.x - 50, camera.target.z + 25)).toBeCloseTo(10, 10);
+    expect(camera.position).toEqual({ x: 50, y: 1.7, z: -25 });
   });
 
   it('preserves eye and heading over 150 seeded non-square pitches and settings', () => {
@@ -81,7 +83,8 @@ describe('TMS-R52 first-person player camera', () => {
         project.pitch.dimensions = { lengthMeters: length, widthMeters: width };
         token.position = { x: x / 10000, y: y / 10000 }; token.rotationDeg = heading / 100;
         const camera = presentation.createPlayerCameraState(project, token.sceneId, token.id, 500, { eyeHeightMeters: height / 10, fieldOfViewDeg: fov })!;
-        expect(presentation.pitch3DToNormalizedPoint(camera.position, project.pitch.dimensions)).toEqual(expect.objectContaining({ x: expect.closeTo(token.position.x, 10), y: expect.closeTo(token.position.y, 10) }));
+        const roundTrip = presentation.pitch3DToNormalizedPoint(camera.position, project.pitch.dimensions);
+        expect(roundTrip.x).toBeCloseTo(token.position.x, 10); expect(roundTrip.y).toBeCloseTo(token.position.y, 10);
         expect(camera.position.y).toBe(height / 10); expect(camera.fieldOfViewDeg).toBe(fov);
         const expected = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), -token.rotationDeg * Math.PI / 180);
         const actual = new THREE.Vector3(camera.target.x - camera.position.x, 0, camera.target.z - camera.position.z).normalize();
@@ -158,6 +161,12 @@ describe('TMS-R52 first-person player camera', () => {
     token.position.x = 0.25; token.rotationDeg = Number.NaN;
     expect(() => presentation.createPlayerCameraState(project, token.sceneId, token.id, 0)).toThrow(/rotation/i);
     token.rotationDeg = 0; token.position = { x: 1, y: 1 }; project.pitch.dimensions.lengthMeters = Number.MAX_VALUE;
+    expect(() => presentation.createPlayerCameraState(project, token.sceneId, token.id, 0)).toThrow(/represent/i);
+  });
+
+  it('rejects a partially lost heading at very large finite pitch coordinates', () => {
+    const project = playerProject(); const token = project.playerTokens[0]!;
+    project.pitch.dimensions.lengthMeters = 1e20; token.position.x = 1; token.rotationDeg = 45;
     expect(() => presentation.createPlayerCameraState(project, token.sceneId, token.id, 0)).toThrow(/represent/i);
   });
 

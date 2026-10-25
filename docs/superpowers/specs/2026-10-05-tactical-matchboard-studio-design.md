@@ -7,7 +7,7 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T18:45:50Z
+timestamp: 2026-10-25T19:12:52Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
 documentation: TMS-R52 contract and owner-authorized branch continuation
@@ -218,7 +218,7 @@ No function was compared between an ML and a non-ML method.
 
 ## Intent not recorded
 
-- TMS-R52: first-person is an ephemeral opt-in view from the current visible roster-backed player token, with a horizontal target 10 m ahead; eye height defaults to 1.7 m (editable 0.1–3 m), FOV to 70° (editable 10–120°). These are configured authoring values, not measured anatomy. No automatic selection switch on hiding, substitution or scene change; show the existing camera with an explanation until a valid player is selected. A preset exits player view, project replacement resets settings, and explicit camera capture stores only the existing position/target/FOV snapshot. Owner may override.
+- TMS-R52: first-person is an ephemeral opt-in view from the current visible roster-backed player token, with a horizontal target 10 m ahead; eye height defaults to 1.7 m (editable 0.1–3 m), FOV to 70° (editable 10–120°). Fractional settings are valid; keyboard increments are 0.1 m / 5°. These are configured authoring values, not measured anatomy. No automatic selection switch on hiding, substitution or scene change; show the existing camera with an explanation until a valid player is selected. A preset exits player view, project replacement resets settings, and explicit camera capture stores only the existing position/target/FOV snapshot. Owner may override.
 
 - TMS-R44: this is instantaneous geometric reach using the existing defender radius, not a reaction-time or speed model. Cones aim at the nearest point on the finite selected-player-to-ball lane; on-lane defenders face toward the ball. The default cone angle is 90°, editable within (0°, 180°]; sectors are clipped to the pitch and exact lane coverage is reported in metres. Display settings are ephemeral like other analysis overlays; no project-schema change. Owner may override.
 
@@ -227,6 +227,8 @@ No function was compared between an ML and a non-ML method.
 - TMS-R31: defaults are cut, fade-through-background and roster-matched player/ball morph; snapshots freeze at transition start and arrival, unpaired players/props/drawings switch halfway, and an optional exit transition enables chapter playback. Owner may override.
 
 ## Change log
+
+- timestamp: 2026-10-25T19:12:52Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: focused unit/type/build/browser GREEN; complete acceptance pending | documentation: R52 implemented without a schema/dependency change. New regressions cover fractional native settings, partial floating-point heading loss and exact restoration of captured level cameras; source/owned tests will be frozen for the full affected gate.
 
 - timestamp: 2026-10-25T18:45:50Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: same-agent contract review; TDD/acceptance pending | documentation: R52 contract recorded before runtime code; current owner authorizes continued work/pushes on the fixed chat branch and handles integration. No connector disconnection, dependency/schema change or status upgrade.
 

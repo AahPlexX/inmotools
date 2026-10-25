@@ -1,19 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { CameraState, TacticalProject } from './tactics-types';
 import { normalizedPointToPitch3D } from './presentation3d-engine';
 import {
+  applyTactical3DCamera,
   createOnDemandFrameScheduler,
   disposeTactical3DObject,
-  type OnDemandFrameScheduler,
 } from './presentation3d-runtime';
+import type { OnDemandFrameScheduler } from './presentation3d-runtime';
 
 interface Tactical3DViewProps {
   opacity?: number;
   project: TacticalProject;
   sceneId: string;
   selectedTokenId?: string;
+  playerViewTokenId?: string;
   cameraState: CameraState;
   onSelectToken: (tokenId: string) => void;
   onCameraChange: (camera: CameraState) => void;
@@ -74,18 +76,12 @@ function addGoals(group: THREE.Group, project: TacticalProject): void {
   }
 }
 
-function applyCamera(camera: THREE.PerspectiveCamera, controls: OrbitControls, state: CameraState): void {
-  camera.position.set(state.position.x, state.position.y, state.position.z);
-  camera.fov = state.fieldOfViewDeg;
-  camera.updateProjectionMatrix();
-  controls.target.set(state.target.x, state.target.y, state.target.z);
-  controls.update();
-}
 export default function Tactical3DView({
   opacity = 1,
   project,
   sceneId,
   selectedTokenId,
+  playerViewTokenId,
   cameraState,
   onSelectToken,
   onCameraChange,
@@ -96,13 +92,15 @@ export default function Tactical3DView({
   const selectRef = useRef(onSelectToken);
   const cameraChangeRef = useRef(onCameraChange);
   const statusRef = useRef(onStatus);
-  const cameraStateRef = useRef(cameraState);
+  const cameraStateRef = useRef({ state: cameraState, playerView: Boolean(playerViewTokenId) });
   const [renderError, setRenderError] = useState('');
 
   selectRef.current = onSelectToken;
   cameraChangeRef.current = onCameraChange;
   statusRef.current = onStatus;
-  cameraStateRef.current = cameraState;
+  useLayoutEffect(() => {
+    cameraStateRef.current = { state: cameraState, playerView: Boolean(playerViewTokenId) };
+  }, [cameraState, playerViewTokenId]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -128,7 +126,7 @@ export default function Tactical3DView({
     controls.screenSpacePanning = true;
     controls.minDistance = 5;
     controls.maxDistance = 300;
-    controls.maxPolarAngle = Math.PI / 2 - 0.015;
+    controls.maxPolarAngle = Math.PI / 2;
 
     const pitchGroup = new THREE.Group();
     const actorGroup = new THREE.Group();
@@ -214,11 +212,12 @@ export default function Tactical3DView({
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
       const hit = raycaster.intersectObjects([...runtime.tokenMeshes.values()], false)[0];
-      const tokenId = hit?.object.userData.tokenId;
+      const tokenId: unknown = hit?.object.userData.tokenId;
       if (typeof tokenId === 'string') selectRef.current(tokenId);
     };
     const handleCameraEnd = () => {
-      const currentCamera = cameraStateRef.current;
+      if (cameraStateRef.current.playerView) return;
+      const currentCamera = cameraStateRef.current.state;
       cameraChangeRef.current({
         id: currentCamera.id,
         timeMs: currentCamera.timeMs,
@@ -236,7 +235,7 @@ export default function Tactical3DView({
     renderer.domElement.addEventListener('webglcontextlost', handleLost);
     renderer.domElement.addEventListener('webglcontextrestored', handleRestored);
     document.addEventListener('visibilitychange', handleVisibility);
-    applyCamera(camera, controls, cameraState);
+    applyTactical3DCamera(camera, controls, cameraStateRef.current.state, cameraStateRef.current.playerView);
     resize();
     invalidate();
 
@@ -261,9 +260,9 @@ export default function Tactical3DView({
   useEffect(() => {
     const runtime = runtimeRef.current;
     if (!runtime) return;
-    applyCamera(runtime.camera, runtime.controls, cameraState);
+    applyTactical3DCamera(runtime.camera, runtime.controls, cameraState, Boolean(playerViewTokenId));
     if (runtime.visible) runtime.renderer.render(runtime.scene, runtime.camera);
-  }, [cameraState]);
+  }, [cameraState, playerViewTokenId]);
 
   useEffect(() => {
     const runtime = runtimeRef.current;
@@ -296,7 +295,7 @@ export default function Tactical3DView({
         .map((layer) => layer.id) ?? [],
     );
     for (const token of project.playerTokens) {
-      if (token.sceneId !== sceneId || !token.visible || !activeLayerIds.has(token.layerId)) continue;
+      if (token.sceneId !== sceneId || !token.visible || !activeLayerIds.has(token.layerId) || token.id === playerViewTokenId) continue;
       const team = project.teams.find((candidate) => candidate.id === token.teamId);
       const selected = token.id === selectedTokenId;
       const mesh = new THREE.Mesh(
@@ -323,7 +322,7 @@ export default function Tactical3DView({
     );
     runtime.ballMesh.position.set(ballPoint.x, Math.max(0.11, ballPoint.y + 0.11), ballPoint.z);
     if (runtime.visible) renderer.render(scene, camera);
-  }, [project, sceneId, selectedTokenId]);
+  }, [project, sceneId, selectedTokenId, playerViewTokenId]);
 
   const visibleLayerIds = new Set(
     project.scenes.find((sceneItem) => sceneItem.id === sceneId)?.layers
@@ -340,7 +339,7 @@ export default function Tactical3DView({
       <div className="tactical-3d-runtime__heading">
         <div>
           <h3 id="tactical-3d-view-title">3D pitch view</h3>
-          <p>Orbit, pan, or zoom the view. Selecting a player here selects the same player on the 2D board and in the precision controls.</p>
+          <p>{playerViewTokenId ? "Live player view follows the selected player’s authored pose. Orbit, pan and zoom are locked; your own actor is hidden in 3D only." : "Orbit, pan, or zoom the view. Selecting a player here selects the same player on the 2D board and in the precision controls."}</p>
         </div>
       </div>
       <p data-testid="tactical-3d-summary" className="tactical-3d-help">
@@ -356,7 +355,8 @@ export default function Tactical3DView({
         style={{ opacity }}
         className="tactical-3d-canvas"
         role="img"
-        aria-label="Interactive three-dimensional tactical pitch presentation"
+        aria-label={playerViewTokenId ? `First-person tactical pitch from ${playerViewTokenId}` : 'Interactive three-dimensional tactical pitch presentation'}
+        aria-describedby={playerViewTokenId ? 'tactical-player-camera-summary' : undefined}
         data-testid="tactical-3d-canvas"
       />
       <p className="tactical-3d-help">

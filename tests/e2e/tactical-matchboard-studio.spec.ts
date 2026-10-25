@@ -1093,11 +1093,11 @@ test('TMS-R52 renders the sampled player eye and heading with locked orbit and p
   if (!box) throw new Error('WebGL player camera is not visible.');
   await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.5);
   await page.mouse.down(); await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.65, { steps: 5 }); await page.mouse.up();
-  expect(await canvas.screenshot()).toEqual(image);
+  expect((await canvas.screenshot()).equals(image)).toBe(true);
   await seekPlayerCamera(page, 500);
   await expect(summary).toContainText('X 0.00 m; Y 1.70 m; Z 0.00 m'); await expect(summary).toContainText('Heading 45.0°');
-  expect(await canvas.screenshot()).not.toEqual(image);
-  await page.getByLabel('Camera preset', { exact: true }).selectOption('broadcast');
+  expect((await canvas.screenshot()).equals(image)).toBe(false);
+  await page.getByRole('combobox', { name: 'Camera preset', exact: true }).selectOption('broadcast');
   await expect(toggle).not.toBeChecked(); await expect(summary).toContainText(/orbit.*authored/i);
   await expect(page.locator('#tactical-3d-panel .notice')).toHaveCount(0);
 });
@@ -1152,6 +1152,21 @@ test('TMS-R52 keeps edits and explicit camera captures canonical through undo re
   await expect(page.getByText('2 camera keyframes', { exact: true })).toBeVisible();
 });
 
+test('TMS-R52 restores a captured level player camera without an orbit-clamp tilt', async ({ page }) => {
+  await loadPlayerCameraProject(page); await page.locator('.tactical-player-list button').nth(1).click();
+  const toggle = page.getByRole('checkbox', { name: 'First-person player camera', exact: true }); await toggle.check();
+  await page.getByLabel('Player eye height (m)', { exact: true }).fill('1.2');
+  await page.getByLabel('Player field of view (deg)', { exact: true }).fill('90');
+  await page.getByRole('button', { name: 'Capture camera at playhead', exact: true }).click();
+  const canvas = page.locator('#tactical-3d-panel canvas'); const captured = await canvas.screenshot();
+  await toggle.uncheck();
+  await expect(page.getByTestId('tactical-player-camera-summary')).toContainText(/orbit.*authored/i);
+  const restored = await canvas.screenshot();
+  await test.info().attach('captured-player-camera', { body: captured, contentType: 'image/png' });
+  await test.info().attach('restored-player-camera', { body: restored, contentType: 'image/png' });
+  expect(restored.equals(captured)).toBe(true);
+});
+
 test('TMS-R52 explains invalid draft settings without capturing or losing the project', async ({ page }) => {
   await loadPlayerCameraProject(page);
   await page.getByRole('checkbox', { name: 'First-person player camera', exact: true }).check();
@@ -1165,6 +1180,9 @@ test('TMS-R52 explains invalid draft settings without capturing or losing the pr
   await expect(summary).toContainText(/field of view/i); await expect(capture).toBeDisabled();
   await fov.fill('90'); await expect(summary).toContainText('Y 1.20 m'); await expect(summary).toContainText('FOV 90.0°'); await expect(capture).toBeEnabled();
   await expect(page.getByText('0 camera keyframes', { exact: true })).toBeVisible();
+  await height.fill('1.75'); expect(await height.evaluate(input => (input as HTMLInputElement).validity.valid)).toBe(true);
+  await fov.fill('73.5'); expect(await fov.evaluate(input => (input as HTMLInputElement).validity.valid)).toBe(true);
+  await expect(summary).toContainText('Y 1.75 m'); await expect(summary).toContainText('FOV 73.5°');
 });
 
 test('TMS-R52 has keyboard touch and accessible reflowing player camera controls', async ({ page, isMobile }) => {
@@ -1187,11 +1205,12 @@ test('TMS-R52 has keyboard touch and accessible reflowing player camera controls
 
 test('TMS-R52 preserves the 2D editor and camera description when WebGL is unavailable', async ({ page }) => {
   await page.addInitScript(() => {
-    const original = HTMLCanvasElement.prototype.getContext;
+    const original: unknown = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, 'getContext')?.value;
+    if (typeof original !== 'function') throw new Error('Canvas context method is unavailable.');
     HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, context: string, options?: unknown) {
       if (context === 'webgl' || context === 'webgl2' || context === 'experimental-webgl') return null;
       return Reflect.apply(original, this, [context, options]) as RenderingContext | null;
-    } as typeof original;
+    } as HTMLCanvasElement['getContext'];
   });
   await page.reload(); await loadPlayerCameraProject(page);
   await page.locator('.tactical-player-list button').nth(1).click();

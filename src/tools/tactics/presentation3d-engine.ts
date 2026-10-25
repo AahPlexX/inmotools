@@ -1,4 +1,4 @@
-import type { CameraState, NormalizedPoint, PitchDimensions } from './tactics-types';
+import type { CameraState, NormalizedPoint, PitchDimensions, TacticalProject } from './tactics-types';
 
 export interface PitchPoint3D {
   x: number;
@@ -125,6 +125,57 @@ export function createCameraPresetState(
     id: `camera-${preset}-${timeMs}`,
     timeMs,
     ...presets[preset],
+  });
+}
+
+export interface PlayerCameraSettings {
+  eyeHeightMeters: number;
+  fieldOfViewDeg: number;
+}
+
+export const DEFAULT_PLAYER_CAMERA_SETTINGS: Readonly<PlayerCameraSettings> = Object.freeze({
+  eyeHeightMeters: 1.7,
+  fieldOfViewDeg: 70,
+});
+
+export function createPlayerCameraState(
+  presentation: TacticalProject,
+  sceneId: string,
+  selectedTokenId: string | undefined,
+  timeMs: number,
+  settings: Readonly<PlayerCameraSettings> = DEFAULT_PLAYER_CAMERA_SETTINGS,
+): CameraState | null {
+  validatePitch(presentation.pitch.dimensions);
+  if (!Number.isInteger(timeMs) || timeMs < 0) {
+    throw new RangeError('Player camera time must be a non-negative integer millisecond value.');
+  }
+  if (!Number.isFinite(settings.eyeHeightMeters) || settings.eyeHeightMeters < 0.1 || settings.eyeHeightMeters > 3) {
+    throw new RangeError('Eye height must be between 0.1 and 3 metres.');
+  }
+  if (!Number.isFinite(settings.fieldOfViewDeg) || settings.fieldOfViewDeg < 10 || settings.fieldOfViewDeg > 120) {
+    throw new RangeError('Player field of view must be between 10 and 120 degrees.');
+  }
+  const scene = presentation.scenes.find(candidate => candidate.id === sceneId);
+  const token = presentation.playerTokens.find(candidate => candidate.id === selectedTokenId && candidate.sceneId === sceneId);
+  if (!scene || !token?.visible || !scene.layers.some(layer => layer.id === token.layerId && layer.visible)) return null;
+  if (!presentation.teams.some(team => team.id === token.teamId && team.roster.some(player => player.id === token.playerId))) return null;
+  if (!Number.isFinite(token.rotationDeg)) throw new RangeError('Player camera rotation must be finite.');
+
+  const position = normalizedPointToPitch3D(token.position, presentation.pitch.dimensions, settings.eyeHeightMeters);
+  const radians = (token.rotationDeg % 360) * Math.PI / 180;
+  const forwardX = Math.cos(radians) * 10;
+  const forwardZ = Math.sin(radians) * 10;
+  const target = { x: position.x + forwardX, y: position.y, z: position.z + forwardZ };
+  const headingError = Math.hypot(target.x - position.x - forwardX, target.z - position.z - forwardZ);
+  if (!Number.isFinite(headingError) || headingError > 1e-8) {
+    throw new RangeError('Player camera heading cannot be represented at these pitch dimensions.');
+  }
+  return validateCameraState({
+    id: `camera-player-${token.id}-${timeMs}`,
+    timeMs,
+    position,
+    target,
+    fieldOfViewDeg: settings.fieldOfViewDeg,
   });
 }
 

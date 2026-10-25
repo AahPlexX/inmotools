@@ -3,7 +3,7 @@ tool: tactical-matchboard-studio
 doc: handoff
 status: active
 updated: 2026-10-25
-timestamp: 2026-10-25T18:55:14Z
+timestamp: 2026-10-25T19:12:52Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
 documentation: TMS-R52 contract and owner-authorized branch continuation
@@ -19,7 +19,7 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 - Repository: `AahPlexX/inmotools`; canonical branch: `main`.
 - Latest locally verified requirement: **TMS-R44 defender interception cones**, runtime `117c119741e389b5b169a0f154aa544937bc0365` on `arena/981e49e9-inmotools`. It is not integrated to main or deployed.
 - R44 local gates: 4,215 units passed / 18 existing skips; type/production/PWA build passed; lint 4,110 existing warnings / 0 errors; all four owned browser specs 98 passed / 2 existing skips / 0 failures / 0 retries, one worker, 12.3 min. Browser records-only head `0eaddedae45f748e7e07524c3152350945452506`.
-- Active implementation task: [7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md), R52 contract/TDD; owner handles integration.
+- Active implementation task: [7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md), R52 frozen acceptance; owner handles integration.
 - R44 integration task: [4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md), integration/hosted-permission follow-up only. Hosted Pages/lint dispatch was refused HTTP 403; no hosted run exists. The main-integration path conflicts with the fixed session branch. No PR was opened and no connector was disconnected.
 - Last main-integrated requirement remains **TMS-R31 scene transitions**.
 - R31 runtime `a528848db0c030c9010aa6fbb76061627077a084`, GREEN workflow `39195675178` / job `117877804494`, integration merge `15e3133a228a67e0913d8c01ea6b8e727896dc8a`.
@@ -31,7 +31,7 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 
 ## Exact next action
 
-Owner's latest request authorizes continuing and pushing on `arena/981e49e9-inmotools`; the owner will handle integration. Do not close/disconnect the connector. R44 is locally verified and unchanged; its integration does not block continued feature work. **Resume R52** via [active task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md): focused baseline passes and RED is captured (15 unit cases / 2 browser cases); implement R52 next, then GREEN and frozen affected acceptance. Continue R78, R75 and R83 in that order afterward. No PR, other branch push, branch-policy workaround, hosted CI, main integration or deployment is claimed. R44 task 4d44 remains active for owner-managed integration.
+Owner's latest request authorizes continuing and pushing on `arena/981e49e9-inmotools`; the owner will handle integration. Do not close/disconnect the connector. R44 is locally verified and unchanged; its integration does not block continued feature work. **Resume R52** via [active task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md): runtime is implemented; all 16 new camera units/type/build pass, plus focused browser groups (12 and 2 cases). Freeze current runtime and complete full repository unit/lint and the canonical four owned browser specs, one worker, original timeouts and zero local retries; R52 remains partial until those results are read. Continue R78, R75 and R83 in that order afterward. No PR, other branch push, branch-policy workaround, hosted CI, main integration or deployment is claimed. R44 task 4d44 remains active for owner-managed integration.
 
 R31 stores optional exit-transition metadata on scenes. It uses the outgoing scene’s final interval and the next contiguous scene’s arrival; cut is instantaneous, fade passes through the background, and morph pairs visible roster identities plus the ball. Unpaired actors/props/drawings switch halfway. Existing projects without settings retain their selected-scene behavior. Setting a transition enables chapter playback at the existing playhead. Preview, 3D, animated SVG/HTML/video/frame exports and PDF contact sheets share the sampled chapter. Animated exports retain boundary/transition samples within the existing cap or report an insufficient cap. Clone/split/reorder/join and JSON import have transition-specific regression coverage; no dependency or schema bump was added.
 

@@ -1,4 +1,21 @@
 import * as THREE from 'three';
+import type { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import type { CameraState } from './tactics-types';
+
+export function applyTactical3DCamera(
+  camera: THREE.PerspectiveCamera,
+  controls: Pick<OrbitControls, 'enabled' | 'target' | 'update'>,
+  state: CameraState,
+  playerView = false,
+): void {
+  controls.enabled = !playerView;
+  camera.position.set(state.position.x, state.position.y, state.position.z);
+  camera.fov = state.fieldOfViewDeg;
+  camera.updateProjectionMatrix();
+  controls.target.set(state.target.x, state.target.y, state.target.z);
+  if (playerView) camera.lookAt(controls.target);
+  else controls.update();
+}
 
 export function disposeTactical3DObject(root: THREE.Object3D): void {
   root.traverse((object) => {
