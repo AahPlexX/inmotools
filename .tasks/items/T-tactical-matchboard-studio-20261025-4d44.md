@@ -7,7 +7,7 @@ state: active
 branch: arena/981e49e9-inmotools
 created: 2026-10-25
 updated: 2026-10-25
-timestamp: 2026-10-25T16:54:04Z
+timestamp: 2026-10-25T17:11:42Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent; independent model review not available)
 documentation: TMS-R44 contract, implementation, TDD receipts and continuation
@@ -32,7 +32,7 @@ Continue where the previous agent stopped.
 
 ## Resume here
 
-TMS-R44 runtime exists; 20 geometry units and the fresh repository suite pass (4,215 passed / 18 skipped); the substituted-on-defender regression is GREEN. TypeScript and production/PWA build pass. Next: run final four-spec Tactical browser acceptance and lint/docs/tool gates on this frozen runtime, then record the exact implementation commit and accepted scope. R44 is partial pending those checks and main integration remains blocked by the fixed session branch.
+Frozen runtime `117c119741e389b5b169a0f154aa544937bc0365` is committed and pushed. Units (4,215 passed / 18 skipped), type/build, lint (4,110 warnings / 0 errors) and docs pass. First four-spec browser batch: 97 passed / 2 existing skips / 1 desktop video-review timeout during final Axe injection; all 8 new R44 cases pass. The unchanged failed test passes isolated in 15.7 s. Next: finish a clean all-four-spec checkpoint with one worker, without changing assertions, timeouts or retries. Hosted Pages/lint dispatch was refused with HTTP 403; reconnect GitHub in Arena to restore workflow permissions. Main integration is independently blocked by the fixed session branch. No hosted run, deployment or integration is claimed.
 
 ## Workflow constraints
 
@@ -86,3 +86,10 @@ TMS-R44 runtime exists; 20 geometry units and the fresh repository suite pass (4
 
 - timestamp: 2026-10-25T16:54:04Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: Vitest 5.0.1, TypeScript 7.0.2, Vite 8.3.0 / PWA 1.3.0 | documentation: Substitution eligibility RED reproduced exactly one failure (incoming `token-opp-2` absent), then corrected by accepting visible active/substitute players while excluding coaches/neutrals. All 20 interception contracts pass, including sampled R33 visibility. Fresh full suite: 4,215 passed / 18 pre-existing skipped / 0 failed, 378 files passed and 2 skipped, 120.97 s. Final type/production/PWA build passes, 32.64 s Vite build, 408 precache entries. Receipts: `/home/user/inmotools-r44-substitution-red.log`, `/home/user/inmotools-r44-substitution-green.log`, `/home/user/inmotools-r44-final-units.log`, `/home/user/inmotools-r44-final-build.log`.
 - timestamp: 2026-10-25T16:54:04Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: dependency selector and same-agent review | documentation: Final scope resolves to ball-flight, studio, substitution and theme specs only. Four new studio contracts retain all interaction assertions in smaller independent cycles: configured geometry, sampled motion/substitution, canonical undo/JSON separation, keyboard/touch/reflow/axe. No existing assertion or timeout changed. R44 remains partial until this exact final browser scope and remaining gates pass; no final passing browser receipt is claimed yet.
+
+## Selected browser diagnostic and CI permission blocker
+
+- timestamp: 2026-10-25T17:11:42Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: Playwright 1.63.0 / Chromium 153.0.8010.0 | documentation: Source `117c119741e389b5b169a0f154aa544937bc0365`; canonical `validationPlan` compares against `fa4dd291c0b4556025a5e58f21e4268f6748e9d6` and selects exactly ball-flight/studio/substitution/theme. Two-worker local batch: 97 passed / 2 pre-existing duplicate mobile skips / 1 failed / no automatic retries, 12.3 min. All 8 R44 cases pass. Only the unchanged desktop local-video review test exhausts its original 30-second budget while injecting Axe into its final analysis page. Video source/fixture/assertions are unchanged. Its trace and log are preserved under ignored `review-receipts/r44-browser-timeout/`; receipt `/home/user/inmotools-r44-final-browser.log`. This failed batch is not called green.
+- timestamp: 2026-10-25T17:11:42Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: Playwright unchanged video contract | documentation: Corrective isolated run, same frozen runtime/test/browser: 1 desktop video-review test passed in 15.7 s (16.8 s total), 0 skips / 0 retries, one worker. Receipt `/home/user/inmotools-r44-video-corrective.log`. No assertion, timeout, source, dependency or fixture changed. A fresh complete four-spec single-worker checkpoint is next, not replaced by the isolated receipt.
+- timestamp: 2026-10-25T17:11:42Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: Oxlint 1.87.0 / type-aware 7.0.2004 | documentation: Final full local lint: 1,291 files / 196 rules, 4,110 warnings / 0 errors, 13.7 s. The new engine and new unit contracts have no diagnostics; remaining warnings are existing repository debt. Receipt `/home/user/inmotools-r44-final-lint.log`.
+- timestamp: 2026-10-25T17:11:42Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: GitHub workflow-dispatch API | documentation: Existing `pages.yml` (validate=true, scope=affected, explicit base) and `lint.yml` dispatches on the fixed session branch both fail HTTP 403 Resource not accessible by integration. No workflow run was created. Owner was asked to reconnect GitHub in Arena; no credentials were requested and no connector was disconnected. Pages branch guards would skip production deployment for this branch; no workflow/policy change or alternate branch/PR is authorized as a workaround.

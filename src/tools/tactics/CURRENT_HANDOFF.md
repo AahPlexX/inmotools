@@ -3,7 +3,7 @@ tool: tactical-matchboard-studio
 doc: handoff
 status: active
 updated: 2026-10-25
-timestamp: 2026-10-25T16:54:04Z
+timestamp: 2026-10-25T17:11:42Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent; automated owned-browser acceptance pending)
 documentation: TMS-R44 contract and active continuation
@@ -27,7 +27,7 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 
 ## Exact next action
 
-Continue TMS-R44 in active [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) on `arena/981e49e9-inmotools`, based on `origin/main` `fa4dd291`. The metre-based engine/controls exist; 20 geometry units, the fresh repository unit suite (4,215 passed / 18 skipped) and type/production/PWA build pass. The substituted-on-defender regression is GREEN. Next: run all four selected Tactical browser specs, final lint/docs/tool gates, and record acceptance on the frozen runtime commit. Main integration remains blocked by the platform branch constraint; do not weaken branch checks or claim integration. R31 remains verified and complete.
+Continue active R44 [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md). Runtime `117c119741e389b5b169a0f154aa544937bc0365` is pushed on `arena/981e49e9-inmotools`; unit/type/build/lint/docs gates pass. The first owned browser batch has 97 passes, 2 existing skips and 1 unchanged desktop video-review timeout during final Axe injection; its isolated rerun passes in 15.7 s and all 8 R44 cases pass. Next: finish a clean single-worker all-four-spec checkpoint with original assertions/timeouts. Hosted Pages/lint dispatch is blocked by HTTP 403 (owner asked to reconnect GitHub in Arena); main integration is independently blocked by the fixed branch. No workflow run/deployment/integration is claimed and no PR is open for this branch.
 
 R31 stores optional exit-transition metadata on scenes. It uses the outgoing scene’s final interval and the next contiguous scene’s arrival; cut is instantaneous, fade passes through the background, and morph pairs visible roster identities plus the ball. Unpaired actors/props/drawings switch halfway. Existing projects without settings retain their selected-scene behavior. Setting a transition enables chapter playback at the existing playhead. Preview, 3D, animated SVG/HTML/video/frame exports and PDF contact sheets share the sampled chapter. Animated exports retain boundary/transition samples within the existing cap or report an insufficient cap. Clone/split/reorder/join and JSON import have transition-specific regression coverage; no dependency or schema bump was added.
 
