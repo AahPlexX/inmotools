@@ -7,15 +7,15 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T16:54:04Z
+timestamp: 2026-10-25T17:27:41Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent; automated owned-browser acceptance pending)
-documentation: TMS-R44 contract and active continuation
+validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
+documentation: TMS-R44 local acceptance and integration-blocked continuation
 ---
 
 # Tactical Matchboard Studio — spec
 
-As-built TMS-R31 runtime `a528848db0c030c9010aa6fbb76061627077a084`, integrated as `15e3133a228a67e0913d8c01ea6b8e727896dc8a`; accepted workflow `39195675178`. Implementation and verification evidence are recorded in `.tasks/items/T-tactical-matchboard-studio-20261019-b823.md`. Prior verified requirements and evidence remain in the tracker. Requirement prefix: `TMS`. Status of each requirement: [TRACKER.md](../../../src/tools/tactics/TRACKER.md). History: [2026-09-21 design](2026-09-21-tactical-matchboard-studio-design.md), [2026-09-02 ethical support addendum](2026-09-02-tactical-ethical-support-addendum.md), [FEATURE_MATRIX.md](../../../src/tools/tactics/FEATURE_MATRIX.md) (rows 1–67, cited below as "formerly <n>"), [HANDOFF.md](../../../src/tools/tactics/HANDOFF.md), [TODO_SEQUENCE.md](../../../src/tools/tactics/TODO_SEQUENCE.md), [plan](../plans/2026-09-21-tactical-matchboard-studio.md). Owner input: [owner feature notes 2026-10-05](../../research/owner-feature-notes-2026-10-05.md#tactical-matchboard-studio-tactical-animation--matchboard-studio).
+As-built TMS-R44 runtime `117c119741e389b5b169a0f154aa544937bc0365` is locally verified: repository units 4,215 passed / 18 existing skips; type/build/lint/docs pass; four owned browser specs 98 passed / 2 existing skips / 0 failures / 0 retries. Implementation, TDD, exact environment and validation receipts are in [active task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md). Main integration and hosted-CI permissions remain blocked; no deployment is claimed. Prior main-integrated R31 runtime `a528848db0c030c9010aa6fbb76061627077a084` and its accepted workflow `39195675178` remain in the tracker and completed R31 task. Requirement prefix: `TMS`. Status of each requirement: [TRACKER.md](../../../src/tools/tactics/TRACKER.md). History: [2026-09-21 design](2026-09-21-tactical-matchboard-studio-design.md), [2026-09-02 ethical support addendum](2026-09-02-tactical-ethical-support-addendum.md), [FEATURE_MATRIX.md](../../../src/tools/tactics/FEATURE_MATRIX.md) (rows 1–67, cited below as "formerly <n>"), [HANDOFF.md](../../../src/tools/tactics/HANDOFF.md), [TODO_SEQUENCE.md](../../../src/tools/tactics/TODO_SEQUENCE.md), [plan](../plans/2026-09-21-tactical-matchboard-studio.md). Owner input: [owner feature notes 2026-10-05](../../research/owner-feature-notes-2026-10-05.md#tactical-matchboard-studio-tactical-animation--matchboard-studio).
 
 ## Purpose
 
@@ -26,7 +26,7 @@ Let coaches, from grassroots to professional level, set up a pitch and squad, au
 In scope:
 - Pitch and rules profiles from 1v1 training formats to 11v11 IFAB and futsal, squads, formations, restarts and training equipment.
 - Keyframed multi-track timeline, Bézier motion, scenes, coordinated actions, linked units and possession.
-- Geometric analysis (Voronoi, hull, passing lanes, vision sectors, grids, rings, occupancy, authored speed).
+- Geometric analysis (Voronoi, hull, passing lanes, defender interception sectors, vision sectors, grids, rings, occupancy, authored speed).
 - Synchronized 3D view, presentation marks, scenarios, session plans and local video review.
 - Local project vault, JSON/ZIP/CSV interchange and SVG, raster, PDF, HTML and video export.
 
@@ -207,7 +207,14 @@ The tool is complete when every requirement is `verified` or `prohibited`, and t
 
 ## Technique decisions
 
-None: no function was compared between an ML and a non-ML method.
+No function was compared between an ML and a non-ML method.
+
+### TMS-R44 — geometry and storage decision
+
+- timestamp: 2026-10-25T17:27:41Z
+- agent: Arena.ai Agent Mode (model name not exposed)
+- validator: same-agent review plus the 20 named unit and 8 owned browser contracts
+- documentation: Deterministic metre-space sectors and finite-segment/circle/angular intersections reuse the existing defender radius; bounded polygons are for drawing, not the lane-coverage measurement. Derivation consumes the canonical presentation snapshot, and display settings stay ephemeral. This introduces no timed-reach inference, alternate motion model, dependency or project schema change. Defaults remain owner-overridable under Intent not recorded.
 
 ## Intent not recorded
 
@@ -218,6 +225,8 @@ None: no function was compared between an ML and a non-ML method.
 - TMS-R31: defaults are cut, fade-through-background and roster-matched player/ball morph; snapshots freeze at transition start and arrival, unpaired players/props/drawings switch halfway, and an optional exit transition enables chapter playback. Owner may override.
 
 ## Change log
+
+- timestamp: 2026-10-25T17:27:41Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: local unit/type/build/lint/owned-browser/docs gates | documentation: TMS-R44 runtime `117c119741e389b5b169a0f154aa544937bc0365` verified locally with 20 new unit contracts (150 seeded geometry cases) and 8 new browser cases; complete owned browser gate 98 passed / 2 existing skips / 0 failures / 0 retries. Configured-radius/angle sectors are pitch-clipped, finite-lane coverage is analytical, timed substitutions follow sampled visibility, and settings remain ephemeral. Hosted CI and main integration are explicitly unperformed.
 
 - timestamp: 2026-10-25T16:49:37Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: Arena.ai Agent Mode (same agent; regression added before correction) | documentation: R44 eligibility follows sampled on-pitch visibility, including a roster substitute brought on by R33; only coaches/neutrals are excluded. No alternate substitution or motion state is introduced.
 

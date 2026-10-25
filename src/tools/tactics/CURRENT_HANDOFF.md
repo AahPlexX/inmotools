@@ -3,10 +3,10 @@ tool: tactical-matchboard-studio
 doc: handoff
 status: active
 updated: 2026-10-25
-timestamp: 2026-10-25T17:11:42Z
+timestamp: 2026-10-25T17:27:41Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent; automated owned-browser acceptance pending)
-documentation: TMS-R44 contract and active continuation
+validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
+documentation: TMS-R44 local acceptance and integration-blocked continuation
 tracker: src/tools/tactics/TRACKER.md
 ---
 
@@ -17,7 +17,10 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 ## Current state
 
 - Repository: `AahPlexX/inmotools`; canonical branch: `main`.
-- Last verified product requirement: **TMS-R31 scene transitions**.
+- Latest locally verified requirement: **TMS-R44 defender interception cones**, runtime `117c119741e389b5b169a0f154aa544937bc0365` on `arena/981e49e9-inmotools`. It is not integrated to main or deployed.
+- R44 local gates: 4,215 units passed / 18 existing skips; type/production/PWA build passed; lint 4,110 existing warnings / 0 errors; all four owned browser specs 98 passed / 2 existing skips / 0 failures / 0 retries, one worker, 12.3 min. Browser records-only head `0eaddedae45f748e7e07524c3152350945452506`.
+- Active task: [4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md), integration/hosted-permission follow-up only. Hosted Pages/lint dispatch was refused HTTP 403; no hosted run exists. The main-integration path conflicts with the fixed session branch. No PR was opened and no connector was disconnected.
+- Last main-integrated requirement remains **TMS-R31 scene transitions**.
 - R31 runtime `a528848db0c030c9010aa6fbb76061627077a084`, GREEN workflow `39195675178` / job `117877804494`, integration merge `15e3133a228a67e0913d8c01ea6b8e727896dc8a`.
 - R31 gate: 4,195 units passed / 18 skipped; TypeScript and production/PWA build passed (5.68 s); four owned Tactical browser specs: 90 passed / 2 existing duplicate mobile skips / 0 failures / no reported retries (3.5 min). Completed task: `.tasks/items/T-tactical-matchboard-studio-20261019-b823.md`.
 - Prior R07 remains verified: runtime `4e05ed2d731de2cfd38b0359bb85942967294ea3`, selector correction `3b7b53d44e77d0ca9cd70e556da238cba72da126`, GREEN workflow `38934899167`; closure `40c5ace3`. Its completed task retains full evidence.
@@ -27,7 +30,7 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 
 ## Exact next action
 
-Continue active R44 [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md). Runtime `117c119741e389b5b169a0f154aa544937bc0365` is pushed on `arena/981e49e9-inmotools`; unit/type/build/lint/docs gates pass. The first owned browser batch has 97 passes, 2 existing skips and 1 unchanged desktop video-review timeout during final Axe injection; its isolated rerun passes in 15.7 s and all 8 R44 cases pass. Next: finish a clean single-worker all-four-spec checkpoint with original assertions/timeouts. Hosted Pages/lint dispatch is blocked by HTTP 403 (owner asked to reconnect GitHub in Arena); main integration is independently blocked by the fixed branch. No workflow run/deployment/integration is claimed and no PR is open for this branch.
+R44 implementation and local acceptance are complete; do not rebuild it or reopen completed R31/R07/PDF work. The active task remains open because main integration has not happened. Owner action: reconnect GitHub in Arena for workflow-dispatch permissions, then run the existing Pages validation and lint workflows on `arena/981e49e9-inmotools` with the explicit base recorded in task 4d44. Read the actual results before claiming hosted acceptance. Resolve main integration through an owner-approved path compatible with the fixed session branch and no-PR rule; do not switch/create/push another branch or weaken repository checks. After integration, resume **TMS-R52 first-person player camera**, then R78, R75 and R83.
 
 R31 stores optional exit-transition metadata on scenes. It uses the outgoing scene’s final interval and the next contiguous scene’s arrival; cut is instantaneous, fade passes through the background, and morph pairs visible roster identities plus the ball. Unpaired actors/props/drawings switch halfway. Existing projects without settings retain their selected-scene behavior. Setting a transition enables chapter playback at the existing playhead. Preview, 3D, animated SVG/HTML/video/frame exports and PDF contact sheets share the sampled chapter. Animated exports retain boundary/transition samples within the existing cap or report an insufficient cap. Clone/split/reorder/join and JSON import have transition-specific regression coverage; no dependency or schema bump was added.
 
@@ -42,13 +45,23 @@ Standalone HTML advances at retained frame timestamps and encoded video uses aut
 - No project schema, dependency, 3D state or alternate playback model was added.
 - A selector regression now includes the fourth Tactical browser spec. Current handoff records receive the same documentation-only scope treatment as ordinary handoffs; a runtime change accompanying a handoff still selects every owned browser spec.
 
-## Remaining ordered work
+## Verified R44 behavior
 
-1. TMS-R44 — defender interception cones (active task 4d44; runtime present; final owned browser/lint/docs gates pending).
-2. TMS-R52 — first-person player camera.
-3. TMS-R78 — touch long-press/radial actions.
-4. TMS-R75 — missing 1200×630 social card.
-5. TMS-R83 — focused offline route proof.
+- Interception cones are opt-in and display the existing selected-player-to-ball lane. Each visible opposing player gets a configured-radius reach sector and metre label, with an exact reachable finite-lane span and textual equivalent.
+- Radius uses the existing defender-radius control; a separate angle defaults to 90° and is editable. Each cone aims at the nearest lane point; an on-lane defender faces toward the ball. Geometry is clipped in physical metres to the pitch and uses bounded polygon sampling; lane coverage is analytical, not sampled.
+- Uses the current presentation snapshot, scene, token/layer visibility and goalkeeper filter. Coaches/neutrals are excluded; an incoming roster substitute appears when R33 makes their token visible, and the outgoing defender disappears at that same millisecond.
+- Settings are ephemeral like other analysis overlays and do not add canonical history, project fields, a schema/dependency change or another playback clock. Canonical edits still drive normal undo/redo; JSON round-trip tests prove display settings stay out of project data.
+- Degenerate lanes are explained without invalid SVG. Keyboard/touch controls, 44px targets, 320/390/768px reflow, accessible text equivalents and scoped axe are covered.
+- This is instantaneous configured geometric reach, not a speed/reaction-time model, measured player ability or pass-success prediction. Owner may override defaults recorded in the spec.
+
+## Remaining ordered product work
+
+1. TMS-R52 — first-person player camera.
+2. TMS-R78 — touch long-press/radial actions.
+3. TMS-R75 — missing 1200×630 social card.
+4. TMS-R83 — focused offline route proof.
+
+R44 integration is the active operational follow-up, not an unimplemented product requirement.
 
 ## Verified R33 behavior
 
@@ -59,6 +72,8 @@ Standalone HTML advances at retained frame timestamps and encoded video uses aut
 - Focused browser acceptance proves the board shows outgoing/incoming state immediately before the authored millisecond and swaps them at the authored millisecond.
 
 ## Verification history relevant to continuation
+
+- timestamp: 2026-10-25T17:27:41Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: automated local gates and same-agent evidence review | documentation: R44 RED contracts `287f3b0`; runtime `117c119741e389b5b169a0f154aa544937bc0365`. Final local owned gate 98 passed / 2 existing skips / 0 failures / 0 retries on records-only head `0eaddedae45f748e7e07524c3152350945452506`. Earlier two-worker batch had one unchanged desktop-video timeout at the final Axe injection; isolated and final complete single-worker runs pass without a source/assertion/timeout change. Detailed receipts, environment recovery and SHA-256 identities are in active task 4d44. Hosted CI and main integration remain unperformed, not silently inferred from local success.
 
 - R33 RED: `1056fb6ffb53a1764d4c58be01607e6a75b145a4`, workflow `38670429054`, job `116212029288`; exactly the new contract failed because the helper did not exist yet.
 - R33 first GREEN attempt: workflow `38671314945`, job `116214857092`; browser setup failed on an ambiguous `Status` test locator before runtime behavior was exercised. Artifact `11944378830` documents it.

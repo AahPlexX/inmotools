@@ -7,17 +7,17 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T17:11:42Z
+timestamp: 2026-10-25T17:27:41Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent; automated owned-browser acceptance pending)
-documentation: TMS-R44 contract and active continuation
+validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
+documentation: TMS-R44 local acceptance and integration-blocked continuation
 ---
 
 # Tactical Matchboard Studio — tracker
 
 ## Resume here
 
-85 requirements: 80 verified, 1 implemented, 2 partial, 2 missing. R44 runtime `117c119741e389b5b169a0f154aa544937bc0365` is committed/pushed; 4,215 unit passes, type/build/lint/docs pass. Four-spec browser batch: 97 passed / 2 existing skips / 1 unchanged desktop video-review timeout; all 8 R44 cases pass and that video test passes isolated. Next: clean single-worker owned checkpoint; see [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md). Hosted CI is blocked by workflow-dispatch HTTP 403; main integration is blocked by the fixed `arena/981e49e9-inmotools` branch. R31 remains verified on runtime `a528848d`, GREEN workflow `39195675178`. Then R52, R78, R75 and R83. `CURRENT_HANDOFF.md` is current; `HANDOFF.md` is archival.
+85 requirements: **81 verified, 1 implemented, 1 partial, 2 missing**. TMS-R44 is locally verified on runtime `117c119741e389b5b169a0f154aa544937bc0365`: 4,215 units pass / 18 existing skips; type/build/lint/docs pass; four owned browser specs: 98 passed / 2 existing skips / 0 failures / 0 retries (one worker, 12.3 min). See [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) and `CURRENT_HANDOFF.md` for exact receipts and the preserved earlier parallel-run diagnostic. No R44 implementation work remains. The task is active for main integration and hosted-CI follow-up only: workflow dispatch is HTTP 403, and the session is fixed to `arena/981e49e9-inmotools`. No main integration or deployment is claimed. Next product work after integration: R52, R78, R75, R83. `HANDOFF.md` is archival.
 
 ## Documents
 
@@ -79,7 +79,7 @@ documentation: TMS-R44 contract and active continuation
 | TMS-R41 | verified | unit "builds physical-Euclidean Voronoi territory clipped to the pitch" | |
 | TMS-R42 | verified | unit "derives convex hull, centroid, width, depth, area and perimeter in physical units", "keeps the selected goalkeeper active when goalkeepers are excluded from team geometry" | |
 | TMS-R43 | verified | unit "reports geometric passing-lane clearance without converting it into a probability" | |
-| TMS-R44 | partial | unit "computes exact finite-lane reach in physical metres without mutating input"; all 8 new browser cases pass on `117c119` | Implementation complete; clean owned batch pending after one unchanged video timeout (isolated rerun passes). Hosted CI HTTP 403 and main integration blocked; task 4d44 |
+| TMS-R44 | verified | unit "computes exact finite-lane reach in physical metres without mutating input", "includes a substituted-on defender according to sampled visibility rather than roster status"; e2e "TMS-R44 displays configured defender reach and exact finite-lane coverage" | Runtime `117c119`; 20 new units, 8 new browser cases, full local owned gate 98 passed / 2 existing skips / 0 failures / 0 retries. Metre-space configured reach; no prediction, schema or dependency change. Not integrated to main; task 4d44 |
 | TMS-R45 | verified | unit "builds authored orientation sectors using physical range and pitch dimensions" | |
 | TMS-R46 | verified | unit "creates configurable positional-play grids without implying an official formation" | |
 | TMS-R47 | verified | unit "creates physical distance rings and dynamic tethers" | |
@@ -124,9 +124,11 @@ documentation: TMS-R44 contract and active continuation
 
 ## Open work
 
-1. TMS-R44: active RED/implementation task `T-tactical-matchboard-studio-20261025-4d44`; final owned browser/lint/docs acceptance pending. Then R52 and R78.
-2. TMS-R75: 1200×630 card.
-3. TMS-R83: offline test.
+1. Integrate the locally verified R44 runtime after the hosted-workflow permission and fixed-session-branch constraints are resolved; task 4d44 stays active until that happens.
+2. TMS-R52 — first-person player camera.
+3. TMS-R78 — touch long-press/radial actions.
+4. TMS-R75 — 1200×630 card.
+5. TMS-R83 — focused offline route test.
 
 ## Known limitations
 
@@ -135,6 +137,8 @@ documentation: TMS-R44 contract and active continuation
 - Analysis and tracking use authored or imported samples only.
 
 ## Verification evidence
+
+- timestamp: 2026-10-25T17:27:41Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: automated local gates; same-agent review | documentation: TMS-R44 runtime `117c119741e389b5b169a0f154aa544937bc0365`, records-only browser head `0eaddedae45f748e7e07524c3152350945452506`. Units 4,215 passed / 18 existing skips; type/production/PWA build passed; lint 4,110 existing warnings / 0 errors; all four owned browser specs 98 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries, one worker, 12.3 min. Includes 20 new unit contracts, 150 seeded property cases and 8 R44 browser cases. The earlier parallel video timeout is retained in task 4d44; that unchanged test passes in the final complete batch. Hosted CI HTTP 403; no main integration/deployment claimed.
 
 - 2026-10-19, TMS-R31: runtime `a528848db0c030c9010aa6fbb76061627077a084`, GREEN workflow `39195675178` / job `117877804494`, integration merge `15e3133a228a67e0913d8c01ea6b8e727896dc8a`. 4,195 units passed / 18 skipped; TypeScript and production/PWA build passed (5.68 s); four owned Tactical browser specs: 90 passed / 2 existing duplicate mobile skips / 0 failures / no reported retries (3.5 min). Local encoded-video receipt: 5.033333 s for 5 authored seconds. Standalone HTML and encoded video retain authored timestamps under frame caps.
 
@@ -145,6 +149,8 @@ documentation: TMS-R44 contract and active continuation
 - 2026-10-05, `expand/tactical-matchboard-studio` from `main` @ `6c991e75`: `pnpm tool:check tactical-matchboard-studio --base origin/main` 75/85, no errors.
 
 ## Change log
+
+- timestamp: 2026-10-25T17:27:41Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: local unit/type/build/lint/owned-browser/docs gates | documentation: TMS-R44 verified locally. Opt-in pitch-clipped per-defender reach sectors, exact finite-lane coverage, metre labels and accessible summaries use sampled scene/layer/token visibility, including timed incoming substitutes; display settings remain outside canonical history/JSON. No prior verified row is reduced. Main integration and hosted-CI permissions remain explicit blockers.
 
 - 2026-10-19 — TMS-R31 verified. Optional cut/fade-through/morph exits share preview/export sampling, preserve legacy projects, validate imports and scene edits, and retain authored playback duration. Timed exports reserve chapter boundaries and report an insufficient frame cap rather than silently omitting chapters.
 
