@@ -7,10 +7,10 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T17:27:41Z
+timestamp: 2026-10-25T18:45:50Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
-documentation: TMS-R44 local acceptance and integration-blocked continuation
+documentation: TMS-R52 contract and owner-authorized branch continuation
 ---
 
 # Tactical Matchboard Studio — spec
@@ -137,7 +137,7 @@ Out of scope:
 | --- | --- | --- |
 | TMS-R50 | Lazy Three.js (WebGL) pitch view with markings, goals, players and ball elevation from the same project as 2D, rendered on demand (formerly 35) | Open 3D; players match the 2D board |
 | TMS-R51 | Camera presets: tactical, broadcast, touchline, goal-line (formerly 36) | Choose each preset; the camera moves |
-| TMS-R52 | First-person camera from a selected player's position and orientation | Choose a player's view; the camera sits at the player and faces their rotation |
+| TMS-R52 | Opt-in first-person camera from the selected visible player's sampled position and authored heading, with configurable eye height/FOV, orbit lock and accessible unavailable/invalid states; ephemeral settings, explicit canonical camera capture | Select a player; the camera follows their sampled metre-space position/heading, visibility and timed substitution; edits and capture undo/redo/JSON stay canonical; keyboard/touch/reflow/axe and WebGL fallback pass |
 | TMS-R53 | Camera keyframes captured at the playhead and interpolated (formerly 37) | Capture two cameras; playback moves between them |
 | TMS-R54 | 2D edits drive the 3D view and 3D selection feeds the 2D inspector (formerly 38) | Move a player in 2D; 3D updates; click in 3D selects it |
 
@@ -218,6 +218,8 @@ No function was compared between an ML and a non-ML method.
 
 ## Intent not recorded
 
+- TMS-R52: first-person is an ephemeral opt-in view from the current visible roster-backed player token, with a horizontal target 10 m ahead; eye height defaults to 1.7 m (editable 0.1–3 m), FOV to 70° (editable 10–120°). These are configured authoring values, not measured anatomy. No automatic selection switch on hiding, substitution or scene change; show the existing camera with an explanation until a valid player is selected. A preset exits player view, project replacement resets settings, and explicit camera capture stores only the existing position/target/FOV snapshot. Owner may override.
+
 - TMS-R44: this is instantaneous geometric reach using the existing defender radius, not a reaction-time or speed model. Cones aim at the nearest point on the finite selected-player-to-ball lane; on-lane defenders face toward the ball. The default cone angle is 90°, editable within (0°, 180°]; sectors are clipped to the pitch and exact lane coverage is reported in metres. Display settings are ephemeral like other analysis overlays; no project-schema change. Owner may override.
 
 - TMS-R07: preset angles are local authoring defaults (ground 0°, driven 10°, lofted 35°, chipped 55°), not measured football characteristics; owner may override. Airborne angles remain editable and flight duration is authored.
@@ -225,6 +227,8 @@ No function was compared between an ML and a non-ML method.
 - TMS-R31: defaults are cut, fade-through-background and roster-matched player/ball morph; snapshots freeze at transition start and arrival, unpaired players/props/drawings switch halfway, and an optional exit transition enables chapter playback. Owner may override.
 
 ## Change log
+
+- timestamp: 2026-10-25T18:45:50Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: same-agent contract review; TDD/acceptance pending | documentation: R52 contract recorded before runtime code; current owner authorizes continued work/pushes on the fixed chat branch and handles integration. No connector disconnection, dependency/schema change or status upgrade.
 
 - timestamp: 2026-10-25T17:27:41Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: local unit/type/build/lint/owned-browser/docs gates | documentation: TMS-R44 runtime `117c119741e389b5b169a0f154aa544937bc0365` verified locally with 20 new unit contracts (150 seeded geometry cases) and 8 new browser cases; complete owned browser gate 98 passed / 2 existing skips / 0 failures / 0 retries. Configured-radius/angle sectors are pitch-clipped, finite-lane coverage is analytical, timed substitutions follow sampled visibility, and settings remain ephemeral. Hosted CI and main integration are explicitly unperformed.
 

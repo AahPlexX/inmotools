@@ -7,17 +7,17 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T17:27:41Z
+timestamp: 2026-10-25T18:45:50Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
-documentation: TMS-R44 local acceptance and integration-blocked continuation
+documentation: TMS-R52 contract and owner-authorized branch continuation
 ---
 
 # Tactical Matchboard Studio — tracker
 
 ## Resume here
 
-85 requirements: **81 verified, 1 implemented, 1 partial, 2 missing**. TMS-R44 is locally verified on runtime `117c119741e389b5b169a0f154aa544937bc0365`: 4,215 units pass / 18 existing skips; type/build/lint/docs pass; four owned browser specs: 98 passed / 2 existing skips / 0 failures / 0 retries (one worker, 12.3 min). See [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) and `CURRENT_HANDOFF.md` for exact receipts and the preserved earlier parallel-run diagnostic. No R44 implementation work remains. The task is active for main integration and hosted-CI follow-up only: workflow dispatch is HTTP 403, and the session is fixed to `arena/981e49e9-inmotools`. No main integration or deployment is claimed. Next product work after integration: R52, R78, R75, R83. `HANDOFF.md` is archival.
+85 requirements: **81 verified, 1 implemented, 1 partial, 2 missing**. TMS-R44 is locally verified on runtime `117c119741e389b5b169a0f154aa544937bc0365`: 4,215 units pass / 18 existing skips; type/build/lint/docs pass; four owned browser specs: 98 passed / 2 existing skips / 0 failures / 0 retries (one worker, 12.3 min). See [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) and `CURRENT_HANDOFF.md` for exact receipts and the preserved earlier parallel-run diagnostic. No R44 implementation work remains. The task is active for main integration and hosted-CI follow-up only: workflow dispatch is HTTP 403, and the session is fixed to `arena/981e49e9-inmotools`. No main integration or deployment is claimed. Owner now authorizes continued work on the fixed chat branch and will handle integration. **Active R52 contract/TDD:** [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md), then R78, R75, R83; do not wait for R44 integration to continue. R52 remains missing; no acceptance is claimed. `HANDOFF.md` is archival.
 
 ## Documents
 
@@ -124,8 +124,8 @@ documentation: TMS-R44 local acceptance and integration-blocked continuation
 
 ## Open work
 
-1. Integrate the locally verified R44 runtime after the hosted-workflow permission and fixed-session-branch constraints are resolved; task 4d44 stays active until that happens.
-2. TMS-R52 — first-person player camera.
+1. TMS-R52 — first-person player camera; active task 7d52, contract recorded before implementation.
+2. Owner-managed integration of locally verified R44; task 4d44 remains active until integration evidence exists.
 3. TMS-R78 — touch long-press/radial actions.
 4. TMS-R75 — 1200×630 card.
 5. TMS-R83 — focused offline route test.
