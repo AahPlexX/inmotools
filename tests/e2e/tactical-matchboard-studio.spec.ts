@@ -3,6 +3,8 @@ import JSZip from 'jszip';
 import path from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { expect, test, type Page } from '@playwright/test';
+import { buildBeginnerTacticalProject, placeMirroredOpposition } from '../../src/tools/tactics/workspace-engine';
+import { exportTacticalProjectJson } from '../../src/tools/tactics/project-io';
 
 const localReviewVideo = path.join(process.cwd(), 'tests/fixtures/tactical-review-sample.webm');
 
@@ -759,6 +761,112 @@ test('renders source-honest spatial analysis overlays with readable metric summa
   await page.getByLabel('Tether target').selectOption('token-2');
   await page.getByLabel('Distance units').selectOption('imperial');
   await expect(page.getByText(/Player\/unit spacing: .* ft/i)).toBeVisible();
+});
+
+
+async function loadInterceptionProject(page: Page) {
+  const base = buildBeginnerTacticalProject({
+    title: 'R44 interception contract', teamName: 'Team', primaryColor: '#154c79', secondaryColor: '#ffffff',
+    formationId: 'ussf-4v4-1-2-1', pitchDimensions: { lengthMeters: 100, widthMeters: 50 }, direction: 'left-to-right',
+  });
+  const scene = base.scenes[0]!;
+  const project = placeMirroredOpposition(base, scene.id, scene.layers[0]!.id);
+  project.playerTokens[0]!.position = { x: 0.1, y: 0.5 };
+  project.ball.position = { x: 0.9, y: 0.5 };
+  const opponents = project.playerTokens.filter(token => token.teamId !== project.playerTokens[0]!.teamId);
+  opponents[0]!.position = { x: 0.5, y: 0.3 };
+  opponents[1]!.position = { x: 0.5, y: 0.9 };
+  opponents[2]!.visible = false;
+  project.scenes[0]!.layers.push({ id: 'hidden-defenders', name: 'Hidden defenders', visible: false, locked: false });
+  opponents[3]!.layerId = 'hidden-defenders';
+  project.timeline.tracks.push({ id: 'defender-motion', targetId: opponents[0]!.id, keyframes: [
+    { id: 'defender-start', timeMs: 0, position: opponents[0]!.position, interpolation: 'linear' },
+    { id: 'defender-end', timeMs: 1000, position: { x: 0.5, y: 0.5 }, interpolation: 'hold' },
+  ] });
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+  await page.getByLabel('Import project file').setInputFiles({
+    name: 'r44-interception.json', mimeType: 'application/json', buffer: Buffer.from(exportTacticalProjectJson(project)),
+  });
+  await expect(setupPanel(page).getByLabel('Project title')).toHaveValue('R44 interception contract');
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+  await page.getByText('Spatial analysis', { exact: true }).click();
+  return opponents[0]!.id;
+}
+
+test('TMS-R44 displays defender reach and exact lane coverage through controls and sampled motion', async ({ page }) => {
+  const defenderId = await loadInterceptionProject(page);
+  const toggle = page.getByLabel('Defender interception cones', { exact: true });
+  const cones = page.locator('[data-analysis-kind="interception-cone"]');
+  const summary = page.getByTestId('interception-summary');
+  await expect(cones).toHaveCount(0);
+  await toggle.focus(); await toggle.press('Space');
+  await expect(toggle).toBeChecked(); await expect(toggle).toBeFocused();
+  await page.getByLabel('Defender radius (m)', { exact: true }).fill('12');
+  await page.getByLabel('Interception cone angle (deg)', { exact: true }).fill('180');
+  await expect(cones).toHaveCount(2);
+  await expect(summary.getByRole('listitem')).toHaveCount(2);
+  await expect(summary.getByRole('listitem').first()).toContainText('10.00 m to lane; 13.27 m of lane within reach');
+  await expect(page.locator('[data-analysis-kind="interception-label"]')).toHaveText(['12.00 m', '12.00 m']);
+  const reachableSpan = page.locator(`[data-analysis-kind="interception-span"][data-defender-id="${defenderId}"]`);
+  expect(Number(await reachableSpan.getAttribute('x1'))).toBeCloseTo(433.6675, 2);
+  expect(Number(await reachableSpan.getAttribute('x2'))).toBeCloseTo(566.3325, 2);
+  await expect(reachableSpan).toHaveAttribute('y1', '500');
+
+  await page.getByLabel('Interception cone angle (deg)', { exact: true }).fill('30');
+  await expect(summary.getByRole('listitem').first()).toContainText('5.36 m of lane within reach');
+  await page.getByLabel('Defender radius (m)', { exact: true }).fill('4');
+  await expect(page.locator('[data-analysis-kind="interception-span"]')).toHaveCount(0);
+  await expect(cones).toHaveCount(2);
+  await expect(summary.getByRole('listitem').first()).toContainText('0.00 m of lane within reach (outside configured reach)');
+  await page.getByLabel('Include goalkeepers in team geometry').uncheck();
+  await expect(cones).toHaveCount(1);
+  await page.getByLabel('Include goalkeepers in team geometry').check();
+  await page.getByLabel('Defender radius (m)', { exact: true }).fill('12');
+  await page.getByLabel('Interception cone angle (deg)', { exact: true }).fill('180');
+  await page.getByText('Timeline & motion', { exact: true }).click();
+  await page.getByLabel('Playhead (ms)').fill('500');
+  await page.getByRole('button', { name: 'Set playhead', exact: true }).click();
+  await expect(summary.getByRole('listitem').first()).toContainText('5.00 m to lane; 21.82 m of lane within reach');
+  await toggle.uncheck(); await expect(cones).toHaveCount(0);
+  await toggle.check(); await expect(cones).toHaveCount(2);
+
+  await page.getByLabel('Playhead (ms)').fill('0');
+  await page.getByRole('button', { name: 'Set playhead', exact: true }).click();
+  await coordinateInput(page, 'X').fill('90'); await coordinateInput(page, 'Y').fill('50');
+  await page.getByRole('button', { name: 'Set position', exact: true }).click();
+  await expect(summary).toContainText('distinct lane endpoints'); await expect(cones).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(cones).toHaveCount(2);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(summary).toContainText('distinct lane endpoints');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(cones).toHaveCount(2);
+});
+
+test('TMS-R44 keeps interception controls and summaries accessible at phone and tablet widths', async ({ page, isMobile }) => {
+  await loadInterceptionProject(page);
+  const toggle = page.getByLabel('Defender interception cones', { exact: true });
+  if (isMobile) await toggle.tap(); else await toggle.check();
+  await page.getByLabel('Defender radius (m)', { exact: true }).fill('12');
+  const angle = page.getByLabel('Interception cone angle (deg)', { exact: true });
+  await angle.fill('30'); await angle.press('ArrowUp');
+  await expect(angle).toHaveValue('31'); await expect(angle).toBeFocused();
+  await expect(page.getByText(/Instantaneous geometric reach/)).toBeVisible();
+  const panel = page.locator('details').filter({ has: page.getByText('Spatial analysis', { exact: true }) });
+  for (const width of [320, 390, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    await panel.scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+    for (const control of [toggle, angle, page.getByLabel('Defender radius (m)', { exact: true })]) {
+      const box = await control.boundingBox();
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+      expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1);
+    }
+    await expect(page.getByTestId('interception-summary').getByRole('listitem')).toHaveCount(2);
+  }
+  const accessibility = await new AxeBuilder({ page }).include('.tactical-analysis-panel')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(accessibility.violations).toEqual([]);
 });
 
 test('derives occupancy and speed metrics only from authored trajectory samples', async ({ page }) => {

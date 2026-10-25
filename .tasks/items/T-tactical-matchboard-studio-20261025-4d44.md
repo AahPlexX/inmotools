@@ -7,7 +7,7 @@ state: active
 branch: arena/981e49e9-inmotools
 created: 2026-10-25
 updated: 2026-10-25
-timestamp: 2026-10-25T16:29:56Z
+timestamp: 2026-10-25T16:38:54Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent; independent model review not available)
 documentation: TMS-R44 contract, implementation, TDD receipts and continuation
@@ -32,7 +32,7 @@ Continue where the previous agent stopped.
 
 ## Resume here
 
-TMS-R44 is the next requirement in `CURRENT_HANDOFF.md`; the preceding R31 task is complete. Contract recorded in the current spec before implementation. Next: write and run failing unit/browser contracts, implement metre-based interception sectors and accessible controls/summaries, then run the owned gates and update this record with exact results. No runtime change is accepted yet.
+TMS-R44 is the next requirement in `CURRENT_HANDOFF.md`; the preceding R31 task is complete. Contract and RED evidence recorded before implementation. Next: implement `createDefenderInterceptionCones`, presentation derivation, opt-in controls, SVG sectors/spans/metre labels and accessible summaries to satisfy the new contracts. No runtime change is accepted yet.
 
 ## Workflow constraints
 
@@ -62,3 +62,16 @@ TMS-R44 is the next requirement in `CURRENT_HANDOFF.md`; the preceding R31 task 
 
 - timestamp: 2026-10-25T16:29:56Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: Arena.ai Agent Mode (same agent) | documentation: Read AGENTS, governance, documentation/validation standards, decisions, current handoff, tracker, current PRD and previous task. Baseline tool gate: 80/85 verified, 1 implemented, 1 partial, 3 missing; docs check: 192 standard documents pass. Branch gate fails on the platform-fixed branch as described above. Origin/main matches the checkout; no active Tactical claim branch was found.
 - timestamp: 2026-10-25T16:29:56Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: automated dependency installer (not an independent model) | documentation: Pinned pnpm 12.3.4 bootstrapped. Frozen install cannot fetch the exact SheetJS CDN tarball under this sandbox's host restrictions. No package or lockfile was changed; recovering the exact integrity-matching archive through an allowed host is an environment step, not permission to substitute a dependency.
+
+## TDD baseline and RED
+
+- timestamp: 2026-10-25T16:38:54Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: pinned automated tools; same agent reviewed failures | documentation: Baseline `9d33f455928f0e7ff550379f0993b92feda2fbd5`: 191/191 Tactical units across 23 files; TypeScript passed; production/PWA build passed (14.54 s, 408 precache entries). Existing spatial-overlay browser contract passed desktop/mobile: 2 passed / 0 skips / 0 retries.
+- timestamp: 2026-10-25T16:38:54Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: Vitest 5.0.1 | documentation: RED `tests/unit/tactics-interception.test.ts`: 19 failures because the engine export and derived cone view do not exist. Covers exact physical coverage/angle, finite endpoints, tangency, on-lane heading, pitch clipping, invalid input, 150 seeded property cases, active/goalkeeper/layer visibility, sampled motion and zero-length lanes. Receipt: `/home/user/inmotools-r44-red-units.log`.
+- timestamp: 2026-10-25T16:38:54Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: Playwright 1.63.0 / Chromium 153.0.8010.0 | documentation: RED desktop/mobile geometry contract: 2 failures at the missing Defender interception cones control after successful project import. No existing assertions or timeouts changed. Additional new coverage exercises keyboard/touch, 320/390/768px geometry, 44px controls and scoped axe. Receipt: `/home/user/inmotools-r44-red-browser.log`.
+
+## Reproducible sandbox validation environment
+
+- The exact original SheetJS 0.20.3 archive was retrieved from the immutable GitHub blob `b9df84a5c07d3bb78d75e310b7931e3dbf56783e` in `AakashJohnson/Neat_portal`; its SHA-512 is identical to the repository lockfile. A copied manifest/lockfile under `/home/user/.cache/inmotools-validation/deps` changes only that tarball locator to the verified local archive. Frozen installation there passes; repository manifests, versions, patches and integrity values remain unchanged. Repository `node_modules/` contains ignored links to that installed tree.
+- Pinned pnpm's normal freshness check retries the blocked CDN because the environment-only locator differs. For validation commands, `/home/user/.cache/inmotools-validation/bin/pnpm` invokes pnpm 12.3.4 with `--config.verify-deps-before-run=false`; it skips only this repeated install attempt, not a unit/type/build/docs/browser check. Export that directory at the front of PATH when reproducing.
+- Chromium 153.0.8010.0 and bundled Linux/SwiftShader libraries come from registry package `@sparticuz/chromium@153.0.0`, installed outside the repository. The Playwright headless-shell executable path is an environment-only launcher for that binary; all repository test assertions/configuration are unchanged. This differs from Playwright's downloadable 153.0.8010.12 build, so browser evidence is fresh local evidence, not reused CI evidence.
+- The local production preview runs on port 4173, bound to 0.0.0.0 with `.e2b.app` allowed through Vite's environment setting. Browser-facing application URLs remain relative. Ignored caches/builds/test artifacts are not committed.

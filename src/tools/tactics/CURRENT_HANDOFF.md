@@ -3,7 +3,7 @@ tool: tactical-matchboard-studio
 doc: handoff
 status: active
 updated: 2026-10-25
-timestamp: 2026-10-25T16:29:56Z
+timestamp: 2026-10-25T16:38:54Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent; automated gates pending)
 documentation: TMS-R44 contract and active continuation
@@ -27,7 +27,7 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 
 ## Exact next action
 
-Continue TMS-R44 defender interception cones in active task [4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md), on the platform-fixed `arena/981e49e9-inmotools` branch based on `origin/main` `fa4dd291`. Contract is in the current spec; write and run RED engine/browser contracts next. No runtime is accepted yet. The platform branch constraint conflicts with `task:start`/normal integration and was reported; do not weaken repository branch checks or claim main integration. R31 is verified and its task is complete; do not reopen completed R07 or archived PDF branches.
+Continue TMS-R44 defender interception cones in active task [4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md), on the platform-fixed `arena/981e49e9-inmotools` branch based on `origin/main` `fa4dd291`. Contract is in the current spec; 19 unit and 2 desktop/mobile browser RED failures confirm the missing feature. Implement the engine and accessible overlay next. No runtime is accepted yet. The platform branch constraint conflicts with `task:start`/normal integration and was reported; do not weaken repository branch checks or claim main integration. R31 is verified and its task is complete; do not reopen completed R07 or archived PDF branches.
 
 R31 stores optional exit-transition metadata on scenes. It uses the outgoing scene’s final interval and the next contiguous scene’s arrival; cut is instantaneous, fade passes through the background, and morph pairs visible roster identities plus the ball. Unpaired actors/props/drawings switch halfway. Existing projects without settings retain their selected-scene behavior. Setting a transition enables chapter playback at the existing playhead. Preview, 3D, animated SVG/HTML/video/frame exports and PDF contact sheets share the sampled chapter. Animated exports retain boundary/transition samples within the existing cap or report an insufficient cap. Clone/split/reorder/join and JSON import have transition-specific regression coverage; no dependency or schema bump was added.
 
@@ -44,7 +44,7 @@ Standalone HTML advances at retained frame timestamps and encoded video uses aut
 
 ## Remaining ordered work
 
-1. TMS-R44 — defender interception cones (active task 4d44; contract recorded, tests next).
+1. TMS-R44 — defender interception cones (active task 4d44; RED recorded, implementation next).
 2. TMS-R52 — first-person player camera.
 3. TMS-R78 — touch long-press/radial actions.
 4. TMS-R75 — missing 1200×630 social card.
