@@ -7,17 +7,17 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-26T00:24:33Z
+timestamp: 2026-10-26T00:44:56Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent); automated focused gates; full R78 acceptance pending
-documentation: R78 candidate implementation and corrective TDD; R44/R52 locally accepted
+validator: Arena.ai Agent Mode (same agent); automated local gates and evidence review
+documentation: R78 locally accepted; R75 then R83; owner-managed integration pending
 ---
 
 # Tactical Matchboard Studio — tracker
 
 ## Resume here
 
-85 requirements: **82 verified, 1 implemented, 2 partial, 0 missing**. Latest locally accepted runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06` adds R52; full units 4,231 passed / 18 existing skips, type/production/PWA build pass, lint 4,104 existing warnings / 0 errors, canonical four-spec browser gate 112 passed / 2 existing skips / 0 failures / 0 retries (one worker, 13.9 min). All 14 new R52 and 8 R44 browser cases pass. Exact input/environment/TDD/receipt identities: [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md); R44 history: [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md). R52/R44 have no remaining implementation/local-acceptance work. Their tasks stay active for owner-managed integration; no hosted CI, main integration or deployment is claimed. The owner authorizes continued work/pushes on the fixed chat branch and handles integration. **Active R78 / acceptance pending:** [task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md). Three complete gates failed (127/2/1, 126/2/2, 126/2/2; passed/skipped/failed, zero retries). Recovery and native pan/pinch now pass both projects. Latest failures: desktop spotlight click and mobile label repeat-hold. Test-only quiet-target geometry / focused-button readiness passes all 20 focused cases and 6 critical repetitions; full lint 4,103 / 0. Publish and rerun all 130. No complete gate active; no inferred acceptance or production source change. Do not wait for integration or disconnect the connector. `HANDOFF.md` is archival.
+85 requirements: **83 verified, 1 implemented, 1 partial, 0 missing**. Latest locally accepted runtime `94d842891264e1ee762694205c625eb3c1a7aca9` adds R78 on top of verified R44/R52. Full units **4,250 passed / 18 existing skips**; type/production/PWA build **17.30 s / 408 entries**; full lint **4,103 warnings / 0 errors**. Fourth canonical four-spec gate on test-only head `94fb7261975fa3131c24e59ebd3ea8e6cb35bdf9`: **128 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries**, one worker, 17.7 min, all 130 cases; all 16 R78 cases pass. All 103 frozen inputs matched after exit; selected documentation/validation regressions 61 passed. [Task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md) retains exact identities, failed-gate history and limits; [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md) / [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) retain R52/R44 history. These three tasks remain active **only for owner-managed integration**, not local implementation/acceptance. No browser acceptance process is active. **Continue R75 → R83** on the owner-authorized fixed chat branch without waiting for main. No PR, hosted CI, integration, deployment or physical-device claim; connector remains untouched. `HANDOFF.md` is archival.
 
 ## Documents
 
@@ -113,7 +113,7 @@ documentation: R78 candidate implementation and corrective TDD; R44/R52 locally 
 | TMS-R75 | partial | unit "composes even social-card sizes and escapes active text" | Social cards are square, portrait, story and landscape 1920×1080; no 1200×630 card |
 | TMS-R76 | verified | e2e "reflows and preserves 44px essential targets across phone, tablet, laptop, and desktop widths", "narrow sheets keep the pitch first and return focus" | |
 | TMS-R77 | verified | e2e "player actions from right-click and the touch button lock the same player" | |
-| TMS-R78 | partial | unit "opens once at 500 ms with the original CSS-pixel anchor and no input mutation", "keeps 150 seeded offscreen anchors and oversized panels within their viewport" | Candidate controller/hook/radial dialog share seven R77 callbacks; 19 new units and full units/build/lint pass. Three failed complete browser gates retained in task 7d78. Stronger autosave/native sequencing/target readiness now pass 20 focused cases + 6 critical repetitions. Fresh four-spec / 130-case acceptance pending |
+| TMS-R78 | verified | unit "opens once at 500 ms with the original CSS-pixel anchor and no input mutation", "keeps 150 seeded offscreen anchors and oversized panels within their viewport"; e2e "TMS-R78 real touch holds a nonselected player through SVG updates without release edits", "TMS-R78 retains native page scrolling and mobile pinch without arming actions", "TMS-R78 radial controls reflow at edges zoom large text and dark theme with focus return" | Runtime `94d8428`, test head `94fb726`; 19 new units / 150 seeded geometry samples and all 16 R78 browser cases. Complete canonical gate 128 passed / 2 existing skips / 0 failures / 0 retries; full units 4,250 / 18 skips, type/build/lint pass. Shared seven R77 callbacks, native pan/pinch and deliberate activation, bounded accessible radial/compact UI; no schema/dependency change. Owner integrates; task 7d78 |
 | TMS-R79 | verified | unit "keeps a tooltip inside the viewport and flips it above a low anchor"; e2e "help, shortcuts, and tooltips stay available without taking over text fields" | |
 | TMS-R80 | verified | unit "keeps shortcut chords unique and described", "ignores authoring shortcuts while typing, on controls, or under an open overlay"; e2e "reduced motion steps playback instead of animating it" | |
 | TMS-R81 | verified | e2e "has no serious or critical accessibility violations in the tactical workspace" | |
@@ -124,10 +124,9 @@ documentation: R78 candidate implementation and corrective TDD; R44/R52 locally 
 
 ## Open work
 
-1. TMS-R78 — acceptance pending; publish the 20-pass / 6-repeat target-readiness correction and rerun all 130 canonical cases; preserve assertions/timeouts/retries and reuse unchanged full units/build.
-2. TMS-R75 — 1200×630 card.
-3. TMS-R83 — focused offline route test.
-4. Owner-managed integration of locally verified R44/R52; tasks 4d44/7d52 stay active until actual integration evidence exists. This does not block the ordered product work above.
+1. TMS-R75 — 1200×630 card.
+2. TMS-R83 — focused offline route test.
+3. Owner-managed integration of locally verified R44/R52/R78; tasks 4d44/7d52/7d78 stay active until actual integration evidence exists. This is nonblocking operational work, not missing implementation or acceptance.
 
 ## Known limitations
 
@@ -136,6 +135,8 @@ documentation: R78 candidate implementation and corrective TDD; R44/R52 locally 
 - Analysis and tracking use authored or imported samples only.
 
 ## Verification evidence
+
+- timestamp: 2026-10-26T00:44:56Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: automated local gates; same-agent evidence review | documentation: R78 runtime `94d842891264e1ee762694205c625eb3c1a7aca9`, test head `94fb7261975fa3131c24e59ebd3ea8e6cb35bdf9`: full units 4,250 passed / 18 existing skips, type/production/PWA build 17.30 s / 408 entries, full lint 4,103 warnings / 0 errors. Complete canonical four-spec browser gate 128 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries, one worker, 1,061,809.562 ms; all 16 R78 cases pass, all 103 frozen inputs verified after exit. Fresh selected regressions 61 passed. Task 7d78 preserves genuine RED/corrective/failure history, plan/input/result digests and local-environment limits. Owner integrates; no hosted/deployment/physical-device or all-four-nudge UI claim. R75 then R83 proceed without waiting.
 
 - timestamp: 2026-10-25T19:39:08Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: automated local gates and same-agent evidence review | documentation: R52 runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06`, records-only browser head `bd5d5b306de510f2203e90a6355740dae730db9c`. Units 4,231 passed / 18 existing skips; type/production/PWA build passed (14.48 s, 408 precache entries); full lint 4,104 warnings / 0 errors. Canonical four owned browser specs 112 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries, one worker, 13.9 min. All 16 new units, 150 seeded geometry cases and 14 new browser cases pass, including exact captured level-camera canvas restoration; R44's 8 cases also pass. Local Chromium 153.0.8010.0, not hosted CI. Task 7d52 preserves initial RED and corrective regressions, exact digests, environment and archived receipts; owner handles integration, connector untouched.
 
@@ -150,6 +151,8 @@ documentation: R78 candidate implementation and corrective TDD; R44/R52 locally 
 - 2026-10-05, `expand/tactical-matchboard-studio` from `main` @ `6c991e75`: `pnpm tool:check tactical-matchboard-studio --base origin/main` 75/85, no errors.
 
 ## Change log
+
+- timestamp: 2026-10-26T00:44:56Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: local unit/type/build/lint/canonical-browser gates | documentation: R78 verified locally after the complete frozen 130-case gate, not from aggregated focused runs. Touch-only 500 ms / 10 px hold shares canonical R77 actions, prevents initiating-release activation, cancels invalid/interrupted targets and preserves native pan/pinch and legacy equivalents. Radial/compact layout retains native controls, focus and viewport bounds; no dependency/schema/config change. R75 and R83 remain.
 
 - timestamp: 2026-10-25T19:39:08Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: local unit/type/build/lint/owned-browser/docs gates | documentation: R52 verified locally. Selected visible player views follow the shared sampled pose with configured eye height/FOV, orbit lock, self-actor omission, native fractional-input validation, accessible fallback and explicit canonical snapshots. Captured level cameras are no longer tilted by the orbit polar boundary. No dependency/schema/config change or prior verified-row reduction. R78 is next; owner integrates R44/R52.
 

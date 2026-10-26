@@ -3,10 +3,10 @@ tool: tactical-matchboard-studio
 doc: handoff
 status: active
 updated: 2026-10-25
-timestamp: 2026-10-26T00:24:33Z
+timestamp: 2026-10-26T00:44:56Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent); automated focused gates; full R78 acceptance pending
-documentation: R78 candidate implementation and corrective TDD; R44/R52 locally accepted
+validator: Arena.ai Agent Mode (same agent); automated local gates and evidence review
+documentation: R78 locally accepted; R75 then R83; owner-managed integration pending
 tracker: src/tools/tactics/TRACKER.md
 ---
 
@@ -17,11 +17,10 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 ## Current state
 
 - Repository: `AahPlexX/inmotools`; canonical branch: `main`.
-- Latest locally verified requirement: **TMS-R52 first-person player camera**, runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06` on `arena/981e49e9-inmotools`; R44 remains verified on the combined source. Neither is integrated to main or deployed at final remote inspection.
-- Latest local gates: **4,231 units passed / 18 existing skips**; type/production/PWA build passed (14.48 s, 408 precache entries); lint **4,104 existing warnings / 0 errors**; canonical four owned browser specs **112 passed / 2 existing skips / 0 failures / 0 retries**, one worker, 13.9 min. Browser execution head `bd5d5b306de510f2203e90a6355740dae730db9c` changes only records.
-- R52 [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md) and R44 [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) remain active solely for owner-managed integration, not local implementation/acceptance.
-- R78 remains partial on frozen runtime `94d842891264e1ee762694205c625eb3c1a7aca9` (4,250 full units / 18 existing skips, type/build and full lint pass). Three complete gates have failed: 127/2/1, 126/2/2, 126/2/2 (passed/skipped/failed), zero retries. Latest recovery and native scroll/pinch checks pass both projects; latest failures are desktop spotlight click and mobile repeated label hold after legacy Escape. Target-geometry readiness is being tightened without changing final assertions/timeouts/runtime. Complete 20-case R78/legacy/squad focused batch passes (3.0 min), plus 3 mobile label-hold and 3 desktop squad/spotlight repetitions; full lint 4,103 / 0. No complete gate is active. Task 7d78 preserves exact receipts and resume steps.
-- Next implementation: **R78 acceptance**, then R75, R83. The owner permits continuing/pushing on the fixed chat branch and handles integration; no need to wait for main. No PR was opened, other branch pushed or connector disconnected. Prior hosted dispatch was refused HTTP 403; no hosted validation was initiated in this continuation and no hosted acceptance/deployment is claimed.
+- Latest locally verified requirement: **TMS-R78 touch long-press/radial actions**, runtime `94d842891264e1ee762694205c625eb3c1a7aca9` on `arena/981e49e9-inmotools`, including verified R44/R52. Main remains `fa4dd291c0b4556025a5e58f21e4268f6748e9d6` at the latest fetch; no main integration or deployment is claimed.
+- Latest gates: **4,250 full units passed / 18 existing skips**; type/production/PWA build **17.30 s / 408 entries**; lint **4,103 warnings / 0 errors**. Fourth canonical four-spec browser gate on published test-only head `94fb7261975fa3131c24e59ebd3ea8e6cb35bdf9`: **128 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries**, 130 cases, one worker, 17.7 min. All 16 R78 cases pass; all 103 frozen source/build/evaluator/environment inputs reverified after exit. Selected documentation/validation regressions: **61 passed**.
+- R78 [task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md), R52 [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md) and R44 [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) remain active solely for owner-managed integration; no local implementation/acceptance work remains for them. Task 7d78 retains failed-gate history and exact evidence/limits. No browser gate is active.
+- Next implementation: **R75 1200×630 card**, then **R83 focused first-visit/offline/reload proof**. Do not reopen accepted R78/R44/R52/R07/R31/R33/PDF. The owner permits continuing/pushing on the fixed chat branch and handles integration; no need to wait for main. No PR was opened, other branch pushed or connector disconnected. Prior hosted dispatch was refused HTTP 403; no hosted/deployment acceptance is inferred.
 - Last main-integrated requirement remains **TMS-R31 scene transitions**.
 - R31 runtime `a528848db0c030c9010aa6fbb76061627077a084`, GREEN workflow `39195675178` / job `117877804494`, integration merge `15e3133a228a67e0913d8c01ea6b8e727896dc8a`.
 - R31 gate: 4,195 units passed / 18 skipped; TypeScript and production/PWA build passed (5.68 s); four owned Tactical browser specs: 90 passed / 2 existing duplicate mobile skips / 0 failures / no reported retries (3.5 min). Completed task: `.tasks/items/T-tactical-matchboard-studio-20261019-b823.md`.
@@ -32,7 +31,7 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 
 ## Exact next action
 
-**Finish TMS-R78 acceptance before R75/R83** on `arena/981e49e9-inmotools`. Read [task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md): third full gate ended 126 passed / 2 existing skips / 2 failures / 0 retries, not accepted. Current test-only target readiness correction passes all 20 focused R78/legacy/squad cases, then 3 mobile label-hold and 3 desktop squad/spotlight repetitions; full lint 4,103 / 0 passes. Publish it, refresh inputs and rerun all four canonical specs / 130 cases with one worker. Preserve original assertions, timeouts and zero retries. Runtime `94d8428`, full units/build and evaluator/config/dependencies are unchanged, so reuse matching unit/build evidence. No complete browser gate is active. Owner integration remains nonblocking; no PR, other branch push, connector disconnection, hosted/deployment claim or reopening completed R44/R52/R31/R07/PDF.
+**Implement TMS-R75, then TMS-R83** on `arena/981e49e9-inmotools`. R78 is locally verified; do not repeat its completed gates or infer main integration. Follow the authoritative spec/tracker and create a current task/contract before coding R75. Preserve existing social-card sizes and browser-only exports, add the missing exact 1200×630 card with TDD and dependency-selected acceptance. Read task 7d78 for matching baseline unit/build/browser evidence and environment recovery if needed. Owner integration is nonblocking; no PR, other branch push, connector disconnection, hosted/deployment claim or reopening completed work.
 
 R31 stores optional exit-transition metadata on scenes. It uses the outgoing scene’s final interval and the next contiguous scene’s arrival; cut is instantaneous, fade passes through the background, and morph pairs visible roster identities plus the ball. Unpaired actors/props/drawings switch halfway. Existing projects without settings retain their selected-scene behavior. Setting a transition enables chapter playback at the existing playhead. Preview, 3D, animated SVG/HTML/video/frame exports and PDF contact sheets share the sampled chapter. Animated exports retain boundary/transition samples within the existing cap or report an insufficient cap. Clone/split/reorder/join and JSON import have transition-specific regression coverage; no dependency or schema bump was added.
 
@@ -65,13 +64,19 @@ Standalone HTML advances at retained frame timestamps and encoded video uses aut
 - Preview settings are ephemeral; explicit Capture camera at playhead stores only existing position/target/FOV/time fields with normal undo/redo, same-time replacement and JSON interchange, never a live player binding. There is no schema/dependency/config change.
 - On-demand rendering, visibility suspension and disposal remain; WebGL failure leaves the 2D editor and accessible camera description usable. Real WebGL rendering/lock, sampled motion, keyboard/touch, native invalid/fractional inputs, 320/390/768 px reflow, 44 px controls, scoped axe and fallback are covered.
 
+## Verified R78 behavior
+
+- A primary touch on a visible player token/label in Move mode, pan off/no overlay, selects immediately; holding 500 ms within 10 CSS px opens the same seven native R77 controls. Locked players remain eligible. Mouse/pen/extra contacts, non-player surfaces and drawing/pan modes do not start holds.
+- Stable-board capture survives selection-driven SVG replacement. Movement beyond slop and release/cancel/capture loss/extra contact/scroll/resize/blur/hidden tab, sampled project/pose/scene/mode/selection/overlay changes and unmount invalidate pending work. Latest sampled visibility is authoritative; no second playback clock or rebinding.
+- Initiating release cannot click through, edit, activate a command, retarget focus or reopen the legacy dialog. Subsequent deliberate native activation uses shared canonical actions/history/lock/status. Gesture/menu state stays out of JSON/ZIP/history; replacement dismisses, unavailable original targets disable commands while Close remains usable.
+- Native labelled modal controls retain focus trapping/Escape/no-scroll return, keyboard/button/right-click/Shift+F10 access, 44 px targets and 8 px visual-viewport gutters. The ring becomes compact/scrollable for short/narrow/enlarged text layouts; light/dark, forced colors and reduced motion remain. Native pan/pinch is preserved; no schema, dependency, backend or workflow change. Defaults are owner-overridable, not browser standards.
+
 ## Remaining ordered product work
 
-1. TMS-R78 — touch long-press/radial actions.
-2. TMS-R75 — missing 1200×630 social card.
-3. TMS-R83 — focused offline route proof.
+1. TMS-R75 — missing 1200×630 social card.
+2. TMS-R83 — focused first-visit/offline/reload route proof.
 
-R44/R52 integration is owner-managed operational follow-up, not unimplemented product work or a blocker to continuing the ordered requirements.
+R44/R52/R78 integration is owner-managed operational follow-up, not unimplemented product work or a blocker to continuing.
 
 ## Verified R33 behavior
 
@@ -82,6 +87,8 @@ R44/R52 integration is owner-managed operational follow-up, not unimplemented pr
 - Focused browser acceptance proves the board shows outgoing/incoming state immediately before the authored millisecond and swaps them at the authored millisecond.
 
 ## Verification history relevant to continuation
+
+- timestamp: 2026-10-26T00:44:56Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: automated local gates; same-agent evidence review | documentation: R78 runtime `94d842891264e1ee762694205c625eb3c1a7aca9`, test head `94fb7261975fa3131c24e59ebd3ea8e6cb35bdf9`: full units 4,250 passed / 18 existing skips, type/production/PWA build 17.30 s / 408 entries, full lint 4,103 warnings / 0 errors. Complete canonical four-spec browser gate 128 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries, one worker, 1,061,809.562 ms; all 16 R78 cases pass, all 103 frozen inputs verified after exit. Fresh selected regressions 61 passed. Task 7d78 preserves genuine RED/corrective/failure history, plan/input/result digests and local-environment limits. Owner integrates; no hosted/deployment/physical-device or all-four-nudge UI claim. R75 then R83 proceed without waiting.
 
 - timestamp: 2026-10-25T19:39:08Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: automated local gates and same-agent evidence review | documentation: R52 contract `2fab4c5`, initial RED `09cc22e`, runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06`, final full owned gate on records-only head `bd5d5b306de510f2203e90a6355740dae730db9c`. Units 4,231 passed / 18 existing skips; build/type/lint passed; 112 browser cases passed / 2 existing skips / 0 failures / 0 retries. Seven new desktop/mobile contracts include byte-identical captured/restored level-camera canvases; 16 new units include 150 seeded pitch/heading cases and finite-coordinate precision guards. Task 7d52 contains exact receipts, archived failure evidence and source/evaluator/environment digests. No hosted CI/main/deployment success is inferred; owner handles integration and connector remains untouched.
 
