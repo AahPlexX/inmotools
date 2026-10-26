@@ -1645,12 +1645,31 @@ test('help, shortcuts, and tooltips stay available without taking over text fiel
   expect(tipBox.bottom).toBeLessThanOrEqual(tipBox.viewportHeight + 1);
 });
 
+async function stableTacticalTargetBox(target: Locator) {
+  let box = await target.boundingBox();
+  let stableSince = Date.now();
+  await expect.poll(async () => {
+    const next = await target.boundingBox();
+    if (!next) { box = null; stableSince = Date.now(); return false; }
+    const previous = box;
+    if (!previous || (['x', 'y', 'width', 'height'] as const).some(key => Math.abs(next[key] - previous[key]) > 0.25)) {
+      stableSince = Date.now();
+    }
+    box = next;
+    return Date.now() - stableSince >= 100;
+  }).toBe(true);
+  if (!box) throw new Error('Touch target is unavailable.');
+  return box;
+}
+
 async function beginTacticalTouch(page: Page, target: Locator) {
   await target.scrollIntoViewIfNeeded(); await target.click({ trial: true });
-  const box = await target.boundingBox(); if (!box) throw new Error('Touch target is unavailable.');
-  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   const session: CDPSession = await page.context().newCDPSession(page);
   await session.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
+  // Focus restoration and smooth scrolling can outlast the trial click. Sample
+  // quiet geometry after emulation, before dispatching the real touch contact.
+  const box = await stableTacticalTargetBox(target);
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 7, ...point }] });
   let ended = false;
   return {
@@ -2002,7 +2021,10 @@ test('scales a squad and authors tokens, props, elevation, spotlight, ghosts, an
   await stage.getByRole('button', { name: 'Author elevation' }).click();
   await expect(page.locator('[data-tactical-kind="elevation-trajectory"]')).toHaveCount(1);
 
-  await stage.getByRole('button', { name: 'Add spotlight' }).click();
+  const spotlight = stage.getByRole('button', { name: 'Add spotlight' });
+  await spotlight.focus();
+  await stableTacticalTargetBox(spotlight);
+  await spotlight.click();
   await expect(page.locator('[data-annotation-kind="spotlight"]')).toHaveCount(1);
 
   await stage.getByRole('button', { name: 'Record onion-skin positions' }).click();
