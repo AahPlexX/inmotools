@@ -7,9 +7,9 @@ state: active
 branch: arena/981e49e9-inmotools
 created: 2026-10-25
 updated: 2026-10-25
-timestamp: 2026-10-26T00:48:56Z
+timestamp: 2026-10-26T00:53:00Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: repository/source inspection; matching accepted baseline; automated focused units
+validator: automated unit/browser RED; same-agent source review
 documentation: R75 contract before implementation; R78 accepted, R83 follows
 ---
 
@@ -23,7 +23,7 @@ Continue the authoritative ordered product work: R78 → R75 → R83. Standing q
 
 ## Resume here
 
-**R75 contract specified; implementation not started.** R78 is locally verified and must not reopen. Baseline documentation head `76bf683d538a2fa56b452ff896a4f2c2aa28fe97`; unchanged accepted runtime `94d842891264e1ee762694205c625eb3c1a7aca9`, test head `94fb7261975fa3131c24e59ebd3ea8e6cb35bdf9`. Existing export units **22 passed** (2.25 s); complete matching four-spec browser baseline **128 passed / 2 existing skips / 0 failures / 0 retries**, including both existing professional-export cases. Next add and run genuine RED unit/browser contracts for OpenGraph, then the smallest preset addition, GREEN and affected acceptance. After focused R75 GREEN, R83 may be batched in the same tool checkpoint under the validation policy; neither pending requirement is promoted from focused evidence alone. Owner integration does not block work.
+**R75 genuine RED recorded, runtime unchanged.** Contract head `9356d71`; new five-case unit addition yields **26 passed / 1 expected failure** (2.63 s), missing `opengraph` preset. Both new native browser cases fail on the absent OpenGraph option (2 expected failures / 0 retries); later download/dimension/content/reflow assertions are not reached at RED. Traces protected before overwrite in `/home/user/.cache/inmotools-validation/receipts/r75-opengraph-red/`; manifest `/home/user/inmotools-r75-red-artifacts.sha256`, logs/results `/home/user/inmotools-r75-red-*`. Existing baseline 22 export units and complete 128-pass / 2-skip R78 browser gate remain accepted. **Next add the one preset to `export-types.ts`, run GREEN units/build and both new browser cases.** R75 remains partial until complete affected acceptance; after focused GREEN, specify/test R83 and batch the final frozen four-spec checkpoint. Owner integration is nonblocking.
 
 ## Workflow and scope
 
@@ -50,3 +50,5 @@ Continue the authoritative ordered product work: R78 → R75 → R83. Standing q
 ## Log
 
 - timestamp: 2026-10-26T00:48:56Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: source/rules/requirement inspection and automated baseline | documentation: R78 acceptance closure committed/pushed as `76bf683d538a2fa56b452ff896a4f2c2aa28fe97`; all 130 browser cases accounted for (128 pass / 2 existing skips / zero failures/retries), 103 frozen inputs matched after exit, 61 selected validators and docs pass. R75 baseline `tests/unit/tactics-export.test.ts`: **22 passed**, 2.25 s, `/home/user/inmotools-r75-baseline-units.log`. Existing export browser cases passed in that same complete baseline. Native preset selector, SVG framing and PNG/JPEG/WebP write probes already exist; only the requested preset is missing. This contract precedes new tests and runtime edits. No external-standard claim or unrelated reopening.
+
+- timestamp: 2026-10-26T00:53:00Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: genuine automated RED on unchanged runtime | documentation: Unit **26 passed / 1 failed** of 27, exactly missing `SOCIAL_STILL_PRESETS.opengraph`; all four newly explicit legacy-dimension regressions pass. Browser **2 expected failures**, both projects, missing labelled native option, original 5 s expect / default test timeout / zero retries. No compile/module-resolution failure or runtime edit. Later assertions were not reached. All six failure artifacts copied before another browser run; manifest and raw JSON/log paths above. Commit this RED before the preset implementation.

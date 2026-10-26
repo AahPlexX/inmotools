@@ -7,10 +7,10 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-26T00:48:56Z
+timestamp: 2026-10-26T00:53:00Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated local gates and evidence review
-documentation: R78 locally accepted; R75 contract specified before code; R83 next
+documentation: R78 accepted; R75 genuine RED before runtime; R83 next
 ---
 
 # Tactical Matchboard Studio — spec
@@ -230,6 +230,8 @@ No function was compared between an ML and a non-ML method.
 - TMS-R31: defaults are cut, fade-through-background and roster-matched player/ball morph; snapshots freeze at transition start and arrival, unpaired players/props/drawings switch halfway, and an optional exit transition enables chapter playback. Owner may override.
 
 ## Change log
+
+- timestamp: 2026-10-26T00:53:00Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: automated unit/browser RED | documentation: R75 new exact-size unit and both native option/download contracts fail only because OpenGraph is absent; all four legacy-dimension regressions pass. Contract `9356d71` precedes tests; runtime still unchanged. Task 7d75 protects traces and records unexecuted later RED assertions.
 
 - timestamp: 2026-10-26T00:48:56Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: source and approved-requirement inspection; baseline export units | documentation: R75 contract expanded before tests/runtime in task 7d75: exact local SVG/decoded-PNG dimensions, native selector, legacy shape/default and non-mutating/passive composition. R78 remains locally verified; R75 remains partial and R83 implemented pending acceptance.
 

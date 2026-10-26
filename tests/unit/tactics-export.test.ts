@@ -335,6 +335,34 @@ describe('Tactical export metadata', () => {
 });
 
 describe('Tactical still, social, and standalone export', () => {
+  it('composes a passive exact 1200 by 630 OpenGraph card without mutating the project', () => {
+    const project = coachingProject();
+    const before = structuredClone(project);
+    expect(SOCIAL_STILL_PRESETS).toHaveProperty('opengraph', {
+      id: 'opengraph', label: 'OpenGraph 1200×630', width: 1200, height: 630,
+    });
+    const svg = composeSocialCardSvg(project, 'scene-1', 'opengraph');
+    expect(svg).toMatch(/^<svg [^>]*width="1200" height="630" viewBox="0 0 1200 630"/);
+    expect(svg).toContain('Pressing shape');
+    expect(svg).toContain('Harbor FC');
+    expect(svg).toContain('data-tactical-kind="player"');
+    expect(svg).toContain('&lt;/script&gt;');
+    expect(svg).not.toMatch(/<script\b|<foreignObject\b|\bonload\s*=/i);
+    expect(project).toEqual(before);
+  });
+
+  it.each([
+    ['square', 1080, 1080],
+    ['portrait', 1080, 1350],
+    ['story', 1080, 1920],
+    ['landscape', 1920, 1080],
+  ] as const)('preserves the %s social card at %i by %i', (id, width, height) => {
+    expect(SOCIAL_STILL_PRESETS[id]).toMatchObject({ width, height });
+    const svg = composeSocialCardSvg(coachingProject(), 'scene-1', id);
+    expect(svg).toMatch(new RegExp(`^<svg [^>]*width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"`));
+    expect(svg).toContain('data-tactical-kind="player"');
+  });
+
   it('composes even social-card sizes and escapes active text', () => {
     const project = coachingProject();
     const svg = composeSocialCardSvg(project, 'scene-1', 'square');

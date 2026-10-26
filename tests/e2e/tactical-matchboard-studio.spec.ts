@@ -205,6 +205,71 @@ test('downloads the current board as SVG', async ({ page }) => {
   expect(text).toContain('data-tactical-kind="player"');
 });
 
+test('TMS-R75 downloads exact 1200 by 630 OpenGraph SVG and PNG cards', async ({ page }) => {
+  await page.getByText('Professional export', { exact: true }).click();
+  const shape = page.getByRole('combobox', { name: 'Social card shape', exact: true });
+  await expect(shape).toHaveValue('landscape');
+  await expect(shape.locator('option[value="opengraph"]')).toHaveText('OpenGraph 1200×630');
+  await expect(shape.locator('option')).toHaveCount(5);
+  await shape.selectOption('opengraph');
+  await expect(shape).toHaveValue('opengraph');
+  await page.getByLabel('Export title', { exact: true }).fill('Link preview & press');
+  await page.getByRole('button', { name: 'Save export metadata', exact: true }).click();
+  await expect(page.locator('.status-line')).toContainText('Export metadata saved.');
+
+  const vector = await readDownload(page, 'Download social card');
+  expect(vector.filename).toBe('link-preview-press-opengraph.svg');
+  const svg = vector.bytes.toString('utf8');
+  expect(svg).toContain('Link preview &amp; press');
+  const vectorDocument = await page.evaluate((source) => {
+    const parsed = new DOMParser().parseFromString(source, 'image/svg+xml');
+    return {
+      errors: parsed.querySelectorAll('parsererror').length,
+      width: parsed.documentElement.getAttribute('width'),
+      height: parsed.documentElement.getAttribute('height'),
+      viewBox: parsed.documentElement.getAttribute('viewBox'),
+      players: parsed.querySelectorAll('[data-tactical-kind="player"]').length,
+    };
+  }, svg);
+  expect(vectorDocument).toMatchObject({ errors: 0, width: '1200', height: '630', viewBox: '0 0 1200 630' });
+  expect(vectorDocument.players).toBeGreaterThan(0);
+
+  await expect(page.getByRole('button', { name: 'Download PNG', exact: true })).toBeVisible();
+  const png = await readDownload(page, 'Download PNG');
+  expect(png.filename).toBe('link-preview-press-opengraph.png');
+  expect(Array.from(png.bytes.subarray(0, 8))).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const image = await page.evaluate(async (encoded) => {
+    const bytes = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('PNG inspection needs a 2D canvas.');
+      context.drawImage(bitmap, 0, 0);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      let contentSamples = 0;
+      for (let offset = 0; offset < pixels.length; offset += 64) {
+        if (pixels[offset] !== pixels[0] || pixels[offset + 1] !== pixels[1] || pixels[offset + 2] !== pixels[2]) contentSamples += 1;
+      }
+      return { width: bitmap.width, height: bitmap.height, contentSamples };
+    } finally {
+      bitmap.close();
+    }
+  }, png.bytes.toString('base64'));
+  expect(image).toMatchObject({ width: 1200, height: 630 });
+  expect(image.contentSamples).toBeGreaterThan(1000);
+
+  for (const width of [320, 390, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    await shape.scrollIntoViewIfNeeded();
+    const box = await shape.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  }
+});
+
 test('touch pointer selection and movement use the same non-drag workflow', async ({ page }) => {
   await dispatchTouchPoint(page, 'player');
   await expect(page.locator('.tactical-board')).toHaveAttribute('data-selected-token', 'token-1');
