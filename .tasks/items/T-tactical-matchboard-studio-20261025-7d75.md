@@ -7,10 +7,10 @@ state: active
 branch: arena/981e49e9-inmotools
 created: 2026-10-25
 updated: 2026-10-25
-timestamp: 2026-10-26T01:11:54Z
+timestamp: 2026-10-26T01:35:29Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: automated unit/type/build/lint/focused-browser/selected regression gates; same-agent review
-documentation: R78 accepted; R75/R83 focused GREEN; final frozen canonical browser gate pending
+documentation: R78 accepted; first combined gate failed 131/2/1; R75/R83 acceptance pending
 ---
 
 # TMS-R75 exact 1200×630 OpenGraph card
@@ -23,7 +23,7 @@ Continue the authoritative ordered product work: R78 → R75 → R83. Standing q
 
 ## Resume here
 
-**R75 implemented; full affected acceptance pending.** Genuine RED committed/pushed as `b80d6de`: 1 missing-preset unit failure / 2 absent-option browser failures, protected below. The runtime delta is exactly one preset entry in `export-types.ts`; no new UI/edit/schema/dependency/config pathway. GREEN export units **27 passed** (2.05 s), type/production/PWA build **16.08 s / 408 entries**, new R75 plus existing professional-export browser cases **4 passed / 0 failures / 0 retries**, one worker, 42.3 s. Both SVG/XML and real decoded nonblank PNG are 1200×630; native default/options, escaping, four legacy sizes, 320/390/768 px no overflow / 44 px controls pass. Full repository units **4,255 passed / 18 existing skips** (181.29 s) and full lint **4,103 warnings / 0 errors** (14.0 s) now pass on `7419a52`; only the final frozen canonical browser checkpoint remains pending. R83 native first-visit/offline-reload/new-tab focused proof now passes both projects without app/config changes. Next freeze and run the canonical combined four-spec acceptance gate. R78 stays accepted; owner integration remains nonblocking.
+**First combined gate FAILED**, exit 1: **131 passed / 2 existing skips / 1 failure / 0 retries**, all 134 cases / one worker, 1,106,765.111 ms. R75/R83 all four new cases and all 16 R78 cases pass in that complete run. The failure is the unchanged desktop ball-flight contract: after its summary click the preset select remained hidden until the original 30 s test deadline. Cause is not yet proven; no production R07 defect or reopening is inferred. **No browser run is active.** All **671** frozen repository/build/environment files matched after exit at `2026-10-26T01:34:09Z`. Failure artifacts are protected under `/home/user/.cache/inmotools-validation/receipts/r75-r83-complete-first/`; list/JSON `/home/user/inmotools-r75-r83-browser.log` and `...-browser-results.json`. Neither R75 nor R83 is verified yet. Next inspect the preserved trace and native panel setup, correct only a proven/readiness test issue without changing original feature assertions/timeouts/retries or production R07, then focused proof and a fresh complete canonical gate. Matching 4,255 units / 18 skips and type/build 16.08 s / 408 remain reusable for test/Markdown-only work. Owner integration is nonblocking; no PR, other branch/main push or connector action.
 
 ## Workflow and scope
 
