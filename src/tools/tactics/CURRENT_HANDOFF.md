@@ -3,10 +3,10 @@ tool: tactical-matchboard-studio
 doc: handoff
 status: active
 updated: 2026-10-25
-timestamp: 2026-10-26T00:53:00Z
+timestamp: 2026-10-26T00:56:18Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent); automated local gates and evidence review
-documentation: R78 accepted; R75 genuine RED before runtime; R83 next
+validator: automated focused unit/type/build/browser gates; same-agent review
+documentation: R78 accepted; R75 focused GREEN, complete acceptance pending; R83 next
 tracker: src/tools/tactics/TRACKER.md
 ---
 
@@ -31,7 +31,7 @@ This file is the current continuation record. `HANDOFF.md` is a preserved histor
 
 ## Exact next action
 
-**Implement TMS-R75, then TMS-R83** on `arena/981e49e9-inmotools`. R78 is locally verified; do not repeat its completed gates or infer main integration. R75 contract is now recorded before code in [task 7d75](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d75.md). Genuine RED is recorded: 1 missing-preset unit failure and 2 absent-native-option browser failures, runtime unchanged. Implement the minimal preset, then GREEN units/build/browser. Follow the authoritative spec/tracker. Preserve existing social-card sizes and browser-only exports, add the missing exact 1200×630 card with TDD and dependency-selected acceptance. Read task 7d78 for matching baseline unit/build/browser evidence and environment recovery if needed. Owner integration is nonblocking; no PR, other branch push, connector disconnection, hosted/deployment claim or reopening completed work.
+**R75 focused GREEN; specify/test R83, then final combined acceptance** on `arena/981e49e9-inmotools`. [Task 7d75](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d75.md) records genuine RED `b80d6de` and the one-entry preset implementation. All 27 export units, type/build (16.08 s / 408 entries) and four new/legacy export browser cases pass (42.3 s / zero retries), including decoded nonblank 1200×630 PNGs on both projects. R75 is implemented, **not yet verified**; repository units/full lint and canonical browser checkpoint are pending. R83 already has site precache implementation, but needs its first-visit/offline/reload contract and real browser proof before promotion. Preserve all existing assertions/timeouts/retries. R78 and prior completed work stay verified; owner integration does not block this ordered batch. No PR, other branch push, policy bypass, connector disconnection or hosted/deployment claim.
 
 R31 stores optional exit-transition metadata on scenes. It uses the outgoing scene’s final interval and the next contiguous scene’s arrival; cut is instantaneous, fade passes through the background, and morph pairs visible roster identities plus the ball. Unpaired actors/props/drawings switch halfway. Existing projects without settings retain their selected-scene behavior. Setting a transition enables chapter playback at the existing playhead. Preview, 3D, animated SVG/HTML/video/frame exports and PDF contact sheets share the sampled chapter. Animated exports retain boundary/transition samples within the existing cap or report an insufficient cap. Clone/split/reorder/join and JSON import have transition-specific regression coverage; no dependency or schema bump was added.
 
@@ -73,7 +73,7 @@ Standalone HTML advances at retained frame timestamps and encoded video uses aut
 
 ## Remaining ordered product work
 
-1. TMS-R75 — missing 1200×630 social card.
+1. TMS-R75 — implemented / focused GREEN; final affected acceptance pending.
 2. TMS-R83 — focused first-visit/offline/reload route proof.
 
 R44/R52/R78 integration is owner-managed operational follow-up, not unimplemented product work or a blocker to continuing.

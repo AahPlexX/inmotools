@@ -7,17 +7,17 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-26T00:53:00Z
+timestamp: 2026-10-26T00:56:18Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent); automated local gates and evidence review
-documentation: R78 accepted; R75 genuine RED before runtime; R83 next
+validator: automated focused unit/type/build/browser gates; same-agent review
+documentation: R78 accepted; R75 focused GREEN, complete acceptance pending; R83 next
 ---
 
 # Tactical Matchboard Studio — tracker
 
 ## Resume here
 
-85 requirements: **83 verified, 1 implemented, 1 partial, 0 missing**. Latest locally accepted runtime `94d842891264e1ee762694205c625eb3c1a7aca9` adds R78 on top of verified R44/R52. Full units **4,250 passed / 18 existing skips**; type/production/PWA build **17.30 s / 408 entries**; full lint **4,103 warnings / 0 errors**. Fourth canonical four-spec gate on test-only head `94fb7261975fa3131c24e59ebd3ea8e6cb35bdf9`: **128 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries**, one worker, 17.7 min, all 130 cases; all 16 R78 cases pass. All 103 frozen inputs matched after exit; selected documentation/validation regressions 61 passed. [Task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md) retains exact identities, failed-gate history and limits; [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md) / [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) retain R52/R44 history. These three tasks remain active **only for owner-managed integration**, not local implementation/acceptance. No browser acceptance process is active. **R75 contract specified:** [task 7d75](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d75.md), Genuine RED: missing preset (1 unit + 2 browser failures); minimal runtime addition next. Continue R75 → R83 on the owner-authorized fixed chat branch without waiting for main. No PR, hosted CI, integration, deployment or physical-device claim; connector remains untouched. `HANDOFF.md` is archival.
+85 requirements: **83 verified, 2 implemented, 0 partial, 0 missing**. Latest locally accepted runtime `94d842891264e1ee762694205c625eb3c1a7aca9` adds R78 on top of verified R44/R52. Full units **4,250 passed / 18 existing skips**; type/production/PWA build **17.30 s / 408 entries**; full lint **4,103 warnings / 0 errors**. Fourth canonical four-spec gate on test-only head `94fb7261975fa3131c24e59ebd3ea8e6cb35bdf9`: **128 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries**, one worker, 17.7 min, all 130 cases; all 16 R78 cases pass. All 103 frozen inputs matched after exit; selected documentation/validation regressions 61 passed. [Task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md) retains exact identities, failed-gate history and limits; [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md) / [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) retain R52/R44 history. These three tasks remain active **only for owner-managed integration**, not local implementation/acceptance. No browser acceptance process is active. **R75 implemented / acceptance pending:** [task 7d75](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d75.md), genuine RED `b80d6de` then one preset entry; 27 export units, type/build (16.08 s / 408), four focused new/legacy export browser cases pass, no retries. Final repository units/lint and canonical browser gate pending. Specify/test R83 next, then one ordered combined checkpoint on the owner-authorized fixed chat branch without waiting for main. No PR, hosted CI, integration, deployment or physical-device claim; connector remains untouched. `HANDOFF.md` is archival.
 
 ## Documents
 
@@ -110,7 +110,7 @@ documentation: R78 accepted; R75 genuine RED before runtime; R83 next
 | TMS-R72 | verified | unit "writes a vector PDF package with info-dictionary fields and a metadata sidecar" | |
 | TMS-R73 | verified | unit "embeds accented Latin, Greek, and Cyrillic player and team names with the Unicode font"; unit "draws an uncovered glyph as a question mark and still builds the PDF"; unit "keeps an unsupported roster name in metadata.json while the page shows ?"; unit "keeps two basic-Latin teams on Helvetica with no Teams line and no Unicode font load"; unit "loads the Unicode font only for drawn text, not for tags or another scene"; unit "ends a roster longer than six lines with a visible +N more marker"; unit "prints a team with no name without a leading colon"; unit "composes a decomposed accent before drawing it"; unit "reports a Unicode font load failure and still builds the PDF with ?" | Page text outside basic Latin uses the bundled Noto Sans subset. A letter that subset does not include is shown as ?. metadata.json keeps the original letter and every team and player name |
 | TMS-R74 | verified | unit "composes even social-card sizes and escapes active text", "builds a local playback document that cannot execute notes as HTML", "offers a raster format only after the browser write probe succeeds and checks the file signature"; e2e "downloads the current board as SVG"; e2e "authors chapter fades and morphs with matching preview and standalone export" | Standalone playback uses authored millisecond spacing between retained frames |
-| TMS-R75 | partial | unit "composes even social-card sizes and escapes active text" | Social cards are square, portrait, story and landscape 1920×1080; no 1200×630 card |
+| TMS-R75 | implemented | unit "composes a passive exact 1200 by 630 OpenGraph card without mutating the project"; e2e "TMS-R75 downloads exact 1200 by 630 OpenGraph SVG and PNG cards" | One new preset, 27 export units/type/build and 4 focused new/legacy export browser cases pass; actual SVG/PNG dimensions/content, legacy defaults/sizes and narrow controls covered. Final full affected acceptance pending; task 7d75 |
 | TMS-R76 | verified | e2e "reflows and preserves 44px essential targets across phone, tablet, laptop, and desktop widths", "narrow sheets keep the pitch first and return focus" | |
 | TMS-R77 | verified | e2e "player actions from right-click and the touch button lock the same player" | |
 | TMS-R78 | verified | unit "opens once at 500 ms with the original CSS-pixel anchor and no input mutation", "keeps 150 seeded offscreen anchors and oversized panels within their viewport"; e2e "TMS-R78 real touch holds a nonselected player through SVG updates without release edits", "TMS-R78 retains native page scrolling and mobile pinch without arming actions", "TMS-R78 radial controls reflow at edges zoom large text and dark theme with focus return" | Runtime `94d8428`, test head `94fb726`; 19 new units / 150 seeded geometry samples and all 16 R78 browser cases. Complete canonical gate 128 passed / 2 existing skips / 0 failures / 0 retries; full units 4,250 / 18 skips, type/build/lint pass. Shared seven R77 callbacks, native pan/pinch and deliberate activation, bounded accessible radial/compact UI; no schema/dependency change. Owner integrates; task 7d78 |
@@ -124,7 +124,7 @@ documentation: R78 accepted; R75 genuine RED before runtime; R83 next
 
 ## Open work
 
-1. TMS-R75 — task 7d75 genuine RED (1 unit + 2 browser failures); add minimal preset, GREEN, then ordered R83/affected checkpoint.
+1. TMS-R75 — implemented/focused GREEN; task 7d75, final affected acceptance pending. R83 contract/tests next, then combined frozen gate.
 2. TMS-R83 — focused offline route test.
 3. Owner-managed integration of locally verified R44/R52/R78; tasks 4d44/7d52/7d78 stay active until actual integration evidence exists. This is nonblocking operational work, not missing implementation or acceptance.
 

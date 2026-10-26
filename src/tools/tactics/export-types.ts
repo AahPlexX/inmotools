@@ -12,6 +12,7 @@ export const SOCIAL_STILL_PRESETS = {
   portrait: { id: 'portrait', label: 'Portrait 4:5', width: 1080, height: 1350 },
   story: { id: 'story', label: 'Story 9:16', width: 1080, height: 1920 },
   landscape: { id: 'landscape', label: 'Landscape 16:9', width: 1920, height: 1080 },
+  opengraph: { id: 'opengraph', label: 'OpenGraph 1200×630', width: 1200, height: 630 },
 } as const;
 
 export type SocialStillPresetId = keyof typeof SOCIAL_STILL_PRESETS;
