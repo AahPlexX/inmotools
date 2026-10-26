@@ -7,10 +7,10 @@ state: active
 branch: arena/981e49e9-inmotools
 created: 2026-10-25
 updated: 2026-10-25
-timestamp: 2026-10-26T01:05:10Z
+timestamp: 2026-10-26T01:11:54Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: automated focused unit/type/build/browser gates; same-agent review
-documentation: R78 accepted; R75 unit/build/lint GREEN; R83 contract before new test; browser batch pending
+validator: automated unit/type/build/lint/focused-browser/selected regression gates; same-agent review
+documentation: R78 accepted; R75/R83 focused GREEN; final frozen canonical browser gate pending
 ---
 
 # TMS-R75 exact 1200×630 OpenGraph card
@@ -23,7 +23,7 @@ Continue the authoritative ordered product work: R78 → R75 → R83. Standing q
 
 ## Resume here
 
-**R75 implemented; full affected acceptance pending.** Genuine RED committed/pushed as `b80d6de`: 1 missing-preset unit failure / 2 absent-option browser failures, protected below. The runtime delta is exactly one preset entry in `export-types.ts`; no new UI/edit/schema/dependency/config pathway. GREEN export units **27 passed** (2.05 s), type/production/PWA build **16.08 s / 408 entries**, new R75 plus existing professional-export browser cases **4 passed / 0 failures / 0 retries**, one worker, 42.3 s. Both SVG/XML and real decoded nonblank PNG are 1200×630; native default/options, escaping, four legacy sizes, 320/390/768 px no overflow / 44 px controls pass. Full repository units **4,255 passed / 18 existing skips** (181.29 s) and full lint **4,103 warnings / 0 errors** (14.0 s) now pass on `7419a52`; only the final frozen canonical browser checkpoint remains pending. Next specify R83 first-online-visit → installed precache → offline reload, then batch complete acceptance in order under the validation policy. R78 stays accepted; owner integration remains nonblocking.
+**R75 implemented; full affected acceptance pending.** Genuine RED committed/pushed as `b80d6de`: 1 missing-preset unit failure / 2 absent-option browser failures, protected below. The runtime delta is exactly one preset entry in `export-types.ts`; no new UI/edit/schema/dependency/config pathway. GREEN export units **27 passed** (2.05 s), type/production/PWA build **16.08 s / 408 entries**, new R75 plus existing professional-export browser cases **4 passed / 0 failures / 0 retries**, one worker, 42.3 s. Both SVG/XML and real decoded nonblank PNG are 1200×630; native default/options, escaping, four legacy sizes, 320/390/768 px no overflow / 44 px controls pass. Full repository units **4,255 passed / 18 existing skips** (181.29 s) and full lint **4,103 warnings / 0 errors** (14.0 s) now pass on `7419a52`; only the final frozen canonical browser checkpoint remains pending. R83 native first-visit/offline-reload/new-tab focused proof now passes both projects without app/config changes. Next freeze and run the canonical combined four-spec acceptance gate. R78 stays accepted; owner integration remains nonblocking.
 
 ## Workflow and scope
 
@@ -56,3 +56,5 @@ Continue the authoritative ordered product work: R78 → R75 → R83. Standing q
 - timestamp: 2026-10-26T00:56:18Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: automated focused GREEN unit/type/build/browser gates; same-agent source review | documentation: Genuine RED `b80d6de` precedes the **one-line** `opengraph` preset addition. GREEN 27 export units / 0 failures (2.05 s), type/production/PWA build 16.08 s / 408 entries; four selected browser cases / 0 failures / 0 retries (42.3 s), including unchanged professional export on both projects. New test checks XML parsing/root/viewBox, players/escaped title, PNG signature and real browser bitmap dimensions/nonbackground content, default/5 options, 320/390/768 px no document overflow and ≥44 px select. Receipts `/home/user/inmotools-r75-green-{units,build,browser}.log`, browser JSON `/home/user/inmotools-r75-green-browser-results.json`. Dist index SHA-256 `a496747fdfebef0a0e3fbddb758d7b4539e3495aa625d2f182f0fc247b589933`; SW `7047726926b6e7f0c7b5aa2d43afb9810e2a95ebbe17da0d692549e323edb6d6`. Full required checkpoint pending; R75 is implemented, not verified yet.
 
 - timestamp: 2026-10-26T01:05:10Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: full repository units and full lint on candidate `7419a52` | documentation: **4,255 passed / 18 existing skips**, 380 passed / 2 skipped files, 181.29 s; full lint **4,103 warnings / 0 errors**, 14.0 s. Runtime, unit/evaluator/config/dependency/build inputs remain unchanged. R83 contract is now recorded in [task 7d83](T-tactical-matchboard-studio-20261025-7d83.md) before its new test. Reuse matching units/build for the pending test/Markdown-only batch; do not promote either requirement before the complete frozen four-spec gate.
+
+- timestamp: 2026-10-26T01:11:54Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: ordered R83 focused proof and final preflight static/selected regressions | documentation: R83 **2 browser cases passed / zero retries**, no runtime/config/dependency change. Latest full lint **4,103 warnings / 0 errors** (16.3 s); selected seven-file regressions **61 passed** (4.70 s). Matching runtime `7419a52` full units 4,255 / 18 skips and type/build remain valid. Freeze both new browser contracts for one canonical four-spec gate before either requirement is promoted.

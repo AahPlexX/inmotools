@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import path from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { expect, test } from '@playwright/test';
-import type { CDPSession, Locator, Page } from '@playwright/test';
+import type { CDPSession, Locator, Page, Response as PlaywrightResponse } from '@playwright/test';
 import { buildBeginnerTacticalProject, placeMirroredOpposition } from '../../src/tools/tactics/workspace-engine';
 import { exportTacticalProjectJson, importTacticalProjectJson } from '../../src/tools/tactics/project-io';
 import { addTimelineSubstitutionEvent } from '../../src/tools/tactics/substitution-engine';
@@ -52,6 +52,64 @@ test.beforeEach(async ({ page }) => {
   });
   await page.goto('./#/tools/tactical-matchboard-studio');
   await expect(page.getByTestId('suite-workspace').getByRole('heading', { name: 'Tactical Matchboard Studio', exact: true })).toBeVisible();
+});
+
+test('TMS-R83 reopens the precached tactical workspace on offline reload and a new tab', async ({ page, context }) => {
+  const route = page.url();
+  expect(await page.evaluate(() => 'serviceWorker' in navigator)).toBe(true);
+  const scope = await page.evaluate(async () => (await navigator.serviceWorker.ready).scope);
+  expect(scope).toBe(new URL('./', route).href);
+  await expect.poll(() => page.evaluate(async () => (await navigator.serviceWorker.ready).active?.state ?? null)).toBe('activated');
+
+  const toolResponses: Array<{ url: string; fromWorker: boolean }> = [];
+  const recordResponse = (response: PlaywrightResponse) => {
+    if (/\/assets\/TacticalMatchboardWorkspace-[^/]+\.(?:js|css)(?:[?#]|$)/.test(response.url())) {
+      toolResponses.push({ url: response.url(), fromWorker: response.fromServiceWorker() });
+    }
+  };
+  page.on('response', recordResponse);
+  let offlineTab: Page | undefined;
+  try {
+    await context.setOffline(true);
+    expect(await page.evaluate(() => navigator.onLine)).toBe(false);
+    const reload = await page.reload();
+    expect(reload?.ok()).toBe(true);
+    expect(reload?.fromServiceWorker()).toBe(true);
+    await expect(page.getByTestId('suite-workspace').getByRole('heading', { name: 'Tactical Matchboard Studio', exact: true })).toBeVisible();
+    await expect(board(page).locator('[data-tactical-kind="player"]').first()).toBeVisible();
+    expect(await page.evaluate(() => navigator.onLine)).toBe(false);
+
+    const before = await coordinateInput(page, 'X').inputValue();
+    await page.getByRole('button', { name: 'Move player right', exact: true }).click();
+    expect(Number(await coordinateInput(page, 'X').inputValue())).toBeGreaterThan(Number(before));
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(coordinateInput(page, 'X')).toHaveValue(before);
+    const svg = await readDownload(page, 'Export SVG');
+    expect(svg.filename).toBe('training-board.svg');
+    expect(svg.bytes.toString('utf8')).toContain('data-tactical-kind="player"');
+
+    offlineTab = await context.newPage();
+    offlineTab.on('response', recordResponse);
+    const reopened = await offlineTab.goto(route);
+    expect(reopened?.ok()).toBe(true);
+    expect(reopened?.fromServiceWorker()).toBe(true);
+    await expect(offlineTab.getByTestId('suite-workspace').getByRole('heading', { name: 'Tactical Matchboard Studio', exact: true })).toBeVisible();
+    expect(await offlineTab.evaluate(() => navigator.onLine)).toBe(false);
+    await expect(board(offlineTab).locator('[data-tactical-kind="player"]').first()).toBeVisible();
+    await expect(offlineTab.getByRole('button', { name: 'Export SVG', exact: true })).toBeEnabled();
+    expect(toolResponses.some(response => /\.js(?:[?#]|$)/.test(response.url) && response.fromWorker)).toBe(true);
+    await test.info().attach('tactical-offline-service-worker-responses', {
+      body: JSON.stringify(toolResponses), contentType: 'application/json',
+    });
+  } finally {
+    page.off('response', recordResponse);
+    offlineTab?.off('response', recordResponse);
+    try {
+      await context.setOffline(false);
+    } finally {
+      await offlineTab?.close();
+    }
+  }
 });
 
 test('catalog route exposes the local tactical workspace', async ({ page }) => {

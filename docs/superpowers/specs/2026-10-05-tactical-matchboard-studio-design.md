@@ -7,10 +7,10 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-26T01:05:10Z
+timestamp: 2026-10-26T01:11:54Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: automated focused unit/type/build/browser gates; same-agent review
-documentation: R78 accepted; R75 unit/build/lint GREEN; R83 contract before new test; browser batch pending
+validator: automated unit/type/build/lint/focused-browser/selected regression gates; same-agent review
+documentation: R78 accepted; R75/R83 focused GREEN; final frozen canonical browser gate pending
 ---
 
 # Tactical Matchboard Studio — spec
@@ -230,6 +230,8 @@ No function was compared between an ML and a non-ML method.
 - TMS-R31: defaults are cut, fade-through-background and roster-matched player/ball morph; snapshots freeze at transition start and arrival, unpaired players/props/drawings switch halfway, and an optional exit transition enables chapter playback. Owner may override.
 
 ## Change log
+
+- timestamp: 2026-10-26T01:11:54Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: native focused offline browser acceptance and final lint/selected regressions | documentation: R83 existing implementation passes both new first-visit/offline-reload/new-tab cases (33.6 s / zero retries) immediately; no fabricated RED or production/config/cache injection. SW navigation/tool-code provenance, players/edit/undo/SVG and cleanup are covered. R75/R83 await the complete frozen canonical gate; matching full units 4,255 / 18, type/build 16.08 s / 408, latest lint 4,103 / 0 and 61 selected regressions pass.
 
 - timestamp: 2026-10-26T01:05:10Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: source/generated-worker and pinned API review; matching baseline gates | documentation: R83 contract specified before its new test in task 7d83: real first online visit/native activation, network-offline reload/fresh client, SW response provenance and usable local board controls/SVG download. No fake caches/network, automatic-restoration promise or shared config edit. R75 runtime `7419a52` passes full 4,255 units / 18 skips and lint 4,103 / 0; final combined browser acceptance pending.
 
