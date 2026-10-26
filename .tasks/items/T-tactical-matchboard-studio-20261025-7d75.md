@@ -7,10 +7,10 @@ state: active
 branch: arena/981e49e9-inmotools
 created: 2026-10-25
 updated: 2026-10-25
-timestamp: 2026-10-26T01:45:19Z
+timestamp: 2026-10-26T01:52:52Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: automated unit/type/build/lint/focused-browser/selected regression gates; same-agent review
-documentation: R78 accepted; test-only panel readiness GREEN; R75/R83 complete acceptance still pending
+documentation: R78 accepted; fixture-local readiness GREEN; fresh complete R75/R83 acceptance pending
 ---
 
 # TMS-R75 exact 1200×630 OpenGraph card
@@ -23,7 +23,7 @@ Continue the authoritative ordered product work: R78 → R75 → R83. Standing q
 
 ## Resume here
 
-**Test-only native panel readiness correction passes focused checks; second complete gate not yet started.** First full attempt remains **FAILED 131/2/1** (passed/existing skips/failed), zero retries, protected below; all R75/R83 and R78 cases passed. The unchanged desktop ball-flight test's native summary stayed closed. Trace showed unstable/out-of-viewport geometry; exact browser cause remains unproven. Setup now waits observed Build completion, focuses and settles the summary before the **same real mouse click**, then asserts native `open=true`. The 100 ms / 0.25 px helper is shared by extraction with a **byte-identical body**, preserving R78 behavior. No feature/production R07, app/unit/build/config/dependency, original feature assertion, timeout/retry/skip or CSS/clock change. **6 critical browser cases passed** (both ball-flight, R78 repeated token/label hold and squad/spotlight), 1.4 min / zero retries; **3 intentional desktop ball-flight repetitions passed**, 48.2 s, not retries. Full lint **4,103 warnings / 0 errors**, 14.0 s / 1296 files; selected regressions **61 passed**, 4.49 s. No browser process active. Next publish the fixture correction, freeze fresh 104 repository / unchanged 547 compiled / 21 environment inputs and run the complete canonical 134 cases. Reuse matching runtime `7419a52` full 4,255 units / 18 skips and type/build 16.08 s / 408; no aggregate/focused acceptance claim.
+**Fixture-local readiness correction is GREEN; second complete gate not started.** First complete attempt stays **FAILED 131/2/1** (pass/existing skip/fail), zero retries, all 671 original inputs verified/protected. R75/R83 and R78 cases passed; the old desktop ball-flight native panel stayed closed. Setup now awaits observed Build completion, focuses/settles the same real summary click and asserts native open state; exact browser cause is still unproven, no production R07 reopening. A temporary cross-spec helper at `35d693c` triggered conservative test-graph full fallback, so **no gate was started and the plan was not overridden**. Keep readiness private in the affected ball-flight fixture; Studio is restored byte-for-byte to its all-passing first complete input `569748e`. Same 100 ms / 0.25 px sampler body, unchanged original feature assertions/default timeout/retries/skips and no app/unit/build/config/dependency change. Actual local form: **2 browser cases passed** (both projects, 33.3 s), **3 intentional desktop repetitions passed** (50.0 s), zero retries; full lint **4,103 warnings / 0 errors** (13.8 s / 1295 files), selected regressions **61 passed** (4.46 s). Working-tree scope resolves the four owned specs again; final canonical plan must be regenerated after publication. Next publish, freeze 103 repository / unchanged 547 compiled / 21 environment inputs and run all 134 cases, one worker / zero retries. Reuse runtime `7419a52` full 4,255 units / 18 skips and type/build 16.08 s / 408. No browser process active and no aggregate/focused acceptance claim.
 
 ## Workflow and scope
 

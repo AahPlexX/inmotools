@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { stableTacticalTargetBox } from './tactical-target';
+import type { Locator } from '@playwright/test';
 
 test('authors ball flight presets with metre-based elevation, undo, manual editing and responsive controls', async ({ page }) => {
   page.on('dialog', dialog => { void dialog.accept(); });
@@ -67,3 +67,20 @@ test('authors ball flight presets with metre-based elevation, undo, manual editi
   const accessibility = await new AxeBuilder({ page }).include('form[aria-describedby="ball-flight-note"]').withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
   expect(accessibility.violations).toEqual([]);
 });
+
+async function stableTacticalTargetBox(target: Locator) {
+  let box = await target.boundingBox();
+  let stableSince = Date.now();
+  await expect.poll(async () => {
+    const next = await target.boundingBox();
+    if (!next) { box = null; stableSince = Date.now(); return false; }
+    const previous = box;
+    if (!previous || (['x', 'y', 'width', 'height'] as const).some(key => Math.abs(next[key] - previous[key]) > 0.25)) {
+      stableSince = Date.now();
+    }
+    box = next;
+    return Date.now() - stableSince >= 100;
+  }).toBe(true);
+  if (!box) throw new Error('Touch target is unavailable.');
+  return box;
+}

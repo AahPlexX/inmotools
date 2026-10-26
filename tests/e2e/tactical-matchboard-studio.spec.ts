@@ -4,7 +4,6 @@ import path from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { expect, test } from '@playwright/test';
 import type { CDPSession, Locator, Page, Response as PlaywrightResponse } from '@playwright/test';
-import { stableTacticalTargetBox } from './tactical-target';
 import { buildBeginnerTacticalProject, placeMirroredOpposition } from '../../src/tools/tactics/workspace-engine';
 import { exportTacticalProjectJson, importTacticalProjectJson } from '../../src/tools/tactics/project-io';
 import { addTimelineSubstitutionEvent } from '../../src/tools/tactics/substitution-engine';
@@ -1768,6 +1767,23 @@ test('help, shortcuts, and tooltips stay available without taking over text fiel
   expect(tipBox.right).toBeLessThanOrEqual(tipBox.viewportWidth + 1);
   expect(tipBox.bottom).toBeLessThanOrEqual(tipBox.viewportHeight + 1);
 });
+
+async function stableTacticalTargetBox(target: Locator) {
+  let box = await target.boundingBox();
+  let stableSince = Date.now();
+  await expect.poll(async () => {
+    const next = await target.boundingBox();
+    if (!next) { box = null; stableSince = Date.now(); return false; }
+    const previous = box;
+    if (!previous || (['x', 'y', 'width', 'height'] as const).some(key => Math.abs(next[key] - previous[key]) > 0.25)) {
+      stableSince = Date.now();
+    }
+    box = next;
+    return Date.now() - stableSince >= 100;
+  }).toBe(true);
+  if (!box) throw new Error('Touch target is unavailable.');
+  return box;
+}
 
 async function beginTacticalTouch(page: Page, target: Locator) {
   await target.scrollIntoViewIfNeeded(); await target.click({ trial: true });
