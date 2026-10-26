@@ -7,10 +7,10 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-26T00:56:18Z
+timestamp: 2026-10-26T01:05:10Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: automated focused unit/type/build/browser gates; same-agent review
-documentation: R78 accepted; R75 focused GREEN, complete acceptance pending; R83 next
+documentation: R78 accepted; R75 unit/build/lint GREEN; R83 contract before new test; browser batch pending
 ---
 
 # Tactical Matchboard Studio — spec
@@ -193,7 +193,7 @@ Out of scope:
 | TMS-R80 | Keyboard shortcuts and transport (play, step, nudge) that ignore text fields; reduced motion steps instead of animating (formerly 54) | Typing in a field does not trigger shortcuts |
 | TMS-R81 | No serious or critical axe violations in the workspace | axe on the route reports none |
 | TMS-R82 | Workspace follows the site-wide theme chosen in the site header (light, dark, system) and passes the colour-contrast check in dark | With Dark chosen, axe colour-contrast on the workspace passes |
-| TMS-R83 | Works offline after the first visit (installed PWA precache) | Load once, go offline, reload; the workspace opens |
+| TMS-R83 | Cached Tactical workspace works offline after the first online visit and native PWA precache activation, including local core edits/exports | Real context-offline reload and fresh-tab navigation are fulfilled by the service worker; workspace/players, precision edit/undo and SVG download work with no synthetic cache/network setup |
 | TMS-R84 | Standalone playback and local video review pause while the tab is hidden; 3D rendering pauses while hidden | Hide the tab during playback; playback stops and does not resume by itself |
 | TMS-R85 | A realistic 11v11 session samples, draws and analyses within the performance budget | The 11v11 audit session stays within its time budget |
 
@@ -230,6 +230,8 @@ No function was compared between an ML and a non-ML method.
 - TMS-R31: defaults are cut, fade-through-background and roster-matched player/ball morph; snapshots freeze at transition start and arrival, unpaired players/props/drawings switch halfway, and an optional exit transition enables chapter playback. Owner may override.
 
 ## Change log
+
+- timestamp: 2026-10-26T01:05:10Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: source/generated-worker and pinned API review; matching baseline gates | documentation: R83 contract specified before its new test in task 7d83: real first online visit/native activation, network-offline reload/fresh client, SW response provenance and usable local board controls/SVG download. No fake caches/network, automatic-restoration promise or shared config edit. R75 runtime `7419a52` passes full 4,255 units / 18 skips and lint 4,103 / 0; final combined browser acceptance pending.
 
 - timestamp: 2026-10-26T00:56:18Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: focused unit/type/build/browser GREEN | documentation: R75 implemented by one preset entry after genuine RED `b80d6de`. 27 export units, type/build (16.08 s / 408) and 4 focused browser cases pass; both actual SVG and nonblank decoded PNG are 1200×630 with legacy/default/reflow regressions. Final acceptance is pending; R83 may follow in the ordered same-tool checkpoint.
 

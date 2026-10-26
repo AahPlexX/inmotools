@@ -7,17 +7,17 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-26T00:56:18Z
+timestamp: 2026-10-26T01:05:10Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: automated focused unit/type/build/browser gates; same-agent review
-documentation: R78 accepted; R75 focused GREEN, complete acceptance pending; R83 next
+documentation: R78 accepted; R75 unit/build/lint GREEN; R83 contract before new test; browser batch pending
 ---
 
 # Tactical Matchboard Studio — tracker
 
 ## Resume here
 
-85 requirements: **83 verified, 2 implemented, 0 partial, 0 missing**. Latest locally accepted runtime `94d842891264e1ee762694205c625eb3c1a7aca9` adds R78 on top of verified R44/R52. Full units **4,250 passed / 18 existing skips**; type/production/PWA build **17.30 s / 408 entries**; full lint **4,103 warnings / 0 errors**. Fourth canonical four-spec gate on test-only head `94fb7261975fa3131c24e59ebd3ea8e6cb35bdf9`: **128 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries**, one worker, 17.7 min, all 130 cases; all 16 R78 cases pass. All 103 frozen inputs matched after exit; selected documentation/validation regressions 61 passed. [Task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md) retains exact identities, failed-gate history and limits; [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md) / [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) retain R52/R44 history. These three tasks remain active **only for owner-managed integration**, not local implementation/acceptance. No browser acceptance process is active. **R75 implemented / acceptance pending:** [task 7d75](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d75.md), genuine RED `b80d6de` then one preset entry; 27 export units, type/build (16.08 s / 408), four focused new/legacy export browser cases pass, no retries. Final repository units/lint and canonical browser gate pending. Specify/test R83 next, then one ordered combined checkpoint on the owner-authorized fixed chat branch without waiting for main. No PR, hosted CI, integration, deployment or physical-device claim; connector remains untouched. `HANDOFF.md` is archival.
+85 requirements: **83 verified, 2 implemented, 0 partial, 0 missing**. Latest locally accepted runtime `94d842891264e1ee762694205c625eb3c1a7aca9` adds R78 on top of verified R44/R52. Full units **4,250 passed / 18 existing skips**; type/production/PWA build **17.30 s / 408 entries**; full lint **4,103 warnings / 0 errors**. Fourth canonical four-spec gate on test-only head `94fb7261975fa3131c24e59ebd3ea8e6cb35bdf9`: **128 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries**, one worker, 17.7 min, all 130 cases; all 16 R78 cases pass. All 103 frozen inputs matched after exit; selected documentation/validation regressions 61 passed. [Task 7d78](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d78.md) retains exact identities, failed-gate history and limits; [task 7d52](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d52.md) / [task 4d44](../../../.tasks/items/T-tactical-matchboard-studio-20261025-4d44.md) retain R52/R44 history. These three tasks remain active **only for owner-managed integration**, not local implementation/acceptance. No browser acceptance process is active. **R75 implemented / acceptance pending:** [task 7d75](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d75.md), genuine RED `b80d6de` then one preset entry; 27 export units, type/build (16.08 s / 408), four focused new/legacy export browser cases pass, no retries. Runtime candidate `7419a52` now passes full 4,255 units / 18 skips and full lint 4,103 / 0; canonical browser gate pending. [R83 task 7d83](../../../.tasks/items/T-tactical-matchboard-studio-20261025-7d83.md) records its contract before new offline proof; then one ordered combined checkpoint on the owner-authorized fixed chat branch without waiting for main. No PR, hosted CI, integration, deployment or physical-device claim; connector remains untouched. `HANDOFF.md` is archival.
 
 ## Documents
 
@@ -125,7 +125,7 @@ documentation: R78 accepted; R75 focused GREEN, complete acceptance pending; R83
 ## Open work
 
 1. TMS-R75 — implemented/focused GREEN; task 7d75, final affected acceptance pending. R83 contract/tests next, then combined frozen gate.
-2. TMS-R83 — focused offline route test.
+2. TMS-R83 — task 7d83 contract specified; add real first-visit/offline-reload/fresh-tab browser proof before the combined gate.
 3. Owner-managed integration of locally verified R44/R52/R78; tasks 4d44/7d52/7d78 stay active until actual integration evidence exists. This is nonblocking operational work, not missing implementation or acceptance.
 
 ## Known limitations
