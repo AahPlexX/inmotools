@@ -7,10 +7,10 @@ state: active
 branch: arena/981e49e9-inmotools
 created: 2026-10-25
 updated: 2026-10-25
-timestamp: 2026-10-26T00:44:56Z
+timestamp: 2026-10-26T02:19:39Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent); automated local gates and evidence review
-documentation: R78 locally accepted; R75 then R83; owner-managed integration pending
+validator: automated full local unit/type/build/lint/canonical-browser/selected/docs gates; same-agent evidence review
+documentation: all 85 requirements locally verified; accepted receipts current; owner integration only
 ---
 
 # TMS-R78 touch long-press radial player actions
@@ -23,7 +23,11 @@ Standing quality/TDD/documentation/no-PR/metadata instructions are recorded verb
 
 ## Resume here
 
-R78 is **locally accepted**. Runtime `94d842891264e1ee762694205c625eb3c1a7aca9`, browser test head `94fb7261975fa3131c24e59ebd3ea8e6cb35bdf9`: fourth canonical four-spec gate **128 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries**, all 130 cases, one worker, 17.7 min, exit 0. All 16 R78 cases pass; all 103 frozen inputs reverified after exit. Matching full units **4,250 passed / 18 existing skips**, type/production/PWA build **17.30 s / 408 entries**, full lint **4,103 warnings / 0 errors** are reused without app/unit/evaluator/config/dependency/build changes. Selected seven-file documentation/validation regressions **61 passed / 0 failures** (5.04 s). No browser acceptance process remains active. Earlier failed gates/prototypes are historical evidence below, not acceptance. This task stays active **solely for owner-managed integration**; no further local R78 work is required. Continue R75 → R83 on the fixed chat branch without waiting for main. Do not disconnect the connector, open a PR or reopen R44/R52/R07/R31/R33/PDF.
+**R78 remains locally verified; task active solely for owner-managed integration.** Original R78 closure `76bf683` on runtime `94d842891264e1ee762694205c625eb3c1a7aca9` / browser head `94fb726` remains accepted: 128 passes / 2 skips and 4,250 units / 18 skips. Detailed failed/prototype/RED history stays below. All 16 R78 cases pass again in the later required R75/R83 checkpoint; no independent R78 reopening or production edit.
+
+**All 85 requirements are locally verified** on runtime `7419a52ff9b396aa168875bc80c77f57bc38c6b5`, browser test head `ff6f1821ea83e08677bc253afc1ddcbd687a3281`. Complete frozen four-spec gate **132 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries**, all 134 cases / one worker; all 671 repository/build/environment inputs matched after exit. Matching 4,255 full units / 18 existing skips, type/build (16.08 s / 408), full lint 4,103 warnings / 0 errors and selected regressions 61 pass. No browser process is active. Main remains `fa4dd291c0b4556025a5e58f21e4268f6748e9d6` at the latest fetch; no integration/hosted/deployment/physical-device claim.
+
+R75 and R83 are now locally verified too; no next R78/R75/R83 implementation or local gate remains. See [R83 task 7d83](T-tactical-matchboard-studio-20261025-7d83.md) for latest exact plan/671-file identities, result receipts and limitations. If current closure records are dirty, finish their docs/completion checks and publish; otherwise owner integration only, not a product-development blocker. Do not redo accepted gates for Markdown-only bookkeeping or reopen completed R44/R52/R78/R07/R31/R33/PDF. No PR, main/other-branch push, connector disconnection or hosted/deployment success is authorized or claimed.
 
 ## Source and workflow
 
@@ -135,3 +139,7 @@ R78 is **locally accepted**. Runtime `94d842891264e1ee762694205c625eb3c1a7aca9`,
 - Limits: local Playwright 1.63.0 / recovered Chromium 153.0.8010.0, not the official 153.0.8010.12 or hosted CI. No full-site browser, physical-device, all-four-nudge UI-coverage, hosted workflow, main integration or deployment claim. Owner handles integration, and this task stays active for that operational step only. No new PR, branch creation/switch/main push, policy bypass or connector action. **Next: R75, then R83.**
 
 - timestamp: 2026-10-26T00:44:56Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: docs synchronization/link checks, computed tool completion and diff review | documentation: `docs:sync` up to date; `docs:check` **195 standard documents**, no errors; `tool:check tactical-matchboard-studio --base origin/main` computes **83/85** (83 verified, 1 implemented, 1 partial), no regression/error; `git diff --check` passes. Only four Markdown records changed after the accepted test head. R78 local acceptance is complete; this task remains active only for owner integration. R75 is the immediate next product requirement.
+
+- timestamp: 2026-10-26T02:17:04Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: latest cumulative local acceptance and same-agent documentation review | documentation: R78 stays verified with no independent implementation reopening. Later runtime `7419a52` / test head `ff6f182` complete gate passes 132 / 2 existing skips, zero failures/retries; all prior R44/R52/R78 cases pass and all 671 inputs match. R75/R83 now verified; current tracker has 85 verified requirements. This is resume/integration bookkeeping only; task remains active for owner integration and original historical evidence is preserved.
+
+- timestamp: 2026-10-26T02:19:39Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: fresh selected/docs/computed-completion gates; same-agent final review | documentation: Closure regressions **61 passed / 7 files / 4.38 s** (`/home/user/inmotools-r75-r83-closure-validators.log`); docs sync up to date; **197 standard documents** pass; strict tool check computes **complete, 85/85 verified**, no prohibited/implemented/partial/missing rows. `/home/user/inmotools-r75-r83-closure-docs.log` records gates. Diff check passes; these eight related Markdown records are the only post-acceptance changes. Matching full 4,255 units / 18 skips, type/build, full lint and complete frozen 132-pass / 2-existing-skip / zero-failure/retry browser result are reused without relevant-input drift; no redundant full rerun. All five active tasks now represent only owner-managed integration. No PR, main/other-branch push, connector action, hosted/deployment/physical claim.

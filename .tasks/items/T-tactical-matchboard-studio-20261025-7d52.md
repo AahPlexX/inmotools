@@ -9,10 +9,10 @@ branch: arena/981e49e9-inmotools
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-25T19:41:33Z
+timestamp: 2026-10-26T02:19:39Z
 agent: Arena.ai Agent Mode (model name not exposed)
-validator: Arena.ai Agent Mode (same agent); automated local gates passed; no independent model review
-documentation: R52 local acceptance and owner-managed integration; R78 next
+validator: automated full local unit/type/build/lint/canonical-browser/selected/docs gates; same-agent evidence review
+documentation: all 85 requirements locally verified; accepted receipts current; owner integration only
 ---
 
 # TMS-R52 first-person player camera — integration pending
@@ -25,9 +25,11 @@ Standing quality, TDD, documentation, no-PR and metadata requirements remain rec
 
 ## Resume here
 
-**R52 is locally verified** on runtime `bedf5ece25cab5a541e8f09605b0dd52e7323f06`. Full repository units: **4,231 passed / 18 existing skips / 0 failed**; type/production/PWA build passes; full lint **4,104 existing warnings / 0 errors**. Complete canonical four-spec browser gate: **112 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries**, one worker, 13.9 min, on records-only execution head `bd5d5b306de510f2203e90a6355740dae730db9c`. All 16 new units (including 150 seeded geometry cases) and all 14 new browser cases pass; all 8 R44 cases also pass on the combined source. No runtime/test/dependency/evaluator change follows this accepted input.
+**R52 remains locally verified; task active solely for owner-managed integration.** Original R52 acceptance on `bedf5ece25cab5a541e8f09605b0dd52e7323f06`, 4,231 units / 18 skips and 112 browser passes / 2 skips, remains historical evidence below. All 14 R52 and 8 R44 cases pass in the latest cumulative gate; no R52 product or local acceptance work remains.
 
-Task remains `active` solely for **owner-managed integration**, not unfinished R52 implementation or local acceptance. The owner explicitly permits continued pushes/work on `arena/981e49e9-inmotools` and handles integration; no PR or main push is made. No hosted validation was initiated in this continuation; the prior workflow-dispatch HTTP 403 remains a recorded permission issue, not a claimed current hosted success. Do not close/disconnect the connector. **Next product work is R78**, then R75, R83; do not wait for main integration or reopen R44/R52/R31/R07/PDF work.
+**All 85 requirements are locally verified** on runtime `7419a52ff9b396aa168875bc80c77f57bc38c6b5`, browser test head `ff6f1821ea83e08677bc253afc1ddcbd687a3281`. Complete frozen four-spec gate **132 passed / 2 existing duplicate mobile skips / 0 failures / 0 retries**, all 134 cases / one worker; all 671 repository/build/environment inputs matched after exit. Matching 4,255 full units / 18 existing skips, type/build (16.08 s / 408), full lint 4,103 warnings / 0 errors and selected regressions 61 pass. No browser process is active. Main remains `fa4dd291c0b4556025a5e58f21e4268f6748e9d6` at the latest fetch; no integration/hosted/deployment/physical-device claim.
+
+R75 and R83 are now locally verified too; no next R78/R75/R83 implementation or local gate remains. See [R83 task 7d83](T-tactical-matchboard-studio-20261025-7d83.md) for latest exact plan/671-file identities, result receipts and limitations. If current closure records are dirty, finish their docs/completion checks and publish; otherwise owner integration only, not a product-development blocker. Do not redo accepted gates for Markdown-only bookkeeping or reopen completed R44/R52/R78/R07/R31/R33/PDF. No PR, main/other-branch push, connector disconnection or hosted/deployment success is authorized or claimed.
 
 ## Workflow and source identity
 
@@ -110,3 +112,7 @@ Task remains `active` solely for **owner-managed integration**, not unfinished R
 
 - timestamp: 2026-10-25T19:41:33Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: authoritative docs workflow unit set and selector/workflow regressions | documentation: Final records-only checkpoint: **61 tests passed / 0 skipped / 0 failed**, seven files, 3.24 s (cad-progress, sheets-wave-b, deployment-config, e2e-spec-selection, validation-dependencies, validation-runner, validation-workflows). Docs sync/check passes **194** standard documents; tool check against origin/main computes **82/85 verified, 1 implemented, 1 partial, 1 missing**, no errors/regressions. Runtime/test/dependency/evaluator digests still match accepted `bedf5ec`.
 - timestamp: 2026-10-25T19:41:33Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: unchanged manifest/lockfile and GitHub push notice | documentation: Existing repository debt is not a new R52 finding: full lint retains 4,104 warnings; GitHub still reports three default-branch dependency alerts (one high, two moderate). Dependency remediation is not performed or claimed in this Tactical-only change; exact package/lockfile pins remain unchanged.
+
+- timestamp: 2026-10-26T02:17:04Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: latest cumulative local acceptance and same-agent documentation review | documentation: R52 stays verified with no independent implementation reopening. Later runtime `7419a52` / test head `ff6f182` complete gate passes 132 / 2 existing skips, zero failures/retries; all prior R44/R52/R78 cases pass and all 671 inputs match. R75/R83 now verified; current tracker has 85 verified requirements. This is resume/integration bookkeeping only; task remains active for owner integration and original historical evidence is preserved.
+
+- timestamp: 2026-10-26T02:19:39Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: fresh selected/docs/computed-completion gates; same-agent final review | documentation: Closure regressions **61 passed / 7 files / 4.38 s** (`/home/user/inmotools-r75-r83-closure-validators.log`); docs sync up to date; **197 standard documents** pass; strict tool check computes **complete, 85/85 verified**, no prohibited/implemented/partial/missing rows. `/home/user/inmotools-r75-r83-closure-docs.log` records gates. Diff check passes; these eight related Markdown records are the only post-acceptance changes. Matching full 4,255 units / 18 skips, type/build, full lint and complete frozen 132-pass / 2-existing-skip / zero-failure/retry browser result are reused without relevant-input drift; no redundant full rerun. All five active tasks now represent only owner-managed integration. No PR, main/other-branch push, connector action, hosted/deployment/physical claim.
