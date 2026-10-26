@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { stableTacticalTargetBox } from './tactical-target';
 
 test('authors ball flight presets with metre-based elevation, undo, manual editing and responsive controls', async ({ page }) => {
   page.on('dialog', dialog => { void dialog.accept(); });
@@ -8,8 +9,13 @@ test('authors ball flight presets with metre-based elevation, undo, manual editi
   await setup.getByLabel('Pitch length (m)').fill('60');
   await setup.getByLabel('Pitch width (m)').fill('40');
   await page.getByRole('button', { name: 'Build board' }).click();
+  await expect(page.locator('.status-line').last()).toContainText(/^Built /);
   const stage = page.locator('.tactical-stage-panel');
-  await stage.locator('summary').click();
+  const summary = stage.locator('summary');
+  await summary.focus();
+  await stableTacticalTargetBox(summary);
+  await summary.click();
+  await expect(stage).toHaveJSProperty('open', true);
   const preset = stage.getByLabel('Ball flight preset');
   await expect(preset.locator('option')).toHaveText(['Ground', 'Driven', 'Lofted', 'Chipped']);
   await preset.selectOption('chipped');

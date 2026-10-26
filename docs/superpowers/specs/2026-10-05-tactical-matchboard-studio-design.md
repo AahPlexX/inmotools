@@ -7,10 +7,10 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-26T01:38:51Z
+timestamp: 2026-10-26T01:45:19Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: automated unit/type/build/lint/focused-browser/selected regression gates; same-agent review
-documentation: R78 accepted; R75/R83 combined gate failed 131/2/1, acceptance pending
+documentation: R78 accepted; test-only panel readiness GREEN; R75/R83 complete acceptance still pending
 ---
 
 # Tactical Matchboard Studio — spec
@@ -230,6 +230,8 @@ No function was compared between an ML and a non-ML method.
 - TMS-R31: defaults are cut, fade-through-background and roster-matched player/ball morph; snapshots freeze at transition start and arrival, unpaired players/props/drawings switch halfway, and an optional exit transition enables chapter playback. Owner may override.
 
 ## Change log
+
+- timestamp: 2026-10-26T01:45:19Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: focused native browser/static/selected regression proof | documentation: Test-only native panel readiness passes 6 critical desktop/mobile cases and 3 intentional desktop repetitions after the protected 131/2/1 complete failure. Await Build completion and focus/quiet bounds before the same mouse click; assert native panel open. Existing helper body is shared byte-identically, with no R78/default/threshold/assertion/timeout/retry/skip or production R07 change. Full lint 4,103 / 0, selected regressions 61 pass; fresh complete acceptance is pending.
 
 - timestamp: 2026-10-26T01:38:51Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: structured complete-run result and frozen-input verification | documentation: First R75/R83 complete four-spec gate on `569748e` failed **131 passed / 2 existing skips / 1 failure / zero retries** (134 cases, one worker). All new R75/R83 and all R78 cases pass; unchanged desktop ball-flight setup leaves its native details panel closed after a summary click. Trace logs repeated unstable/out-of-viewport target reports before dispatch; exact browser cause remains unproven. All 671 repository/build/environment hashes match after exit and failure artifacts are protected in task 7d83. Neither new row is verified; no production R07 reopening or assertion/timeout relaxation.
 
