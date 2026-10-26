@@ -7,10 +7,10 @@ status: active
 spec: docs/superpowers/specs/2026-10-05-tactical-matchboard-studio-design.md
 tracker: src/tools/tactics/TRACKER.md
 updated: 2026-10-25
-timestamp: 2026-10-26T00:44:56Z
+timestamp: 2026-10-26T00:48:56Z
 agent: Arena.ai Agent Mode (model name not exposed)
 validator: Arena.ai Agent Mode (same agent); automated local gates and evidence review
-documentation: R78 locally accepted; R75 then R83; owner-managed integration pending
+documentation: R78 locally accepted; R75 contract specified before code; R83 next
 ---
 
 # Tactical Matchboard Studio — spec
@@ -180,7 +180,7 @@ Out of scope:
 | TMS-R72 | Vector coaching PDF with contact sheet, packaged with a metadata sidecar (formerly 58) | Download the PDF ZIP; `coaching.pdf` contains vector pitch operators |
 | TMS-R73 | Coaching PDF page text keeps accented Latin, Greek, and Cyrillic letters. A letter the embedded Noto Sans subset does not include is shown as ? and the ZIP still downloads. metadata.json keeps the original letter, including every team and player name. A Teams line is printed only when a team or player name leaves basic Latin; past six lines it ends with (+N more in metadata.json), where N is the number of players left off plus 1 for each left-off team that has no players. If the font cannot load, the download still completes and the status says so (formerly part of 58) | A page with José, Αθήνα, Иванов, é, and ß shows those letters from the embedded Unicode font. A note with 字 shows ? on the page and 字 in metadata.json. A player named 字 shows ? on the page and 字 in metadata.json. Two basic-Latin teams print no Teams line and load no Unicode font |
 | TMS-R74 | Still export (SVG, PNG, JPEG, WebP after a write probe), social cards (square, portrait, story, landscape) and standalone HTML playback (formerly 59) | Download the board as SVG and PNG; the HTML plays without a remote script and advances retained frames at their authored millisecond times |
-| TMS-R75 | OpenGraph social card export at 1200×630 for link previews | Export the OpenGraph card; the image is 1200×630 |
+| TMS-R75 | Explicit OpenGraph 1200×630 social-card preset in the existing local SVG/probed-raster export flow, preserving the four existing shapes/default and escaped selected-scene content | Native selector exposes OpenGraph; downloaded SVG root/viewBox and decoded PNG are exactly 1200×630 with card content; all four legacy sizes, non-mutating composition and narrow-screen controls remain |
 
 ### Interaction, layout and accessibility
 
@@ -218,6 +218,7 @@ No function was compared between an ML and a non-ML method.
 
 ## Intent not recorded
 
+- TMS-R75: add `opengraph` / OpenGraph 1200×630 to the existing shape selector and SVG/probed-raster controls, preserving the current landscape default and all four legacy shapes. Reuse selected-scene framing and escaped metadata; selection/composition do not add canonical fields. This is a local image export, not automatic hosted link metadata or a claim that the protocol requires this size. Owner may override.
 - TMS-R78: a 500 ms primary touch hold in Move mode, within 10 CSS px Euclidean tolerance, opens the same seven R77 actions. Release does not activate; subsequent deliberate native button activation does. Interruption/visibility/scene/mode/selection changes cancel pending work. Use a radial ring where space/text size fits and a compact scrollable layout otherwise, with 8 px viewport gutters. Native pan/pinch and existing taps/keyboard/button/right-click access stay available; gesture/menu state is ephemeral. Owner may override.
 
 - TMS-R52: first-person is an ephemeral opt-in view from the current visible roster-backed player token, with a horizontal target 10 m ahead; eye height defaults to 1.7 m (editable 0.1–3 m), FOV to 70° (editable 10–120°). Fractional settings are valid; keyboard increments are 0.1 m / 5°. These are configured authoring values, not measured anatomy. No automatic selection switch on hiding, substitution or scene change; show the existing camera with an explanation until a valid player is selected. A preset exits player view, project replacement resets settings, and explicit camera capture stores only the existing position/target/FOV snapshot. Owner may override.
@@ -229,6 +230,8 @@ No function was compared between an ML and a non-ML method.
 - TMS-R31: defaults are cut, fade-through-background and roster-matched player/ball morph; snapshots freeze at transition start and arrival, unpaired players/props/drawings switch halfway, and an optional exit transition enables chapter playback. Owner may override.
 
 ## Change log
+
+- timestamp: 2026-10-26T00:48:56Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: source and approved-requirement inspection; baseline export units | documentation: R75 contract expanded before tests/runtime in task 7d75: exact local SVG/decoded-PNG dimensions, native selector, legacy shape/default and non-mutating/passive composition. R78 remains locally verified; R75 remains partial and R83 implemented pending acceptance.
 
 - timestamp: 2026-10-26T00:44:56Z | agent: Arena.ai Agent Mode (model name not exposed) | validator: local unit/type/build/lint/canonical-browser gates; same-agent evidence review | documentation: R78 verified locally on runtime `94d8428`, test-only head `94fb726`. Full 4,250 units / 18 existing skips, type/build (17.30 s / 408), full lint 4,103 / 0; fourth complete four-spec gate 128 passed / 2 existing skips / 0 failures / 0 retries, one worker, 17.7 min. All 16 R78 cases and all 103 frozen inputs match after exit. Fresh selected validators 61 passed. Task 7d78 preserves initial RED `61ed61a`, inherited-coordinate/release-focus/unavailable-focus/caption corrections, all three failed full gates, rejected synthetic-scroll prototype and final readiness-only corrections. No historical failure is erased or production cause inferred. Owner-managed integration remains pending/nonblocking; R75 then R83 are next. No hosted, deployment or physical-device claim.
 
